@@ -1,0 +1,35 @@
+App.tsx(36,6): error TS2741: Property 'id' is missing in type '{ children: Element[]; screenOptions: { headerShown: false; }; }' but required in type '{ id: string; }'.
+App.tsx(52,6): error TS2741: Property 'id' is missing in type '{ children: (Element | Element[])[]; screenOptions: { headerShown: false; tabBarShowLabel: true; tabBarHideOnKeyboard: true; tabBarStyle: { backgroundColor: string; borderTopColor: string; borderTopWidth: number; height: number; paddingBottom: number; paddingTop: number; }; ... 4 more ...; tabBarIconStyle: { ...; };...' but required in type '{ id: string; }'.
+App.tsx(96,56): error TS2322: Type 'string' is not assignable to type '"search" | "repeat" | "link" | "at" | "body" | "code" | "map" | "menu" | "time" | "ellipse" | "filter" | "image" | "stop" | "text" | "navigate" | "card" | "push" | "key" | "alert" | ... 1318 more ... | "woman-sharp"'.
+App.tsx(123,14): error TS2741: Property 'id' is missing in type '{ children: Element[]; screenOptions: { headerShown: false; }; initialRouteName: string; }' but required in type '{ id: string; }'.
+components/CustomDrawerContent.tsx(50,17): error TS2322: Type 'string' is not assignable to type '"search" | "repeat" | "link" | "at" | "body" | "code" | "map" | "menu" | "time" | "ellipse" | "filter" | "image" | "stop" | "text" | "navigate" | "card" | "push" | "key" | "alert" | ... 1318 more ... | "woman-sharp"'.
+components/LoginModal.tsx(32,25): error TS2769: No overload matches this call.
+  Argument of type '[string]' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(options: never): void', gave the following error.
+    Argument of type '"OTP"' is not assignable to parameter of type 'never'.
+components/MainDrawerContent.tsx(67,17): error TS2322: Type 'string' is not assignable to type '"search" | "repeat" | "link" | "at" | "body" | "code" | "map" | "menu" | "time" | "ellipse" | "filter" | "image" | "stop" | "text" | "navigate" | "card" | "push" | "key" | "alert" | ... 1318 more ... | "woman-sharp"'.
+components/NameModal.tsx(30,25): error TS2769: No overload matches this call.
+  Argument of type '[string]' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(options: never): void', gave the following error.
+    Argument of type '"Main"' is not assignable to parameter of type 'never'.
+context/SplashContext.tsx(23,9): error TS2794: Expected 1 arguments, but got 0. Did you forget to include 'void' in your type argument to 'Promise'?
+screens/DashboardScreen.tsx(91,48): error TS2769: No overload matches this call.
+  Argument of type '[string]' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(options: never): void', gave the following error.
+    Argument of type '"Notifications"' is not assignable to parameter of type 'never'.
+screens/DashboardScreen.tsx(158,27): error TS2322: Type 'string' is not assignable to type '"search" | "repeat" | "link" | "at" | "body" | "code" | "map" | "menu" | "time" | "ellipse" | "filter" | "image" | "stop" | "text" | "navigate" | "card" | "push" | "key" | "alert" | ... 1318 more ... | "woman-sharp"'.
+screens/LoginScreen.tsx(27,25): error TS2769: No overload matches this call.
+  Argument of type '[string]' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(options: never): void', gave the following error.
+    Argument of type '"OTP"' is not assignable to parameter of type 'never'.
+screens/MocksScreen.tsx(144,27): error TS2322: Type 'string' is not assignable to type '"search" | "repeat" | "link" | "at" | "body" | "code" | "map" | "menu" | "time" | "ellipse" | "filter" | "image" | "stop" | "text" | "navigate" | "card" | "push" | "key" | "alert" | ... 1318 more ... | "woman-sharp"'.
+screens/NameScreen.tsx(33,18): error TS2322: Type 'string' is not assignable to type 'never'.
+screens/OtpVerificationScreen.tsx(38,25): error TS2769: No overload matches this call.
+  Argument of type '[string]' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(options: never): void', gave the following error.
+    Argument of type '"Name"' is not assignable to parameter of type 'never'.
+screens/ProfileScreen.tsx(246,3): error TS1117: An object literal cannot have multiple properties with the same name.
+screens/ProfileScreen.tsx(248,3): error TS1117: An object literal cannot have multiple properties with the same name.
+screens/ProfileScreen.tsx(256,3): error TS1117: An object literal cannot have multiple properties with the same name.
+screens/SplashScreen.tsx(27,23): error TS2367: This comparison appears to be unintentional because the types 'Value' and 'number' have no overlap.
+screens/SSCExamsScreen.tsx(131,48): error TS2345: Argument of type '[string, { screen: string; }]' is not assignable to parameter of type 'never'.
