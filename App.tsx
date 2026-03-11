@@ -7,6 +7,7 @@ import { Text } from 'react-native';
 import { LoginModalProvider } from './context/LoginModalContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SplashProvider } from './context/SplashContext';
+import { MocksProvider } from './context/MocksContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
@@ -18,6 +19,9 @@ import NotificationScreen from './screens/NotificationScreen';
 import PyqsScreen from './screens/PyqsScreen';
 import MocksScreen from './screens/MocksScreen';
 import SplashScreen from './screens/SplashScreen';
+import CreateMockScreen from './screens/CreateMockScreen';
+import MockInstructionScreen from './screens/MockInstructionScreen';
+import MockPracticeScreen from './screens/MockPracticeScreen';
 import { Ionicons } from '@expo/vector-icons';
 
 const Stack = createNativeStackNavigator();
@@ -119,7 +123,8 @@ export default function App() {
     <ThemeProvider>
       <LoginModalProvider>
         <SplashProvider>
-          <NavigationContainer>
+          <MocksProvider>
+            <NavigationContainer>
             <StatusBar style="auto" />
             <Stack.Navigator
               id={undefined}
@@ -132,9 +137,17 @@ export default function App() {
               <Stack.Screen name="OTP" component={OtpVerificationScreen} />
               <Stack.Screen name="Name" component={NameScreen} />
               <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen name="CreateMock" component={CreateMockScreen} />
+              <Stack.Screen 
+                name="MockInstruction" 
+                component={MockInstructionScreen}
+                options={{ presentation: 'modal' }}
+              />
+              <Stack.Screen name="MockPractice" component={MockPracticeScreen} />
             </Stack.Navigator>
             <SplashScreen />
-          </NavigationContainer>
+            </NavigationContainer>
+          </MocksProvider>
         </SplashProvider>
       </LoginModalProvider>
     </ThemeProvider>

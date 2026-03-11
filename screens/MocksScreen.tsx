@@ -1,13 +1,15 @@
 import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { useMocks } from '../context/MocksContext';
 
 const FEATURE_CARDS = [
   {
     id: 'create',
     title: 'Create Challenge',
-    subtitle: 'Create tailored tests by topic & difficulty levels.',
+
     badge: 'PYQ-POWERED',
     cta: 'Build Now',
     icon: 'construct',
@@ -15,7 +17,7 @@ const FEATURE_CARDS = [
   {
     id: 'archives',
     title: 'PYQ Archives',
-    subtitle: 'Actual papers from 2018–2024 across all shifts.',
+
     badge: 'PREVIOUS YEAR',
     cta: 'Browse Files',
     icon: 'archive',
@@ -23,7 +25,7 @@ const FEATURE_CARDS = [
   {
     id: 'rank',
     title: 'Rank Maker Series',
-    subtitle: 'Signature mocks for top rank aspirants.',
+
     badge: 'ELITE SERIES',
     cta: 'Upgrade',
     icon: 'ribbon',
@@ -31,7 +33,7 @@ const FEATURE_CARDS = [
   {
     id: 'prescription',
     title: "Doctor's Prescription",
-    subtitle: 'Diagnostic test to get a personalized plan.',
+
     badge: 'FIRST STEP',
     cta: 'Start',
     icon: 'medkit',
@@ -67,7 +69,9 @@ const PUBLIC_CHALLENGES = [
 
 export default function MocksScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { isDark, toggleTheme } = useTheme();
+  const { myChallenges } = useMocks();
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const card = isDark ? '#020617' : '#ffffff';
@@ -82,8 +86,8 @@ export default function MocksScreen() {
       {/* Shared app header (logo + theme + notifications) */}
       <View style={[styles.header, { borderBottomColor: border }]}>
         <View style={styles.logoRow}>
-          <Image 
-            source={require('../assets/sscguidelogo.png')} 
+          <Image
+            source={require('../assets/sscguidelogo.png')}
             style={styles.headerLogo}
             resizeMode="contain"
           />
@@ -119,7 +123,7 @@ export default function MocksScreen() {
               Design tests by choosing topics and difficulty, then share with friends or keep
               them private.
             </Text>
-            <Pressable style={styles.heroBtn}>
+            <Pressable style={styles.heroBtn} onPress={() => navigation.navigate('CreateMock')}>
               <Text style={styles.heroBtnText}>Create New Mock</Text>
             </Pressable>
           </View>
@@ -129,7 +133,7 @@ export default function MocksScreen() {
         </View>
 
         {/* More to explore – 2x2 grid */}
-        <Text style={[styles.sectionTitle, { color: text }]}>More to explore</Text>
+        <Text style={[styles.sectionTitle, { color: text }]}>Mock Tools</Text>
         <View style={styles.exploreGrid}>
           {FEATURE_CARDS.map((item) => (
             <Pressable
@@ -138,6 +142,13 @@ export default function MocksScreen() {
                 styles.exploreGridCard,
                 { backgroundColor: card, borderColor: border },
               ]}
+              onPress={() => {
+                if (item.id === 'create') {
+                  navigation.navigate('CreateMock');
+                } else if (item.id === 'archives') {
+                  navigation.navigate('PYQs');
+                }
+              }}
             >
               <View style={[styles.exploreIconWrap, { backgroundColor: isDark ? primary + '20' : primary + '15', marginBottom: 12 }]}>
                 <Ionicons name={item.icon as any} size={24} color={primary} />
@@ -145,12 +156,46 @@ export default function MocksScreen() {
               <Text style={[styles.exploreTitle, { color: text, textAlign: 'center' }]} numberOfLines={2}>
                 {item.title}
               </Text>
-              <Text style={[styles.exploreSub, { color: muted, textAlign: 'center', marginTop: 4 }]} numberOfLines={2}>
-                {item.subtitle}
-              </Text>
+
             </Pressable>
           ))}
         </View>
+
+        {/* My Challenges list */}
+        {myChallenges.length > 0 && (
+          <>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: text, marginBottom: 0 }]}>
+                My Challenges
+              </Text>
+            </View>
+            <View style={styles.challengeList}>
+              {myChallenges.map((c) => (
+                <View
+                  key={c.id}
+                  style={[styles.challengeListItem, { backgroundColor: primary + '15', borderColor: primary, borderWidth: 1 }]}
+                >
+                  <View style={[styles.challengeIconWrap, { backgroundColor: primary }]}>
+                    <Ionicons name="folder-open" size={20} color="#fff" />
+                  </View>
+                  <View style={styles.challengeInfo}>
+                    <Text style={[styles.challengeTitle, { color: text }]} numberOfLines={1}>{c.title}</Text>
+                    <Text style={[styles.challengeMeta, { color: muted }]} numberOfLines={1}>{c.meta}</Text>
+                    <Text style={[styles.challengeAuthor, { color: primary, fontSize: 10, fontWeight: '700' }]} numberOfLines={1}>{c.author}</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.challengeStartBtn, { backgroundColor: primary }]}
+                    onPress={() => navigation.navigate('MockInstruction', {
+                      mockData: { title: c.title, questions: 15, duration: 15 }
+                    })}
+                  >
+                    <Text style={styles.challengeStartText}>Start</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Public challenges list */}
         <View style={styles.sectionHeaderRow}>
@@ -173,10 +218,15 @@ export default function MocksScreen() {
               <View style={styles.challengeInfo}>
                 <Text style={[styles.challengeTitle, { color: text }]} numberOfLines={1}>{c.title}</Text>
                 <Text style={[styles.challengeMeta, { color: muted }]} numberOfLines={1}>{c.meta}</Text>
-                <Text style={[styles.challengeAuthor, { color: muted }]} numberOfLines={1}>{c.author}</Text>
+                <Text style={[styles.challengeAuthor, { color: muted, fontSize: 10, fontWeight: '700' }]} numberOfLines={1}>{c.author}</Text>
               </View>
-              <Pressable style={[styles.challengeStartBtn, { backgroundColor: primary }]}>
-                <Text style={styles.challengeStartText}>Start</Text>
+              <Pressable
+                style={[styles.challengeStartBtn, { backgroundColor: card, borderWidth: 1, borderColor: border }]}
+                onPress={() => navigation.navigate('MockInstruction', {
+                  mockData: { title: c.title, questions: 15, duration: 15 }
+                })}
+              >
+                <Text style={[styles.challengeStartText, { color: text }]}>Start</Text>
               </Pressable>
             </View>
           ))}
