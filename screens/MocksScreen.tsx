@@ -1,4 +1,5 @@
 import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, Image } from 'react-native';
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -65,6 +66,18 @@ const PUBLIC_CHALLENGES = [
     meta: '22 Questions · 15 Minutes',
     author: 'BY NIKHIL MAURYA · 6 MAR 2026',
   },
+  {
+    id: 'c5',
+    title: 'ssc cgl tier 1 mock',
+    meta: '100 Questions · 60 Minutes',
+    author: 'BY RAHUL · 5 MAR 2026',
+  },
+  {
+    id: 'c6',
+    title: 'chsl practice set',
+    meta: '25 Questions · 20 Minutes',
+    author: 'BY AMAN · 4 MAR 2026',
+  },
 ];
 
 export default function MocksScreen() {
@@ -72,6 +85,8 @@ export default function MocksScreen() {
   const navigation = useNavigation<any>();
   const { isDark, toggleTheme } = useTheme();
   const { myChallenges } = useMocks();
+
+  const [showAllPublic, setShowAllPublic] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const card = isDark ? '#020617' : '#ffffff';
@@ -207,7 +222,7 @@ export default function MocksScreen() {
           </Pressable>
         </View>
         <View style={styles.challengeList}>
-          {PUBLIC_CHALLENGES.map((c) => (
+          {(showAllPublic ? PUBLIC_CHALLENGES : PUBLIC_CHALLENGES.slice(0, 3)).map((c) => (
             <View
               key={c.id}
               style={[styles.challengeListItem, { backgroundColor: cardSoft }]}
@@ -231,6 +246,17 @@ export default function MocksScreen() {
             </View>
           ))}
         </View>
+
+        {PUBLIC_CHALLENGES.length > 3 && (
+          <Pressable
+            style={{ paddingVertical: 12, alignItems: 'center' }}
+            onPress={() => setShowAllPublic(!showAllPublic)}
+          >
+            <Text style={{ color: primary, fontWeight: '700', fontSize: 13 }}>
+              {showAllPublic ? 'View Less' : 'Load More'}
+            </Text>
+          </Pressable>
+        )}
 
         {/* Recent history section */}
         <Text style={[styles.sectionTitle, { color: text, marginTop: 16 }]}>Recent History</Text>

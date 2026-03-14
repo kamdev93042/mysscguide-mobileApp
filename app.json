@@ -9,7 +9,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mysscguide.app"
@@ -20,6 +22,9 @@
       },
       "package": "com.mysscguide.app"
     },
-    "web": {}
+    "web": {},
+    "plugins": [
+      "@react-native-community/datetimepicker"
+    ]
   }
 }

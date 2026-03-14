@@ -12,13 +12,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 
-const INSTRUCTIONS = [
-  "Total time for this test is 15 minutes.",
-  "The clock will be set at the server. The countdown timer in the top right corner of screen will display the remaining time available for you to complete the examination.",
-  "Submit your answers before the time runs out.",
-  "You can navigate between sections at any time.",
-  "Do not refresh the page or exit fullscreen mode during the test.",
-  "The test will auto-submit when the timer reaches zero.",
+const INSTRUCTIONS_GENERAL = [
+  "1. The clock will be set at the server. The countdown timer at the top right corner of screen will display the remaining time available for you to complete the examination. When the timer reaches zero, the examination will end by itself. You need not terminate the examination or submit your paper.",
+  "2. The Question Palette displayed on the right side of screen will show the status of each question using one of the following symbols:"
+];
+
+const INSTRUCTIONS_NAV = [
+  "3. To answer a question, do the following:",
+  "1. Click on the question number in the Question Palette at the right of your screen to go to that numbered question directly. Note that using this option does NOT save your answer to the current question.",
+  "2. Click on Save & Next to save your answer for the current question and then go to the next question.",
+  "3. Click on Mark for Review & Next to save your answer for the current question, mark it for review, and then go to the next question."
 ];
 
 export default function MockInstructionScreen() {
@@ -62,12 +65,12 @@ export default function MockInstructionScreen() {
           <Ionicons name="close" size={24} color={text} />
         </Pressable>
         {/* Placeholder for center alignment */}
-        <View style={{ width: 40 }} /> 
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.centerWrapper}>
-          
+
           <View style={[styles.instructionCard, { backgroundColor: card, borderColor: border }]}>
             {/* Top accent bar */}
             <View style={[styles.accentBar, { backgroundColor: primary }]} />
@@ -80,15 +83,52 @@ export default function MockInstructionScreen() {
             </View>
 
             <View style={[styles.instructionsBox, { backgroundColor: bg }]}>
-              {INSTRUCTIONS.map((inst, index) => (
-                <View key={index} style={styles.instructionRow}>
-                  <View style={[styles.bullet, { backgroundColor: primary }]} />
+              <Text style={[styles.sectionHeading, { color: text }]}>General Instructions</Text>
+
+              {INSTRUCTIONS_GENERAL.map((inst, index) => (
+                <View key={`gen-${index}`} style={styles.instructionRow}>
                   <Text style={[styles.instructionText, { color: text }]}>{inst}</Text>
                 </View>
               ))}
+
+              {/* Legend matching the authentic SSC layout */}
+              <View style={styles.legendContainer}>
+                <View style={styles.legendRow}>
+                  <View style={[styles.legendIcon, { backgroundColor: bg, borderColor: border, borderWidth: 1 }]} />
+                  <Text style={[styles.legendText, { color: text }]}>You have not visited the question yet.</Text>
+                </View>
+                <View style={styles.legendRow}>
+                  <View style={[styles.legendIcon, { backgroundColor: '#ef4444' }]} />
+                  <Text style={[styles.legendText, { color: text }]}>You have not answered the question.</Text>
+                </View>
+                <View style={styles.legendRow}>
+                  <View style={[styles.legendIcon, { backgroundColor: primary }]} />
+                  <Text style={[styles.legendText, { color: text }]}>You have answered the question.</Text>
+                </View>
+                <View style={styles.legendRow}>
+                  <View style={[styles.legendIcon, { backgroundColor: '#8b5cf6', borderRadius: 999 }]} />
+                  <Text style={[styles.legendText, { color: text }]}>You have NOT answered the question, but have marked the question for review.</Text>
+                </View>
+                <View style={styles.legendRow}>
+                  <View style={[styles.legendIcon, { backgroundColor: '#8b5cf6', borderRadius: 999 }]}>
+                    <View style={{ width: 8, height: 8, backgroundColor: '#22c55e', borderRadius: 4, position: 'absolute', bottom: -2, right: -2 }} />
+                  </View>
+                  <Text style={[styles.legendText, { color: text }]}>The question(s) "Answered and Marked for Review" will be considered for evaluation.</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.sectionHeading, { color: text, marginTop: 16 }]}>Navigating to a Question:</Text>
+
+              {INSTRUCTIONS_NAV.map((inst, index) => (
+                <View key={`nav-${index}`} style={styles.instructionRow}>
+                  <Text style={[styles.instructionText, { color: text }]}>{inst}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.noteText, { color: '#ef4444', marginTop: 8 }]}>Note: All the questions are compulsory.</Text>
             </View>
 
-            <Pressable 
+            <Pressable
               style={[styles.consentBox, { borderColor: hasAgreed ? primary : border }]}
               onPress={() => setHasAgreed(!hasAgreed)}
             >
@@ -96,24 +136,18 @@ export default function MockInstructionScreen() {
                 {hasAgreed && <Ionicons name="checkmark" size={14} color="#fff" />}
               </View>
               <Text style={[styles.consentText, { color: text }]}>
-                I have read and understood all the instructions. I agree to abide by the rules of the examination.
+                I have read and understood the instructions.
               </Text>
             </Pressable>
 
             <View style={styles.actionsRow}>
-              <Pressable 
-                style={[styles.actionBtn, styles.cancelBtn, { borderColor: border }]}
-                onPress={() => navigation.goBack()}
-              >
-                <Text style={[styles.cancelBtnText, { color: textMuted }]}>CANCEL</Text>
-              </Pressable>
-              <Pressable 
+              <Pressable
                 style={[styles.actionBtn, styles.continueBtn, { backgroundColor: hasAgreed ? primary : border }]}
                 onPress={handleContinue}
                 disabled={!hasAgreed}
               >
                 <Text style={[styles.continueBtnText, { color: hasAgreed ? '#fff' : textMuted }]}>
-                  CONTINUE
+                  BEGIN
                 </Text>
               </Pressable>
             </View>
@@ -174,21 +208,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   instructionsBox: {
-    marginHorizontal: 32,
-    padding: 24,
+    marginHorizontal: 16,
+    padding: 20,
     borderRadius: 16,
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 12,
   },
   instructionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  bullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 6,
-    marginRight: 12,
+    marginBottom: 10,
   },
   instructionText: {
     flex: 1,
@@ -196,10 +228,35 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '500',
   },
-  consentBox: {
+  legendContainer: {
+    paddingLeft: 8,
+    marginVertical: 12,
+  },
+  legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 32,
+    marginBottom: 10,
+  },
+  legendIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  legendText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  noteText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  consentBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 16,
     marginTop: 24,
     padding: 16,
     borderWidth: 1,
