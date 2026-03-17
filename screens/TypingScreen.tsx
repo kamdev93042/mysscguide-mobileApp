@@ -36,10 +36,47 @@ const GOAL_CARDS = [
   },
 ];
 
-const PASSAGES: Record<string, string> = {
-  'History': 'The Delhi Sultanate, a series of five successive dynasties that ruled over large parts of the Indian subcontinent from 1206 to 1526, established a new Turko-Persian culture and left a lasting impact on Indian administration and architecture. The first of these was the Mamluk or Slave Dynasty, founded by Qutb-ud-din Aibak.',
-  'Science': 'Photosynthesis is a process used by plants and other organisms to convert light energy into chemical energy that, through cellular respiration, can later be released to fuel the organism\'s activities.',
-  'General': 'Sustainable development is the organizing principle for meeting human development goals while simultaneously sustaining the ability of natural systems to provide the natural resources and ecosystem services on which the economy and society depend.',
+const PASSAGES: Record<string, string[]> = {
+  'History': [
+    "The early phase of the Indian National Congress (INC), from its formation in 1885 to around 1905, was dominated by leaders who came to be known as the Moderates. Leaders like Dadabhai Naoroji, Pherozeshah Mehta, and Gopal Krishna Gokhale led this faction. They had immense faith in British justice and fair play and believed that India's political goals could be achieved through",
+    "The Delhi Sultanate, a series of five successive dynasties that ruled over large parts of the Indian subcontinent from 1206 to 1526, established a new Turko-Persian culture and left a lasting impact on Indian administration and architecture. The first of these was the Mamluk or Slave Dynasty, founded by Qutb-ud-din Aibak.",
+    "The Mughal Empire, at its peak, was one of the largest and most powerful empires in human history. Foundation laid by Babur in 1526, it reached its zenith under Akbar, who introduced the Din-i-Ilahi and refined the Mansabdari system. The empire saw significant architectural achievements, including the Taj Mahal during Shah Jahan's reign."
+  ],
+  'Science': [
+    "Photosynthesis is a process used by plants and other organisms to convert light energy into chemical energy that, through cellular respiration, can later be released to fuel the organism's activities.",
+    "Newton's Laws of Motion are three physical laws that, together, laid the foundation for classical mechanics. They describe the relationship between a body and the forces acting upon it, and its motion in response to those forces. The first law defines inertia, the second relates force to acceleration, and the third states every action has an opposite reaction.",
+    "The cell is the basic structural, functional, and biological unit of all known organisms. Cells are the smallest units of life, and hence are often referred to as the 'building blocks of life'. The study of cells is called cell biology, cytology, or microbiology."
+  ],
+  'Vocabulary': [
+    "Expanding your vocabulary is essential for effective communication and academic success. Learning root words, suffixes, and prefixes can help you decipher the meaning of unfamiliar words. Practicing synonyms and antonyms regularly ensures a deeper understanding of word nuances and prevents repetitive writing.",
+    "Idioms and phrases add color and depth to the English language. Phrases like 'a blessing in disguise' or 'beat around the bush' carry meanings that aren't immediately obvious from the individual words. Mastering these expressions is key to achieving native-like fluency and scoring high in competitive language exams.",
+    "Context clues are hints found within a sentence, paragraph, or passage that a reader can use to understand the meanings of new or unfamiliar words. Recognizing these clues—such as definitions, examples, or contrasts—is a vital skill for improving reading comprehension and overall verbal proficiency."
+  ],
+  'Polity': [
+    "The Preamble to the Constitution of India is a brief introductory statement that sets out the guiding purpose, principles, and philosophy of the document. It declares India to be a Sovereign, Socialist, Secular, Democratic Republic and secures justice, liberty, equality, and fraternity for all its citizens.",
+    "The Indian Parliamentary system is based on the Westminster model. It consists of two houses: the Lok Sabha (House of the People) and the Rajya Sabha (Council of States). The President is the titular head, while the Prime Minister and the Council of Ministers exercise real executive power, being collectively responsible to the Lok Sabha.",
+    "Fundamental Rights in India are the basic human rights of all citizens, guaranteed by the Constitution under Part III. These rights—such as the Right to Equality and Right to Freedom—are enforceable by the courts and act as a check on the powers of the state, ensuring the dignity and liberty of every individual."
+  ],
+  'Geography': [
+    "The Solar System consists of an average star we call the Sun, and the planets Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune. It also includes the satellites of the planets; numerous comets, asteroids, and meteoroids; and the interplanetary medium. The planets are divided into terrestrial and gas giants.",
+    "India is a land of great physical diversity. From the towering Himalayas in the north to the vast coastal plains in the south, the country features diverse landscapes like the Indo-Gangetic Plains, the Thar Desert, and the Deccan Plateau. These physical features significantly influence the climate, culture, and economy of different regions.",
+    "Climate change refers to significant changes in global temperature, precipitation, wind patterns, and other measures of climate that occur over several decades or longer. The increasing concentration of greenhouse gases in the atmosphere, primarily due to human activities, is driving global warming and affecting ecosystems worldwide."
+  ],
+  'Economy': [
+    "The Gross Domestic Product (GDP) is the total monetary or market value of all the finished goods and services produced within a country's borders in a specific time period. It serves as a comprehensive scorecard of a given country's economic health and is used by analysts to compare the productivity of different nations.",
+    "The NITI Aayog is a policy think tank of the Government of India, established with the aim to achieve sustainable development goals with cooperative federalism. It replaced the Planning Commission and focuses on providing strategic and technical advice to the central and state governments on key economic and social policy issues.",
+    "Inflation is the rate at which the general level of prices for goods and services is rising and, consequently, the purchasing power of currency is falling. Central banks attempt to limit inflation, and avoid deflation, in order to keep the economy running smoothly while managing interest rates and money supply."
+  ],
+  'PYQ': [
+    "Previous Year Questions (PYQs) are an invaluable resource for candidates preparing for competitive exams. They provide insights into the recurring patterns, difficulty levels, and the specific topics emphasized by the examiners. Practicing with actual past passages helps build confidence and improves time management skills for the primary test.",
+    "The Data Entry Speed Test (DEST) for SSC CGL typically involves typing a passage of about 2000 key depressions. Success requires not only speed but also extreme precision, as penalties are levied for both full and half mistakes. Regular practice with previous year scripts is the best way to familiarize oneself with the expected format.",
+    "SSC Typing Tests emphasize accuracy over mere speed. Candidates must focus on minimizing errors like omissions, substitutions, and spelling mistakes. Using the spare time after completing a passage to review and correct mistakes is a strategy used by top scorers to ensure they meet the qualifying standards fixed by the Commission."
+  ],
+  'General': [
+    "Sustainable development is the organizing principle for meeting human development goals while simultaneously sustaining the ability of natural systems to provide the natural resources and ecosystem services on which the economy and society depend.",
+    "Digital India is a flagship program of the Government of India with a vision to transform India into a digitally empowered society and knowledge economy. It focuses on providing digital infrastructure as a utility to every citizen, governance and services on demand, and digital empowerment of all citizens.",
+    "The Importance of Education cannot be overstated. It is a powerful tool for personal growth, social development, and economic prosperity. Education empowers individuals to think critically, solve problems, and contribute meaningfully to society, while fostering values of equality, tolerance, and global citizenship."
+  ],
 };
 
 const EXAM_TOPICS = [
@@ -71,10 +108,15 @@ export default function TypingScreen() {
   const { userName } = useLoginModal();
 
   // Mode Management
-  const [activeMode, setActiveMode] = useState<'LOBBY' | 'PRACTICE' | 'EXAM_INSTRUCTIONS' | 'EXAM_PRACTICE'>('LOBBY');
+  const [activeMode, setActiveMode] = useState<'LOBBY' | 'PRACTICE' | 'EXAM_TOPICS' | 'EXAM_INSTRUCTIONS' | 'EXAM_PRACTICE'>('LOBBY');
+  const [isReadyDecl, setIsReadyDecl] = useState(false);
   const [analysisSession, setAnalysisSession] = useState<any>(null);
   const [currentTopic, setCurrentTopic] = useState('History');
-  const [passage, setPassage] = useState(PASSAGES['History']);
+  const getRandomPassage = (topic: string) => {
+    const list = PASSAGES[topic] || PASSAGES['General'];
+    return list[Math.floor(Math.random() * list.length)];
+  };
+  const [passage, setPassage] = useState(getRandomPassage('History'));
   const [typedText, setTypedText] = useState('');
   const [timeLeft, setTimeLeft] = useState(60); // 1:00
   const [wpm, setWpm] = useState(0);
@@ -155,14 +197,64 @@ export default function TypingScreen() {
   };
 
   const handleStartExamMode = () => {
-    setActiveMode('EXAM_INSTRUCTIONS');
+    setActiveMode('EXAM_TOPICS');
     setCurrentTopic('History'); // Default to History
   };
 
+  const handleTopicSelect = (topicId: string) => {
+    setCurrentTopic(topicId);
+    setPassage(getRandomPassage(topicId));
+    setActiveMode('EXAM_INSTRUCTIONS');
+    setIsReadyDecl(false);
+  };
+
   const handleStartRealExam = () => {
+    if (!isReadyDecl) return;
     setActiveMode('EXAM_PRACTICE');
     resetPractice();
-    setTimeLeft(900); // 15:00 for SSC Exam
+    setTimeLeft(600); // 10:00 as per screenshot duration logic
+  };
+
+  const handleSubmitTest = () => {
+    setIsStarted(false);
+    
+    // Calculate final stats for the summary
+    const typedWords = typedText.trim().split(/\s+/);
+    const passageWords = passage.trim().split(/\s+/);
+    let cw = 0;
+    let rw = 0;
+
+    typedWords.forEach((word, index) => {
+      if (index < passageWords.length) {
+        if (word === passageWords[index]) cw++;
+        else rw++;
+      }
+    });
+
+    const timeElapsedSec = 600 - timeLeft;
+    const timeElapsedMin = timeElapsedSec / 60;
+    const grossWpm = Math.round((typedText.length / 5) / (timeElapsedMin || 1));
+    const netWpm = Math.round(cw / (timeElapsedMin || 1));
+
+    const finalSession = {
+      id: Date.now(),
+      title: `SSC Exam - ${currentTopic}`,
+      sub: `Completed SSC mock test on ${currentTopic}.`,
+      score: netWpm * 10, // Arbitrary score logic
+      accuracy: `${Math.round((cw / (cw + rw || 1)) * 100)}%`,
+      time: formatTime(timeElapsedSec),
+      date: new Date().toLocaleDateString(),
+      color: '#10b981',
+      netWpm,
+      grossWpm,
+      mistakes: rw,
+      keystrokes: typedText.length,
+      totalWords: typedWords.length,
+      consistency: '85%', // Mocked for now
+      performance: [grossWpm, netWpm, Math.max(0, netWpm - 5), netWpm + 2], // Mocked trend
+    };
+
+    setAnalysisSession(finalSession);
   };
 
   const resetPractice = () => {
@@ -181,7 +273,7 @@ export default function TypingScreen() {
 
   const handleNextPassage = () => {
     resetPractice();
-    // Logic for next passage can be added here
+    setPassage(getRandomPassage(currentTopic));
   };
 
   const renderAnalysisDetails = () => {
@@ -342,12 +434,12 @@ export default function TypingScreen() {
             </View>
             <View style={styles.handLoadRow}>
               <View style={styles.handLoadItem}>
-                <Text style={{ color: emerald, fontSize: 32, fontWeight: '800' }}>0.0%</Text>
-                <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginTop: 4, letterSpacing: 1 }}>LEFT HAND</Text>
+                <Text style={[styles.handLoadValue, { color: '#10b981' }]}>0.0%</Text>
+                <Text style={styles.handLoadLabel}>LEFT HAND</Text>
               </View>
               <View style={styles.handLoadItem}>
-                <Text style={{ color: '#3b82f6', fontSize: 32, fontWeight: '800' }}>0.0%</Text>
-                <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginTop: 4, letterSpacing: 1 }}>RIGHT HAND</Text>
+                <Text style={[styles.handLoadValue, { color: '#3b82f6' }]}>0.0%</Text>
+                <Text style={styles.handLoadLabel}>RIGHT HAND</Text>
               </View>
             </View>
           </View>
@@ -471,11 +563,20 @@ export default function TypingScreen() {
             </View>
           </Pressable>
         </ScrollView>
+
+        {isExam && (
+          <View style={[styles.examFooterBar, { backgroundColor: isDark ? '#0f172a' : '#f1f5f9', borderTopColor: border }]}>
+            <Text style={[styles.examFooterTitle, { color: text }]}>SSC CGL TIER-II (PAPER-I)</Text>
+            <Pressable style={styles.submitBtn} onPress={handleSubmitTest}>
+              <Text style={styles.submitBtnText}>SUBMIT TEST</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     );
   }
 
-  if (activeMode === 'EXAM_INSTRUCTIONS') {
+  if (activeMode === 'EXAM_TOPICS') {
     return (
       <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
         <View style={[styles.header, { borderBottomColor: border }]}>
@@ -503,7 +604,7 @@ export default function TypingScreen() {
                   styles.examTopicCard,
                   { backgroundColor: cardBg, borderColor: currentTopic === topic.id ? '#059669' : border }
                 ]}
-                onPress={() => setCurrentTopic(topic.id)}
+                onPress={() => handleTopicSelect(topic.id)}
               >
                 <View style={styles.topicItemLeft}>
                   <Text style={[styles.examTopicTitle, { color: text }]}>{topic.title}</Text>
@@ -519,43 +620,65 @@ export default function TypingScreen() {
           <View style={styles.selectTopicBox}>
             <Text style={styles.selectTopicText}>Select a topic above</Text>
           </View>
+        </ScrollView>
+      </View>
+    );
+  }
 
-          <View style={styles.instructionContainer}>
-            <Text style={[styles.instructionTitle, { color: muted }]}>Formula to Calculate Speed Test:</Text>
-            <View style={styles.formulaRow}>
-              <Text style={[styles.formulaText, { color: muted }]}><Text style={{ fontWeight: '800' }}>CW</Text> = Total correct typed words</Text>
-              <Text style={[styles.formulaText, { color: muted }]}><Text style={{ fontWeight: '800' }}>RW</Text> = Total Wrong typed words</Text>
-              <Text style={[styles.formulaText, { color: muted }]}><Text style={{ fontWeight: '800' }}>TW</Text> = Total Typed Word ( CW + RW )</Text>
-              <Text style={[styles.formulaText, { color: muted }]}><Text style={{ fontWeight: '800' }}>Typing Speed (WPM)</Text> = [CW] / Time</Text>
-              <Text style={[styles.formulaText, { color: muted }]}><Text style={{ fontWeight: '800' }}>Accuracy</Text> = (CW / TW) x 100</Text>
+  if (activeMode === 'EXAM_INSTRUCTIONS') {
+    return (
+      <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
+        <View style={[styles.header, { borderBottomColor: border }]}>
+          <View style={styles.practiceHeaderLeft}>
+            <Pressable onPress={() => setActiveMode('EXAM_TOPICS')} style={styles.backBtn}>
+              <Ionicons name="chevron-back" size={24} color={muted} />
+            </Pressable>
+            <Text style={[styles.practiceTitle, { color: text }]}>General Instructions</Text>
+          </View>
+        </View>
+
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.examScrollContent}>
+          <View style={[styles.instructionsDetailedBox, { backgroundColor: cardBg, borderColor: border }]}>
+            <Text style={[styles.instructionTitleMain, { color: text }]}>General Instructions:</Text>
+            <View style={styles.instructionPoints}>
+              <Text style={[styles.instructionPoint, { color: muted }]}>• The clock will be set at the server. The countdown timer at the top right corner of screen will display the remaining time available for you to complete the examination. When the timer reaches zero, the examination will end by itself.</Text>
+              <Text style={[styles.instructionPoint, { color: muted }]}>• You will be given 10 minutes (or specific test duration) to type the text.</Text>
+              <Text style={[styles.instructionPoint, { color: muted }]}>• Type the text exactly as shown in the text box.</Text>
+              <Text style={[styles.instructionPoint, { color: muted }]}>• You can use the Backspace key to correct your mistakes.</Text>
+              <Text style={[styles.instructionPoint, { color: muted }]}>• Do not use any other keys or shortcuts not relevant to typing.</Text>
             </View>
 
-            <Text style={[styles.instructionTitle, { color: muted, marginTop: 32 }]}>Instruction for Proficiency Test/Skill Test:</Text>
-            <Text style={[styles.instructionBody, { color: muted }]}>
-              In the Combined Graduate Level Examination, posts of Assistant (CSS) and Tax Assistant for CBEC and CBDT are included. Skill Test in Data Entry (DEST) with speed of 8000 (eight thousand) key depressions per hour on computer for the post of Tax Assistant (Central Excise and Income Tax) is prescribed. For the post of Assistant (CSS), Computer Proficiency Test has been prescribed. DEST and CPT are of qualifying nature. While DEST will be administered using SSC-NIC software, Excel and PowerPoint modules of CPT will be administered in M.S. Office 2007. Word Processing Module of CPT will be administered using SSC-NIC software.
-            </Text>
-            <Text style={[styles.instructionBody, { color: muted }]}>
-              The skill test will be administered for duration of 15 minutes on passages containing text of 2000 key depressions.
-            </Text>
-            <Text style={[styles.instructionBody, { color: muted }]}>
-              The actual skill test will be preceded by a test passage for 5 minutes in order to enable the candidates to adjust to the system and key board provided by the Commission.
-            </Text>
-            <Text style={[styles.instructionBody, { color: muted }]}>
-              The candidates are not required to re-enter the text on completion of the passage and, therefore, should utilize the spare time to correct mistakes, if any.
-            </Text>
-            <Text style={[styles.instructionBody, { color: muted }]}>
-              Commission will decide at its discretion qualifying standard in entry of the text for different categories of candidates taking into consideration overall performance of the candidates in the skill test and available vacancies, subject to the standards not falling below limits fixed by the Commission.
-            </Text>
-            <Text style={[styles.instructionBody, { color: muted }]}>
-              The skill test will be of qualifying nature.
-            </Text>
+            <Text style={[styles.instructionTitleMain, { color: text, marginTop: 24 }]}>Key Layout:</Text>
+            <Text style={[styles.instructionPoint, { color: muted }]}>English Typing Test supports standard US QWERTY keyboard layout.</Text>
 
-            <Text style={[styles.instructionTitle, { color: muted, marginTop: 32 }]}>Getting Acquainted with the typing test for ssc cgl</Text>
-            <Text style={[styles.instructionBody, { color: muted }]}>
-              Typing test for ssc cgl evaluates a candidate's typing proficiency, assessing both speed and accuracy. It's imperative for aspirants to achieve the required typing speed while maintaining minimal errors. Our simulation offers a precise replica of this test, giving candidates an edge by familiarizing them with the format, time constraints, and difficulty level.
-            </Text>
+            <Text style={[styles.instructionTitleMain, { marginTop: 24, color: '#ef4444' }]}>Important:</Text>
+            <Text style={[styles.instructionPoint, { color: muted }]}>Once you click "Start Test", the exam will begin in full-screen mode. Do not attempt to switch tabs or exit full screen, as this may result in disqualification or submission of the test.</Text>
+
+            <View style={styles.declarationRow}>
+              <Pressable 
+                style={[styles.checkbox, { borderColor: border, backgroundColor: isReadyDecl ? '#059669' : 'transparent' }]} 
+                onPress={() => setIsReadyDecl(!isReadyDecl)}
+              >
+                {isReadyDecl && <Ionicons name="checkmark" size={14} color="#fff" />}
+              </Pressable>
+              <Text style={[styles.declarationText, { color: text }]}>
+                I have read and understood the Instructions. I declare that I am ready to begin the typing test and will adhere to the rules.
+              </Text>
+            </View>
+
+            <View style={styles.examActionsRow}>
+              <Pressable 
+                style={[styles.readyBtn, { backgroundColor: isReadyDecl ? '#059669' : muted }]} 
+                onPress={handleStartRealExam}
+                disabled={!isReadyDecl}
+              >
+                <Text style={styles.readyBtnText}>I am Ready to Begin</Text>
+              </Pressable>
+              <Pressable style={[styles.cancelBtn, { borderColor: border }]} onPress={() => setActiveMode('EXAM_TOPICS')}>
+                <Text style={[styles.cancelBtnText, { color: text }]}>Cancel</Text>
+              </Pressable>
+            </View>
           </View>
-
         </ScrollView>
       </View>
     );
@@ -916,7 +1039,14 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 18, fontWeight: '700', marginLeft: -4 },
   headerIcons: { flexDirection: 'row', alignItems: 'center' },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 40 },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 40,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
   welcomeSection: { marginBottom: 24 },
   welcomeText: { fontSize: 22, fontWeight: '800', marginBottom: 4 },
   welcomeSub: { fontSize: 14 },
@@ -1262,11 +1392,12 @@ const styles = StyleSheet.create({
   pageNumberText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   sessionsScrollContent: { gap: 16, paddingRight: 16 },
   sessionCard: {
-    width: Dimensions.get('window').width - 32,
-    borderRadius: 16,
+    width: Dimensions.get('window').width * 0.92,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 20,
-    gap: 16,
+    padding: 24,
+    gap: 20,
+    marginRight: 16,
   },
   sessionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sessionIconBox: {
@@ -1290,18 +1421,30 @@ const styles = StyleSheet.create({
   sessionCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sessionDate: { fontSize: 11, fontWeight: '600' },
   viewAnalysisBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  viewAnalysisText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  viewAnalysisText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   analysisBackBtn: { padding: 4, marginRight: 8 },
-  analysisScrollContent: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 120 },
+  analysisScrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 120,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
   analysisMainGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
   analysisMainCard: {
-    width: '48.2%',
-    padding: 20,
-    borderRadius: 16,
+    width: (Dimensions.get('window').width - 32 - 12) / 2, // Container padding (32) + Gap (12)
+    padding: 24,
+    borderRadius: 20,
     borderWidth: 1,
     position: 'relative',
     overflow: 'hidden',
@@ -1426,4 +1569,97 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   backBtnFullText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  instructionsDetailedBox: {
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 40,
+  },
+  instructionTitleMain: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 16,
+  },
+  instructionPoints: {
+    gap: 12,
+  },
+  instructionPoint: {
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  declarationRow: {
+    flexDirection: 'row',
+    marginTop: 32,
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  declarationText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  examActionsRow: {
+    flexDirection: 'row',
+    marginTop: 40,
+    gap: 12,
+  },
+  readyBtn: {
+    flex: 2,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readyBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  examFooterBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+  },
+  examFooterTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    opacity: 0.7,
+  },
+  submitBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  submitBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
 });
