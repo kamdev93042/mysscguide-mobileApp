@@ -24,7 +24,13 @@ import SplashScreen from './screens/SplashScreen';
 import CreateMockScreen from './screens/CreateMockScreen';
 import MockInstructionScreen from './screens/MockInstructionScreen';
 import MockPracticeScreen from './screens/MockPracticeScreen';
+import TypingScreen from './screens/TypingScreen';
 import { Ionicons } from '@expo/vector-icons';
+
+import ContestScreen from './screens/ContestScreen';
+import MnemonicsScreen from './screens/MnemonicsScreen';
+import ForumsScreen from './screens/ForumsScreen';
+import ForumPostScreen from './screens/ForumPostScreen';
 
 const Stack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -33,8 +39,12 @@ const Tab = createBottomTabNavigator();
 const TAB_SCREENS = [
   { name: 'Mocks', label: 'Mocks', icon: 'document-text', component: MocksScreen },
   { name: 'PYQs', label: 'PYQs', icon: 'document-text', component: PyqsScreen },
-  { name: 'Typing', label: 'Typing', icon: 'keypad', component: PlaceholderScreen },
-  { name: 'Contests', label: 'Contests', icon: 'trophy', component: PlaceholderScreen },
+  { name: 'Mnemonics', label: 'Mnemonics', icon: 'bulb', component: MnemonicsScreen },
+  { name: 'Typing', label: 'Typing', icon: 'keypad', component: TypingScreen },
+  { name: 'Contests', label: 'Contests', icon: 'trophy', component: ContestScreen },
+  { name: 'Forums', label: 'Forums', icon: 'people', component: ForumsScreen },
+
+
 ];
 
 function HomeStackNavigator() {
@@ -57,6 +67,7 @@ function MainTabs() {
   return (
     <Tab.Navigator
       id={undefined}
+      initialRouteName="Home"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
@@ -120,6 +131,9 @@ function MainTabs() {
   );
 }
 
+import { MnemonicsProvider } from './context/MnemonicsContext';
+import { ForumsProvider } from './context/ForumsContext';
+
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState('Login');
@@ -149,7 +163,9 @@ export default function App() {
       <LoginModalProvider>
         <SplashProvider>
           <MocksProvider>
-            <NavigationContainer>
+            <MnemonicsProvider>
+              <ForumsProvider>
+                <NavigationContainer>
             <StatusBar style="auto" />
             <Stack.Navigator
               id={undefined}
@@ -169,9 +185,12 @@ export default function App() {
                 options={{ presentation: 'modal' }}
               />
               <Stack.Screen name="MockPractice" component={MockPracticeScreen} />
+              <Stack.Screen name="ForumPost" component={ForumPostScreen} />
             </Stack.Navigator>
             <SplashScreen />
             </NavigationContainer>
+               </ForumsProvider>
+            </MnemonicsProvider>
           </MocksProvider>
         </SplashProvider>
       </LoginModalProvider>

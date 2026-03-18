@@ -87,6 +87,7 @@ export default function MocksScreen() {
   const { myChallenges } = useMocks();
 
   const [showAllPublic, setShowAllPublic] = useState(false);
+  const [showAllMy, setShowAllMy] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const card = isDark ? '#020617' : '#ffffff';
@@ -185,7 +186,7 @@ export default function MocksScreen() {
               </Text>
             </View>
             <View style={styles.challengeList}>
-              {myChallenges.map((c) => (
+              {(showAllMy ? myChallenges : myChallenges.slice(0, 3)).map((c) => (
                 <View
                   key={c.id}
                   style={[styles.challengeListItem, { backgroundColor: primary + '15', borderColor: primary, borderWidth: 1 }]}
@@ -209,6 +210,17 @@ export default function MocksScreen() {
                 </View>
               ))}
             </View>
+            
+            {myChallenges.length > 3 && (
+              <Pressable
+                style={{ paddingVertical: 12, alignItems: 'center' }}
+                onPress={() => setShowAllMy(!showAllMy)}
+              >
+                <Text style={{ color: primary, fontWeight: '700', fontSize: 13 }}>
+                  {showAllMy ? 'View Less' : 'Load More'}
+                </Text>
+              </Pressable>
+            )}
           </>
         )}
 

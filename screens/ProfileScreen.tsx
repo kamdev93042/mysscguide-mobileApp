@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLoginModal } from '../context/LoginModalContext';
+import { useMnemonics } from '../context/MnemonicsContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { userApi } from '../services/api';
 
@@ -16,6 +17,9 @@ export default function ProfileScreen() {
   const text = '#111827';
   const muted = '#6b7280';
   const border = '#e5e7eb';
+  
+  const { mnemonics, toggleSave, incrementLike, incrementDislike } = useMnemonics();
+  const savedMnemonics = mnemonics.filter(m => m.isSaved);
 
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -166,6 +170,33 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Saved Mnemonics Section */}
+        {savedMnemonics.length > 0 && (
+          <View style={[styles.profileCard, { backgroundColor: card, borderColor: border, marginTop: 16 }]}>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
+              <Ionicons name="bookmark" size={18} color="#059669" style={{marginRight: 8}} />
+              <Text style={[styles.sectionHeader, { color: text, marginBottom: 0 }]}>Saved Mnemonics</Text>
+            </View>
+            
+            {savedMnemonics.map(item => (
+              <View key={item.id} style={styles.savedMnemonicCard}>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+                   <Text style={[styles.savedMnemonicWord, { color: text }]}>{item.word}</Text>
+                   <Pressable onPress={() => toggleSave(item.id)} hitSlop={8}>
+                     <Ionicons name="bookmark" size={18} color="#059669" />
+                   </Pressable>
+                </View>
+                <Text style={[styles.savedMnemonicMeaning, { color: muted }]}>{item.meaning}</Text>
+                
+                <View style={styles.savedTrickBox}>
+                  <Text style={[styles.savedTrickText, { color: text }]}>{item.trick}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+        
       </ScrollView>
     </View>
   );
@@ -311,4 +342,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   graphText: { fontSize: 13, textAlign: 'center' },
+  savedMnemonicCard: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  savedMnemonicWord: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  savedMnemonicMeaning: { fontSize: 13, marginBottom: 8 },
+  savedTrickBox: {
+    backgroundColor: '#f0fdf4',
+    padding: 10,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#10b981',
+  },
+  savedTrickText: { fontSize: 13, fontStyle: 'italic', lineHeight: 20 },
 });
