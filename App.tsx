@@ -147,7 +147,7 @@ export default function App() {
               screenOptions={{
                 headerShown: false,
               }}
-              initialRouteName="Main"
+              initialRouteName="Login"
             >
               <Stack.Screen name="Login" component={LoginScreen} />
               <Stack.Screen name="OTP" component={OtpVerificationScreen} />
