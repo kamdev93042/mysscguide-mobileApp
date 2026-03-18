@@ -4,16 +4,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLoginModal } from '../context/LoginModalContext';
 import { useMnemonics } from '../context/MnemonicsContext';
 
+import { useTheme } from '../context/ThemeContext';
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { userName, userEmail, userPhone } = useLoginModal();
+  const { isDark } = useTheme();
 
-  const bg = '#fdfdfd';
-  const card = '#ffffff';
-  const cardSoft = '#f9fafb';
-  const text = '#111827';
-  const muted = '#6b7280';
-  const border = '#e5e7eb';
+  const bg = isDark ? '#0f172a' : '#fdfdfd';
+  const card = isDark ? '#1e293b' : '#ffffff';
+  const cardSoft = isDark ? '#334155' : '#f9fafb';
+  const text = isDark ? '#ffffff' : '#111827';
+  const muted = isDark ? '#94a3b8' : '#6b7280';
+  const border = isDark ? '#334155' : '#e5e7eb';
   
   const { mnemonics, toggleSave, incrementLike, incrementDislike } = useMnemonics();
   const savedMnemonics = mnemonics.filter(m => m.isSaved);
