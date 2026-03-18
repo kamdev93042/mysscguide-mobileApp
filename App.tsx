@@ -38,7 +38,7 @@ const TAB_SCREENS = [
   { name: 'Mocks', label: 'Mocks', icon: 'document-text', component: MocksScreen },
   { name: 'PYQs', label: 'PYQs', icon: 'document-text', component: PyqsScreen },
   { name: 'Mnemonics', label: 'Mnemonics', icon: 'bulb', component: MnemonicsScreen },
-  { name: 'Typing', label: 'Typing', icon: 'keypad', component: PlaceholderScreen },
+  { name: 'Typing', label: 'Typing', icon: 'keypad', component: TypingScreen },
   { name: 'Contests', label: 'Contests', icon: 'trophy', component: ContestScreen },
   { name: 'Forums', label: 'Forums', icon: 'people', component: ForumsScreen },
 
@@ -65,7 +65,7 @@ function MainTabs() {
   return (
     <Tab.Navigator
       id={undefined}
-      initialRouteName="Typing"
+      initialRouteName="Home"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
