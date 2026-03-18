@@ -7,31 +7,56 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useLoginModal } from '../context/LoginModalContext';
 import { useSplash } from '../context/SplashContext';
+import { authApi } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function NameScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { setUserName, setHasLoggedIn } = useLoginModal();
+  const { setUserName, setHasLoggedIn, userEmail } = useLoginModal();
   const { showSplash } = useSplash();
   const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleContinue = async () => {
-    const trimmed = name.trim() || 'User';
-    setUserName(trimmed);
-    setHasLoggedIn(true);
+    const trimmed = name.trim();
+    if (!trimmed) {
+      Alert.alert('Error', 'Please enter your full name');
+      return;
+    }
 
-    // Call splash screen for 2s before navigating
-    await showSplash(2000);
+    try {
+      setLoading(true);
+      const signupResponse = await authApi.signup(trimmed, userEmail || '');
+      
+      // Save session
+      await AsyncStorage.setItem('userToken', signupResponse?.token || 'true');
+      await AsyncStorage.setItem('isLoggedIn', 'true');
 
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Main' }],
-    });
+      setLoading(false);
+
+      setUserName(trimmed);
+      setHasLoggedIn(true);
+
+      // Call splash screen for 2s before navigating
+      await showSplash(2000);
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
+    } catch (error) {
+      console.error('Signup Error in NameScreen:', error);
+      setLoading(false);
+      Alert.alert('Signup Error', error instanceof Error ? error.message : 'Could not create account');
+    }
   };
 
   return (
@@ -54,8 +79,12 @@ export default function NameScreen() {
             onChangeText={setName}
           />
 
-          <Pressable style={styles.btn} onPress={handleContinue}>
-            <Text style={styles.btnText}>Continue</Text>
+          <Pressable style={[styles.btn, loading && { opacity: 0.7 }]} onPress={handleContinue} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.btnText}>Continue</Text>
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>

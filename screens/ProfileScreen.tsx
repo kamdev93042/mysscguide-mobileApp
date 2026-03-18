@@ -1,7 +1,10 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLoginModal } from '../context/LoginModalContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userApi } from '../services/api';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -14,8 +17,29 @@ export default function ProfileScreen() {
   const muted = '#6b7280';
   const border = '#e5e7eb';
 
-  const initial = (userName || 'U').charAt(0).toUpperCase();
-  const displayName = userName || 'User';
+  const [profileData, setProfileData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (token && token !== 'true') {
+          const res = await userApi.getProfile(token);
+          // Standardize payload extraction if it's wrapped or flat
+          setProfileData(res?.user || res);
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const displayName = profileData?.fullName || profileData?.username || userName || 'User';
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
@@ -64,16 +88,27 @@ export default function ProfileScreen() {
             <View style={styles.infoCol}>
               <Text style={[styles.label, { color: muted }]}>Email</Text>
               <Text style={[styles.infoLine, { color: text }]}>
-                {userEmail || 'email not set'}
+                {profileData?.email || userEmail || 'Not set'}
               </Text>
             </View>
             <View style={styles.infoCol}>
               <Text style={[styles.label, { color: muted }]}>Mobile</Text>
               <Text style={[styles.infoLine, { color: text }]}>
-                {userPhone || 'mobile not set'}
+                {profileData?.phone || userPhone || 'Not set'}
               </Text>
             </View>
           </View>
+
+          {(profileData?.city || profileData?.state) && (
+            <View style={[styles.infoRow, { marginTop: 4 }]}>
+              <View style={styles.infoCol}>
+                <Text style={[styles.label, { color: muted }]}>Location</Text>
+                <Text style={[styles.infoLine, { color: text }]}>
+                  {[profileData?.city, profileData?.state].filter(Boolean).join(', ')}
+                </Text>
+              </View>
+            </View>
+          )}
 
           <Pressable style={styles.editBtn}>
             <Text style={styles.editBtnText}>Edit Profile</Text>
