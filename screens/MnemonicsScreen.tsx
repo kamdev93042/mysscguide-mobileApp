@@ -9,15 +9,18 @@ import {
   TextInput,
   Modal,
   Image,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { useMnemonics } from '../context/MnemonicsContext';
+import { useMnemonics, MnemonicItem } from '../context/MnemonicsContext';
 import { useLoginModal } from '../context/LoginModalContext';
 
 const FILTER_OPTIONS = ['By word', 'By username'];
+const REPORT_REASONS = ['Inappropriate content', 'Incorrect information', 'Spam', 'Other'];
 
 export default function MnemonicsScreen() {
   const navigation = useNavigation();
@@ -26,58 +29,114 @@ export default function MnemonicsScreen() {
   const { isDark, toggleTheme } = useTheme();
   const { userName } = useLoginModal();
 
-  const { mnemonics, addMnemonic, toggleSave, incrementLike, incrementDislike } = useMnemonics();
+  const { mnemonics, addMnemonic, deleteMnemonic, reportMnemonic, incrementLike, incrementDislike } = useMnemonics();
 
   const [filterQuery, setFilterQuery] = useState('By word');
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Pagination State
+  // Pagination State for word groups
   const [visibleCount, setVisibleCount] = useState(3);
+  
+  // Track how many variants to show per word group:
+  // e.g., expandedGroups["assiduous"] = 4 (shows original + 3 variants)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, number>>({});
 
   useFocusEffect(
     useCallback(() => {
-      // Reset visible count when screen comes into focus
       setVisibleCount(3);
     }, [])
   );
 
-  // Modal state
+  // Modal states
   const [modalVisible, setModalVisible] = useState(false);
   const [newWord, setNewWord] = useState('');
   const [newMeaning, setNewMeaning] = useState('');
   const [newTrick, setNewTrick] = useState('');
+
+  // Report Modal states
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportTargetId, setReportTargetId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState<string>('');
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const cardBg = isDark ? '#1e293b' : '#fff';
   const text = isDark ? '#fff' : '#1e293b';
   const muted = isDark ? '#94a3b8' : '#64748b';
   const border = isDark ? '#1e293b' : '#e2e8f0';
+  const groupTileWidth = width > 1100 ? '32%' : width > 700 ? '48%' : '100%';
 
   const filteredMnemonics = useMemo(() => {
     return mnemonics.filter((m) => {
       if (!searchQuery) return true;
       const lowerSearch = searchQuery.toLowerCase();
       if (filterQuery === 'By word') {
-        return m.word.toLowerCase().includes(lowerSearch);
+        return m.word.toLowerCase().startsWith(lowerSearch);
       } else {
-        return m.author.toLowerCase().includes(lowerSearch);
+        return m.author.toLowerCase().startsWith(lowerSearch);
       }
     });
   }, [mnemonics, searchQuery, filterQuery]);
 
-  const visibleMnemonics = useMemo(() => {
-    return filteredMnemonics.slice(0, visibleCount);
-  }, [filteredMnemonics, visibleCount]);
+  const groupedMnemonics = useMemo(() => {
+    const groups: Record<string, MnemonicItem[]> = {};
+    filteredMnemonics.forEach((m) => {
+      const key = m.word.toLowerCase();
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(m);
+    });
 
-  const handleLoadMore = () => {
+    Object.keys(groups).forEach(key => {
+      groups[key].sort((a, b) => {
+        if (b.likes !== a.likes) return b.likes - a.likes;
+
+        const aTs = Number(a.id) || 0;
+        const bTs = Number(b.id) || 0;
+        return bTs - aTs;
+      });
+    });
+
+    // Keep word groups in alphabetical order.
+    return Object.values(groups).sort((a, b) =>
+      (a[0]?.word || '').localeCompare(b[0]?.word || '', undefined, {
+        sensitivity: 'base',
+      })
+    );
+  }, [filteredMnemonics, userName]);
+
+  const myGroupedMnemonics = useMemo(() => {
+    if (!userName) return [];
+
+    return groupedMnemonics
+      .map((group) => group.filter((item) => item.author === userName))
+      .filter((group) => group.length > 0)
+      .sort((a, b) =>
+        (a[0]?.word || '').localeCompare(b[0]?.word || '', undefined, {
+          sensitivity: 'base',
+        })
+      );
+  }, [groupedMnemonics, userName]);
+
+  const visibleGroups = useMemo(() => {
+    return groupedMnemonics.slice(0, visibleCount);
+  }, [groupedMnemonics, visibleCount]);
+
+  const handleLoadMoreGroups = () => {
     setVisibleCount(prev => prev + 3);
   };
 
-  const canSubmit = newWord.trim().length > 0 && newMeaning.trim().length > 0 && newTrick.trim().length > 0;
+  const handleExpandGroup = (word: string) => {
+    const key = word.toLowerCase();
+    setExpandedGroups(prev => ({
+      ...prev,
+      [key]: (prev[key] || 1) + 3 // show 3 more
+    }));
+  };
+
+  const canSubmitTrick = newWord.trim().length > 0 && newMeaning.trim().length > 0 && newTrick.trim().length > 0;
 
   const handlePostMnemonic = () => {
-    if (!canSubmit) return;
+    if (!canSubmitTrick) return;
     const authorName = userName || 'Anonymous';
     addMnemonic(newWord.trim(), newMeaning.trim(), newTrick.trim(), authorName);
     setModalVisible(false);
@@ -86,9 +145,104 @@ export default function MnemonicsScreen() {
     setNewTrick('');
   };
 
+  const openReportModal = (id: string) => {
+    setReportTargetId(id);
+    setReportReason('');
+    setReportModalVisible(true);
+  };
+
+  const submitReport = () => {
+    if (reportTargetId && reportReason) {
+      reportMnemonic(reportTargetId, reportReason);
+      setReportModalVisible(false);
+      setReportTargetId(null);
+      setReportReason('');
+      Alert.alert("Report Submitted", "Thank you for helping keep the community clean.");
+    }
+  };
+
+  const deleteTrick = (id: string) => {
+    // Alert dialogs are unreliable on web, so delete directly there.
+    if (Platform.OS === 'web') {
+      deleteMnemonic(id);
+      return;
+    }
+
+    Alert.alert(
+      "Delete Trick",
+      "Are you sure you want to delete this trick?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => deleteMnemonic(id) }
+      ]
+    );
+  };
+
+  const renderMnemonicCard = (item: MnemonicItem, isVariant = false) => {
+    return (
+      <View
+        key={item.id}
+        style={[
+          styles.mnemonicCard,
+          { backgroundColor: cardBg, borderColor: border, borderWidth: 1 },
+          isVariant && { marginLeft: 16, borderLeftWidth: 4, borderLeftColor: '#059669', marginBottom: 12, borderRadius: 12, padding: 16 }
+        ]}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cardWord, { color: text }, isVariant && { fontSize: 16 }]}>{item.word}</Text>
+          <View style={{ flexDirection: 'row', gap: 16 }}>
+            <Pressable onPress={() => openReportModal(item.id)} hitSlop={8}>
+              <Ionicons name="flag-outline" size={20} color={muted} />
+            </Pressable>
+            {userName && item.author === userName && (
+              <Pressable onPress={() => deleteTrick(item.id)} hitSlop={8}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </Pressable>
+            )}
+          </View>
+        </View>
+        <Text style={[styles.cardMeaning, { color: muted }]}>{item.meaning}</Text>
+
+        <View style={[styles.trickContainer, { backgroundColor: isDark ? '#132135' : '#f0fdf4', borderColor: isDark ? '#1e293b' : '#bbf7d0' }]}>
+          <View style={styles.trickTag}>
+            <Text style={styles.trickTagText}>TRICK</Text>
+          </View>
+          <Text style={[styles.trickText, { color: text }]}>{item.trick}</Text>
+        </View>
+
+        <View style={styles.cardFooter}>
+          <View style={styles.authorRow}>
+            <View style={styles.authorAvatar}>
+              <Ionicons name="person" size={12} color="#fff" />
+            </View>
+            <View>
+              <Text style={[styles.authorLabel, { color: muted }]}>POSTED BY</Text>
+              <Text style={[styles.authorName, { color: text }]}>{item.author}</Text>
+            </View>
+          </View>
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[styles.actionBtn, item.userVote === 'like' && { backgroundColor: 'rgba(5, 150, 105, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }]}
+              onPress={() => incrementLike(item.id)}
+            >
+              <Ionicons name={item.userVote === 'like' ? 'thumbs-up' : 'thumbs-up-outline'} size={16} color={item.userVote === 'like' ? '#059669' : muted} />
+              <Text style={[styles.actionNum, { color: item.userVote === 'like' ? '#059669' : muted }]}>{item.likes}</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.actionBtn, item.userVote === 'dislike' && { backgroundColor: 'rgba(239, 68, 68, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }]}
+              onPress={() => incrementDislike(item.id)}
+            >
+              <Ionicons name={item.userVote === 'dislike' ? 'thumbs-down' : 'thumbs-down-outline'} size={16} color={item.userVote === 'dislike' ? '#ef4444' : muted} />
+              <Text style={[styles.actionNum, { color: item.userVote === 'dislike' ? '#ef4444' : muted }]}>{item.dislikes}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
-      {/* Shared Dashboard/App Header */}
       <View style={[styles.appHeader, { borderBottomColor: border }]}>
         <View style={styles.logoRow}>
           <Image
@@ -122,7 +276,6 @@ export default function MnemonicsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 100 }]}
       >
-        {/* Hero Banner Section */}
         <View style={styles.heroBanner}>
           <View style={styles.heroContent}>
             <View style={styles.tagWrap}>
@@ -139,10 +292,8 @@ export default function MnemonicsScreen() {
           </View>
         </View>
 
-        {/* Search & Filter Bar */}
         <View style={[styles.searchBarContainer, { flexDirection: width > 600 ? 'row' : 'column' }]}>
           <View style={[styles.searchInputWrapper, { backgroundColor: cardBg, borderColor: border }]}>
-            {/* Filter Dropdown */}
             <View style={{ position: 'relative', zIndex: 10 }}>
               <Pressable
                 style={[styles.inSearchBarFilter, { borderRightColor: border }]}
@@ -178,7 +329,6 @@ export default function MnemonicsScreen() {
               )}
             </View>
 
-            {/* Input */}
             <TextInput
               style={[styles.searchInput, { color: text }]}
               placeholder={`Search ${filterQuery.toLowerCase()}...`}
@@ -188,7 +338,6 @@ export default function MnemonicsScreen() {
             />
           </View>
 
-          {/* Submit Trick Button */}
           <Pressable
             style={[styles.submitTrickBtn, width <= 600 && { marginTop: 12 }]}
             onPress={() => setModalVisible(true)}
@@ -198,76 +347,124 @@ export default function MnemonicsScreen() {
           </Pressable>
         </View>
 
-        {/* Mnemonics Grid */}
+        {userName ? (
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionTitle, { color: text }]}>My Mnemonics</Text>
+            <Text style={[styles.sectionSubtitle, { color: muted }]}>Your submitted tricks shown first, grouped A-Z.</Text>
+          </View>
+        ) : null}
+
+        {userName ? (
+          <View style={[styles.grid, { flexDirection: width > 600 ? 'row' : 'column' }]}>
+            {myGroupedMnemonics.map((group) => {
+              const topTrick = group[0];
+              const key = topTrick.word.toLowerCase();
+              const variantsVisible = expandedGroups[key] || 1;
+              const hasMoreVariants = group.length > variantsVisible;
+              const shownVariants = group.slice(1, variantsVisible);
+
+              return (
+                <View key={`mine-${topTrick.id}`} style={{ width: groupTileWidth, marginBottom: 24 }}>
+                  {renderMnemonicCard(topTrick, false)}
+                  {shownVariants.length > 0 ? (
+                    <View style={styles.variantStack}>
+                      {shownVariants.map(variant => (
+                        <View key={variant.id} style={styles.variantItemWrap}>
+                          {renderMnemonicCard(variant, true)}
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {hasMoreVariants ? (
+                    <Pressable 
+                      onPress={() => handleExpandGroup(topTrick.word)}
+                      style={styles.moreVariantsBtn}
+                    >
+                      <Ionicons name="chevron-down-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
+                      <Text style={styles.moreVariantsText}>See {group.length - variantsVisible} more trick{group.length - variantsVisible > 1 ? 's' : ''}</Text>
+                    </Pressable>
+                  ) : (group.length > 1 && variantsVisible >= group.length) ? (
+                    <Pressable 
+                      onPress={() => setExpandedGroups(p => ({ ...p, [key]: 1 }))}
+                      style={styles.moreVariantsBtn}
+                    >
+                      <Ionicons name="chevron-up-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
+                      <Text style={styles.moreVariantsText}>Show less</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
+
+            {myGroupedMnemonics.length === 0 && (
+              <Text style={{ color: muted, width: '100%', textAlign: 'center', marginTop: 4, marginBottom: 20 }}>
+                No mnemonic posted by you yet.
+              </Text>
+            )}
+          </View>
+        ) : null}
+
+        <View style={styles.sectionHeaderWrap}>
+          <Text style={[styles.sectionTitle, { color: text }]}>All Mnemonics (A-Z)</Text>
+          <Text style={[styles.sectionSubtitle, { color: muted }]}>Word groups are alphabetically sorted.</Text>
+        </View>
+
         <View style={[styles.grid, { flexDirection: width > 600 ? 'row' : 'column' }]}>
-          {visibleMnemonics.map((item) => (
-            <View
-              key={item.id}
-              style={[
-                styles.mnemonicCard,
-                { backgroundColor: cardBg, borderColor: border },
-                width > 600 && { width: '31%', marginRight: '2%' }
-              ]}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={[styles.cardWord, { color: text }]}>{item.word}</Text>
-                <Pressable onPress={() => toggleSave(item.id)} hitSlop={8}>
-                  <Ionicons
-                    name={item.isSaved ? "bookmark" : "bookmark-outline"}
-                    size={22}
-                    color={item.isSaved ? "#059669" : muted}
-                  />
-                </Pressable>
-              </View>
-              <Text style={[styles.cardMeaning, { color: muted }]}>{item.meaning}</Text>
+          {visibleGroups.map((group) => {
+            const topTrick = group[0];
+            const key = topTrick.word.toLowerCase();
+            const variantsVisible = expandedGroups[key] || 1;
+            const hasMoreVariants = group.length > variantsVisible;
+            const shownVariants = group.slice(1, variantsVisible);
 
-              <View style={[styles.trickContainer, { backgroundColor: isDark ? '#132135' : '#f0fdf4', borderColor: isDark ? '#1e293b' : '#bbf7d0' }]}>
-                <View style={styles.trickTag}>
-                  <Text style={styles.trickTagText}>TRICK</Text>
-                </View>
-                <Text style={[styles.trickText, { color: text }]}>{item.trick}</Text>
-              </View>
+            return (
+              <View key={topTrick.id} style={{ width: groupTileWidth, marginBottom: 24 }}>
+                {/* Main Trick */}
+                {renderMnemonicCard(topTrick, false)}
 
-              <View style={styles.cardFooter}>
-                <View style={styles.authorRow}>
-                  <View style={styles.authorAvatar}>
-                    <Ionicons name="person" size={12} color="#fff" />
+                {/* Sub Tricks if expanded */}
+                {shownVariants.length > 0 ? (
+                  <View style={styles.variantStack}>
+                    {shownVariants.map(variant => (
+                      <View key={variant.id} style={styles.variantItemWrap}>
+                        {renderMnemonicCard(variant, true)}
+                      </View>
+                    ))}
                   </View>
-                  <View>
-                    <Text style={[styles.authorLabel, { color: muted }]}>POSTED BY</Text>
-                    <Text style={[styles.authorName, { color: text }]}>{item.author}</Text>
-                  </View>
-                </View>
-                <View style={styles.actionRow}>
-                  <Pressable
-                    style={[styles.actionBtn, item.userVote === 'like' && { backgroundColor: 'rgba(5, 150, 105, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }]}
-                    onPress={() => incrementLike(item.id)}
-                  >
-                    <Ionicons name={item.userVote === 'like' ? 'thumbs-up' : 'thumbs-up-outline'} size={16} color={item.userVote === 'like' ? '#059669' : muted} />
-                    <Text style={[styles.actionNum, { color: item.userVote === 'like' ? '#059669' : muted }]}>{item.likes}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.actionBtn, item.userVote === 'dislike' && { backgroundColor: 'rgba(239, 68, 68, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }]}
-                    onPress={() => incrementDislike(item.id)}
-                  >
-                    <Ionicons name={item.userVote === 'dislike' ? 'thumbs-down' : 'thumbs-down-outline'} size={16} color={item.userVote === 'dislike' ? '#ef4444' : muted} />
-                    <Text style={[styles.actionNum, { color: item.userVote === 'dislike' ? '#ef4444' : muted }]}>{item.dislikes}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          ))}
+                ) : null}
 
-          {/* Pagination Load More */}
-          {filteredMnemonics.length > visibleCount && (
+                {/* Show more variants button */}
+                {hasMoreVariants ? (
+                  <Pressable 
+                    onPress={() => handleExpandGroup(topTrick.word)}
+                    style={styles.moreVariantsBtn}
+                  >
+                    <Ionicons name="chevron-down-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
+                    <Text style={styles.moreVariantsText}>See {group.length - variantsVisible} more trick{group.length - variantsVisible > 1 ? 's' : ''}</Text>
+                  </Pressable>
+                ) : (group.length > 1 && variantsVisible >= group.length) ? (
+                  <Pressable 
+                    onPress={() => setExpandedGroups(p => ({ ...p, [key]: 1 }))}
+                    style={styles.moreVariantsBtn}
+                  >
+                    <Ionicons name="chevron-up-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
+                    <Text style={styles.moreVariantsText}>Show less</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+          })}
+
+          {groupedMnemonics.length > visibleCount && (
             <View style={{ width: '100%', alignItems: 'center', marginTop: 12, marginBottom: 24 }}>
-              <Pressable style={styles.loadMoreBtn} onPress={handleLoadMore}>
+              <Pressable style={styles.loadMoreBtn} onPress={handleLoadMoreGroups}>
                 <Text style={styles.loadMoreText}>Load More</Text>
               </Pressable>
             </View>
           )}
 
-          {filteredMnemonics.length === 0 && (
+          {groupedMnemonics.length === 0 && (
             <Text style={{ color: muted, width: '100%', textAlign: 'center', marginTop: 20 }}>
               No mnemonics found matching "{searchQuery}"
             </Text>
@@ -284,7 +481,6 @@ export default function MnemonicsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: bg, borderColor: border }]}>
-            {/* Modal Header */}
             <View style={[styles.modalHeader, { borderBottomColor: border }]}>
               <View style={styles.modalTitleRow}>
                 <View style={styles.modalIconWrap}>
@@ -302,7 +498,6 @@ export default function MnemonicsScreen() {
             </Text>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Form Fields */}
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: text }]}>
                   Word / Concept <Text style={{ color: '#ef4444' }}>*</Text>
@@ -357,13 +552,74 @@ export default function MnemonicsScreen() {
               <Pressable style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                 <Text style={[styles.cancelBtnText, { color: muted }]}>Cancel</Text>
               </Pressable>
-              {/* The user requested post mnemonic responsive, button fits cleanly in bottom corner */}
               <Pressable
-                style={[styles.postBtn, !canSubmit && { opacity: 0.5 }]}
+                style={[styles.postBtn, !canSubmitTrick && { opacity: 0.5 }]}
                 onPress={handlePostMnemonic}
-                disabled={!canSubmit}
+                disabled={!canSubmitTrick}
               >
                 <Text style={styles.postBtnText}>Post Mnemonic</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Report Modal */}
+      <Modal
+        visible={reportModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setReportModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: bg, borderColor: border }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: border }]}>
+              <View style={styles.modalTitleRow}>
+                <View style={[styles.modalIconWrap, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                  <Ionicons name="flag" size={16} color="#ef4444" />
+                </View>
+                <Text style={[styles.modalTitle, { color: text }]}>Report Trick</Text>
+              </View>
+              <Pressable onPress={() => setReportModalVisible(false)} hitSlop={10}>
+                <Ionicons name="close" size={24} color={muted} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.modalSubtitle, { color: muted }]}>
+              Why are you reporting this mnemonic?
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              {REPORT_REASONS.map((reason) => (
+                <Pressable
+                  key={reason}
+                  onPress={() => setReportReason(reason)}
+                  style={[
+                    styles.reportOption,
+                    { borderColor: border },
+                    reportReason === reason && { borderColor: '#059669', backgroundColor: 'rgba(5, 150, 105, 0.05)' }
+                  ]}
+                >
+                  <Ionicons
+                    name={reportReason === reason ? "radio-button-on" : "radio-button-off"}
+                    size={20}
+                    color={reportReason === reason ? "#059669" : muted}
+                  />
+                  <Text style={[styles.reportOptionText, { color: text }]}>{reason}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <Pressable style={styles.cancelBtn} onPress={() => setReportModalVisible(false)}>
+                <Text style={[styles.cancelBtnText, { color: muted }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.postBtn, { backgroundColor: '#ef4444' }, !reportReason && { opacity: 0.5 }]}
+                onPress={submitReport}
+                disabled={!reportReason}
+              >
+                <Text style={styles.postBtnText}>Submit Report</Text>
               </Pressable>
             </View>
           </View>
@@ -393,8 +649,21 @@ const styles = StyleSheet.create({
 
   contentContainer: { padding: 16 },
 
+  sectionHeaderWrap: {
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+
   heroBanner: {
-    backgroundColor: '#059669', // green background matching the image
+    backgroundColor: '#059669',
     borderRadius: 16,
     padding: 24,
     flexDirection: 'row',
@@ -426,54 +695,18 @@ const styles = StyleSheet.create({
   },
   heroBtnText: { color: '#059669', fontWeight: '700', fontSize: 13 },
 
-  heroImageWrapper: {
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  laptopScreen: {
-    width: '100%',
-    height: 90,
-    backgroundColor: '#1e293b',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    borderWidth: 4,
-    borderColor: '#334155',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  laptopCamera: { position: 'absolute', top: 4, width: 20, height: 4, backgroundColor: '#0f172a', borderRadius: 2 },
-  laptopIconWrapper: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  laptopBase: {
-    width: '115%',
-    height: 10,
-    backgroundColor: '#64748b',
-    borderBottomLeftRadius: 6,
-    borderBottomRightRadius: 6,
-  },
-  laptopTrackpad: {
-    position: 'absolute',
-    bottom: 27, // on the base
-    width: 30,
-    height: 4,
-    backgroundColor: '#475569',
-    borderRadius: 2,
-    zIndex: 5,
-  },
-
   searchBarContainer: {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
-    zIndex: 10, // for dropdown
+    zIndex: 10,
   },
   searchInputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 24, // pill shape
+    borderRadius: 24,
     width: '100%',
   },
   inSearchBarFilter: {
@@ -516,13 +749,14 @@ const styles = StyleSheet.create({
   grid: {
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    columnGap: 12,
+    rowGap: 12,
   },
   mnemonicCard: {
     width: '100%',
     borderRadius: 16,
-    borderWidth: 1,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 0, // removed margin so parent dictates it
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
   cardWord: { fontSize: 20, fontWeight: '800' },
@@ -558,7 +792,39 @@ const styles = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionNum: { fontSize: 13, fontWeight: '600' },
 
-  // Modal Styles
+  variantStack: {
+    marginTop: 8,
+    rowGap: 8,
+  },
+  variantItemWrap: {
+    marginBottom: 0,
+  },
+
+  moreVariantsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 16,
+    marginTop: 10,
+    marginBottom: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  moreVariantsText: {
+    color: '#059669',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+
+  loadMoreBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#059669',
+    backgroundColor: 'rgba(5, 150, 105, 0.05)',
+  },
+  loadMoreText: { color: '#059669', fontSize: 13, fontWeight: '600' },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -625,14 +891,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   postBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  loadMoreBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#059669',
-    backgroundColor: 'rgba(5, 150, 105, 0.05)',
-  },
-  loadMoreText: { color: '#059669', fontSize: 13, fontWeight: '600' },
 
+  reportOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  reportOptionText: {
+    marginLeft: 10,
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });

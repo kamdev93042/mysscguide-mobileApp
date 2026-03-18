@@ -10,44 +10,84 @@ export type MnemonicItem = {
   dislikes: number;
   isSaved: boolean;
   userVote: 'like' | 'dislike' | null;
+  reportedReasons: string[];
 };
 
 const INITIAL_MNEMONICS: MnemonicItem[] = [
   {
     id: '1',
     word: 'Assiduous',
-    meaning: 'Showing great care and perseverance (परिश्रमी / लगनशील)',
-    trick: `"Ass + iduous. Ek donkey (ass) ki tarah bina thake lagatar mehnat karna assiduous kahlata hai."`,
+    meaning: 'Showing great care and perseverance',
+    trick: `"Ass + iduous" -> like an ass doing nonstop hard work.`,
     author: 'Praveen Maurya',
-    likes: 4,
+    likes: 18,
     dislikes: 0,
     isSaved: false,
     userVote: null,
+    reportedReasons: [],
   },
   {
     id: '2',
-    word: 'Belligerent',
-    meaning: 'Aggressive, ladaku',
-    trick: `"Belli + gerrr” — Belly me gussa, ‘grrrr’ ki awaaz — hamesha ladne ko ready -> belligerent"`,
-    author: 'Yash Maurya',
-    likes: 3,
-    dislikes: 0,
+    word: 'Assiduous',
+    meaning: 'Diligent and persistent',
+    trick: `"A city does work daily" -> Assiduous reminds me of consistent effort.`,
+    author: 'Ritika Sharma',
+    likes: 11,
+    dislikes: 1,
     isSaved: false,
     userVote: null,
+    reportedReasons: [],
   },
   {
     id: '3',
-    word: 'Deference',
-    meaning: 'Respect',
-    trick: `"Tumahare aur bade ke age mai difference hai to tum unki respect karoge"`,
-    author: 'Nikhil Maurya',
-    likes: 2,
+    word: 'Belligerent',
+    meaning: 'Hostile and aggressive',
+    trick: `"Belly + grrr" -> always ready to fight.`,
+    author: 'Yash Maurya',
+    likes: 21,
     dislikes: 0,
     isSaved: false,
     userVote: null,
+    reportedReasons: [],
   },
   {
     id: '4',
+    word: 'Belligerent',
+    meaning: 'Warlike in attitude',
+    trick: `"Bell rings, argument begins" -> Belligerent means quarrelsome.`,
+    author: 'Aman Singh',
+    likes: 7,
+    dislikes: 0,
+    isSaved: false,
+    userVote: null,
+    reportedReasons: [],
+  },
+  {
+    id: '5',
+    word: 'Deference',
+    meaning: 'Respect',
+    trick: `"Difference in age -> deference in behavior".`,
+    author: 'Nikhil Maurya',
+    likes: 12,
+    dislikes: 0,
+    isSaved: false,
+    userVote: null,
+    reportedReasons: [],
+  },
+  {
+    id: '6',
+    word: 'Deference',
+    meaning: 'Humble submission and respect',
+    trick: `"Dear-fence" -> keep a respectful boundary with seniors.`,
+    author: 'Gauri S.',
+    likes: 6,
+    dislikes: 0,
+    isSaved: false,
+    userVote: null,
+    reportedReasons: [],
+  },
+  {
+    id: '7',
     word: 'Alacrity',
     meaning: 'Brisk and cheerful readiness',
     trick: `"All + crity (city) -> All city people are ready with alacrity."`,
@@ -56,9 +96,10 @@ const INITIAL_MNEMONICS: MnemonicItem[] = [
     dislikes: 1,
     isSaved: false,
     userVote: null,
+    reportedReasons: [],
   },
   {
-    id: '5',
+    id: '8',
     word: 'Capricious',
     meaning: 'Given to sudden and unaccountable changes of mood or behavior',
     trick: `"Capri pants -> weather changes suddenly, so you wear capris."`,
@@ -67,9 +108,10 @@ const INITIAL_MNEMONICS: MnemonicItem[] = [
     dislikes: 0,
     isSaved: false,
     userVote: null,
+    reportedReasons: [],
   },
   {
-    id: '6',
+    id: '9',
     word: 'Diligent',
     meaning: 'Careful and using a lot of effort',
     trick: `"Dilli + Gents -> Delhi gents are very hard working."`,
@@ -78,6 +120,7 @@ const INITIAL_MNEMONICS: MnemonicItem[] = [
     dislikes: 0,
     isSaved: false,
     userVote: null,
+    reportedReasons: [],
   },
 ];
 
@@ -85,6 +128,8 @@ type MnemonicsContextType = {
   mnemonics: MnemonicItem[];
   addMnemonic: (word: string, meaning: string, trick: string, author: string) => void;
   toggleSave: (id: string) => void;
+  deleteMnemonic: (id: string) => void;
+  reportMnemonic: (id: string, reason: string) => void;
   incrementLike: (id: string) => void;
   incrementDislike: (id: string) => void;
 };
@@ -93,6 +138,8 @@ const MnemonicsContext = createContext<MnemonicsContextType>({
   mnemonics: [],
   addMnemonic: () => {},
   toggleSave: () => {},
+  deleteMnemonic: () => {},
+  reportMnemonic: () => {},
   incrementLike: () => {},
   incrementDislike: () => {},
 });
@@ -113,6 +160,7 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       dislikes: 0,
       isSaved: false,
       userVote: null,
+      reportedReasons: [],
     };
     // Add new mnonics to the top of the list
     setMnemonics((prev) => [newItem, ...prev]);
@@ -123,6 +171,19 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((item) =>
         item.id === id ? { ...item, isSaved: !item.isSaved } : item
       )
+    );
+  };
+
+  const deleteMnemonic = (id: string) => {
+    setMnemonics((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const reportMnemonic = (id: string, reason: string) => {
+    setMnemonics((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        return { ...item, reportedReasons: [...item.reportedReasons, reason] };
+      })
     );
   };
 
@@ -186,7 +247,15 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   return (
     <MnemonicsContext.Provider
-      value={{ mnemonics, addMnemonic, toggleSave, incrementLike, incrementDislike }}
+      value={{
+        mnemonics,
+        addMnemonic,
+        toggleSave,
+        deleteMnemonic,
+        reportMnemonic,
+        incrementLike,
+        incrementDislike,
+      }}
     >
       {children}
     </MnemonicsContext.Provider>
