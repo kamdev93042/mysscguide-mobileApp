@@ -5,7 +5,7 @@ const LoginModalContext = createContext(null);
 export function LoginModalProvider({ children }) {
   const [isVisible, setIsVisible] = useState(false);
   const [nameModalVisible, setNameModalVisible] = useState(false);
-  const [hasLoggedIn, setHasLoggedIn] = useState(false);
+  const [hasLoggedIn, setHasLoggedIn] = useState(true);
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userEmail, setUserEmail] = useState('');

@@ -22,6 +22,7 @@ import SplashScreen from './screens/SplashScreen';
 import CreateMockScreen from './screens/CreateMockScreen';
 import MockInstructionScreen from './screens/MockInstructionScreen';
 import MockPracticeScreen from './screens/MockPracticeScreen';
+import TypingScreen from './screens/TypingScreen';
 import { Ionicons } from '@expo/vector-icons';
 
 import ContestScreen from './screens/ContestScreen';
@@ -40,6 +41,8 @@ const TAB_SCREENS = [
   { name: 'Typing', label: 'Typing', icon: 'keypad', component: PlaceholderScreen },
   { name: 'Contests', label: 'Contests', icon: 'trophy', component: ContestScreen },
   { name: 'Forums', label: 'Forums', icon: 'people', component: ForumsScreen },
+
+
 ];
 
 function HomeStackNavigator() {
@@ -62,6 +65,7 @@ function MainTabs() {
   return (
     <Tab.Navigator
       id={undefined}
+      initialRouteName="Typing"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
@@ -143,7 +147,7 @@ export default function App() {
               screenOptions={{
                 headerShown: false,
               }}
-              initialRouteName="Login"
+              initialRouteName="Main"
             >
               <Stack.Screen name="Login" component={LoginScreen} />
               <Stack.Screen name="OTP" component={OtpVerificationScreen} />
