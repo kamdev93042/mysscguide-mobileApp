@@ -78,6 +78,26 @@ const PASSAGES: Record<string, string[]> = {
     "Digital India is a flagship program of the Government of India with a vision to transform India into a digitally empowered society and knowledge economy. It focuses on providing digital infrastructure as a utility to every citizen, governance and services on demand, and digital empowerment of all citizens.",
     "The Importance of Education cannot be overstated. It is a powerful tool for personal growth, social development, and economic prosperity. Education empowers individuals to think critically, solve problems, and contribute meaningfully to society, while fostering values of equality, tolerance, and global citizenship."
   ],
+  'Environment': [
+    "Environmental pollution is one of the most pressing problems facing the modern world. Air, water, and soil pollution caused by industrial activities, vehicular emissions, and improper waste disposal have serious consequences for human health and biodiversity. Sustainable practices and stringent regulations are essential to reverse this damage.",
+    "Biodiversity refers to the variety of life on Earth at all its levels, from genes to ecosystems. It encompasses the evolutionary, ecological, and cultural processes that sustain life. The rapid loss of biodiversity due to habitat destruction, pollution, climate change, and overexploitation poses a critical threat to global ecosystems.",
+    "The Paris Agreement is a landmark international accord adopted in 2015 to address climate change by limiting global warming to well below 2 degrees Celsius above pre-industrial levels. It requires all signatory nations to set nationally determined contributions and regularly report on their progress toward reducing emissions."
+  ],
+  'Current Affairs': [
+    "Current affairs encompass the most recent and significant events happening around the world in politics, economics, science, sports, and culture. For competitive exam aspirants, staying updated with current affairs is crucial, as questions on recent events are a staple in papers like SSC CGL, CHSL, and various state-level examinations.",
+    "The Union Budget of India is an annual financial statement presented by the Finance Minister in Parliament. It outlines the government's revenue and expenditure for the coming financial year and sets the economic agenda. Key highlights include allocations for defense, education, infrastructure, and social welfare schemes.",
+    "India's space program, led by the Indian Space Research Organisation (ISRO), has achieved remarkable milestones in recent years. From the Chandrayaan missions to study the Moon to the Mangalyaan Mars orbiter, ISRO has established India as a major spacefaring nation, delivering complex missions at a fraction of the cost of its global counterparts."
+  ],
+  'Mathematics': [
+    "Mathematics is the universal language of science and engineering. Its branches, including algebra, geometry, calculus, and statistics, form the backbone of modern computation, finance, and technology. Proficiency in mathematics is a key differentiator in competitive examinations and professional success in quantitative fields.",
+    "Number theory is a branch of pure mathematics devoted primarily to the study of the integers and integer-valued functions. German mathematician Carl Friedrich Gauss said that mathematics is the queen of the sciences and number theory is the queen of mathematics. It has deep connections to cryptography and computer science.",
+    "Statistics is the discipline that concerns the collection, organization, analysis, interpretation, and presentation of data. It is applicable to a wide variety of academic disciplines, from natural and social sciences to engineering and requires understanding of both descriptive and inferential statistical methods."
+  ],
+  'Computer': [
+    "A computer is an electronic device that manipulates information or data. It has the ability to store, retrieve, and process data. Computers are used in various fields including education, research, business, healthcare, and entertainment. The development from vacuum tubes to microprocessors marked a revolution in computing technology.",
+    "The Internet is a global network of interconnected computers that communicate using standardized protocols. It has transformed modern civilization by enabling instant communication, e-commerce, information sharing, and social networking on an unprecedented scale. Cloud computing further extends this by offering on-demand access to computing resources.",
+    "Artificial Intelligence is the simulation of human intelligence processes by machines, especially computer systems. Specific applications include expert systems, natural language processing, speech recognition, and machine vision. AI is rapidly transforming industries from healthcare and finance to transportation and manufacturing."
+  ],
 };
 
 const EXAM_TOPICS = [
@@ -87,7 +107,23 @@ const EXAM_TOPICS = [
   { id: 'Polity', title: 'Polity', sub: 'Constitution & Governance', icon: 'balance-scale' },
   { id: 'Geography', title: 'Geography', sub: 'Solar System, Physical Features', icon: 'globe' },
   { id: 'Economy', title: 'Economy', sub: 'Indian Economy & Budget', icon: 'stats-chart' },
+  { id: 'Environment', title: 'Environment', sub: 'Ecology, Pollution & Climate Change', icon: 'leaf' },
+  { id: 'Current Affairs', title: 'Current Affairs', sub: 'Latest news & events for SSC', icon: 'newspaper' },
+  { id: 'Mathematics', title: 'Mathematics', sub: 'Quantitative Aptitude & Number Theory', icon: 'calculator' },
+  { id: 'Computer', title: 'Computer', sub: 'IT Fundamentals & Digital Literacy', icon: 'desktop' },
+  { id: 'General', title: 'General', sub: 'Mixed topics & General Awareness', icon: 'globe-outline' },
   { id: 'PYQ', title: 'Previous Year Typing Question', sub: 'Practice with actual past exam questions', icon: 'time' },
+];
+
+// Practice mode topic selector - matches website topics
+const PRACTICE_TOPICS = [
+  { id: 'History', label: 'History' },
+  { id: 'Geography', label: 'Geography' },
+  { id: 'Polity', label: 'Polity' },
+  { id: 'Science', label: 'Science' },
+  { id: 'Economy', label: 'Economy' },
+  { id: 'Environment', label: 'Environment' },
+  { id: 'General', label: 'General' },
 ];
 
 const RECENT_SESSIONS = [
@@ -127,17 +163,15 @@ export default function TypingScreen() {
   const [isSubmitConfirmVisible, setIsSubmitConfirmVisible] = useState(false);
   const [backspacesCount, setBackspacesCount] = useState(0);
   const [wpmTrend, setWpmTrend] = useState<{time: number, wpm: number}[]>([]);
+  const [showTopicDropdown, setShowTopicDropdown] = useState(false);
 
   // Keyboard heatmap sizing
-  const [keyboardWidth, setKeyboardWidth] = useState(Dimensions.get('window').width - 32);
-  const KEY_PADDING = 16; // padding inside the keyboard container
-  const KEY_GAP = 6; // gap between keys
-  const MAX_KEYS_IN_ROW = 12; // Largest row of keys (numbers row)
-  const keySize = Math.min(
-    34,
-    Math.max(24, Math.floor((keyboardWidth - KEY_PADDING * 2 - KEY_GAP * (MAX_KEYS_IN_ROW - 1)) / MAX_KEYS_IN_ROW))
-  );
-  const keyFontSize = Math.max(10, Math.floor(keySize * 0.45));
+  const [keyboardWidth, setKeyboardWidth] = useState(Dimensions.get('window').width - 56);
+  const KEY_GAP = 3; // gap between keys
+  // Rows: number row = 13, QWERTY = 10, ASDF = 9, ZXCV = 7
+  const MAX_KEYS_IN_ROW = 13;
+  const keySize = Math.max(18, Math.floor((keyboardWidth - KEY_GAP * (MAX_KEYS_IN_ROW - 1)) / MAX_KEYS_IN_ROW));
+  const keyFontSize = Math.max(8, Math.floor(keySize * 0.42));
 
   const inputRef = useRef<TextInput>(null);
 
@@ -430,8 +464,24 @@ export default function TypingScreen() {
   };
 
   const handleNextPassage = () => {
+    const newPassage = getRandomPassage(currentTopic);
+    setPassage(newPassage);
     resetPractice();
-    setPassage(getRandomPassage(currentTopic));
+  };
+
+  // Change topic and load its passage atomically
+  const handleTopicChange = (topicId: string) => {
+    const newPassage = getRandomPassage(topicId);
+    setCurrentTopic(topicId);
+    setPassage(newPassage);
+    setTypedText('');
+    setTimeLeft(60);
+    setWpm(0);
+    setAccuracy(100);
+    setIsStarted(false);
+    setBackspacesCount(0);
+    setWpmTrend([]);
+    setShowTopicDropdown(false);
   };
 
   const renderAnalysisDetails = () => {
@@ -445,12 +495,20 @@ export default function TypingScreen() {
       return 'rgba(255,255,255,0.3)';
     };
 
+    // Standard QWERTY layout matching reference site (no overflow punctuation)
     const keyboardRows = [
-      ['1','2','3','4','5','6','7','8','9','0','-','='],
+      ['1','2','3','4','5','6','7','8','9','0','-','=','⌫'],
       ['Q','W','E','R','T','Y','U','I','O','P','[',']','\\'],
-      ['A','S','D','F','G','H','J','K','L',';',"'"],
+      ['A','S','D','F','G','H','J','K','L',";","'"],
       ['Z','X','C','V','B','N','M',',','.','/'],
     ];
+    // Key sizes per row to fill full width evenly
+    const rowKeyCounts = [13, 13, 11, 10];
+    const getKeySize = (rowIdx: number) => {
+      const count = rowKeyCounts[rowIdx] ?? MAX_KEYS_IN_ROW;
+      return Math.max(18, Math.floor((keyboardWidth - KEY_GAP * (count - 1)) / count));
+    };
+    const getKeyFont = (rowIdx: number) => Math.max(7, Math.floor(getKeySize(rowIdx) * 0.42));
 
     return (
       <View style={[styles.analysisContainer, { backgroundColor: '#020617' }]}>
@@ -640,39 +698,45 @@ export default function TypingScreen() {
                 setKeyboardWidth(width);
               }}
             >
-              {keyboardRows.map((row, rowIndex) => (
-                <View key={rowIndex} style={styles.keyRow}>
-                  {row.map((k) => (
-                    <View
-                      key={k}
-                      style={[
-                        styles.keyMock,
-                        {
-                          width: keySize,
-                          height: keySize,
-                          borderColor: keyColor(k),
-                          backgroundColor: 'rgba(255,255,255,0.05)',
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.keyTextMock, { color: keyColor(k), fontSize: keyFontSize }]}>{k}</Text>
-                    </View>
-                  ))}
-                </View>
-              ))}
+              {keyboardRows.map((row, rowIndex) => {
+                const rKeySize = getKeySize(rowIndex);
+                const rKeyFont = getKeyFont(rowIndex);
+                return (
+                  <View key={rowIndex} style={[styles.keyRow, { gap: KEY_GAP, marginBottom: KEY_GAP }]}>
+                    {row.map((k) => (
+                      <View
+                        key={k}
+                        style={[
+                          styles.keyMock,
+                          {
+                            width: rKeySize,
+                            height: rKeySize * 1.1,
+                            borderColor: k === '⌫' ? 'rgba(255,255,255,0.3)' : keyColor(k),
+                            backgroundColor: k === '⌫' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)',
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.keyTextMock, { color: k === '⌫' ? 'rgba(255,255,255,0.5)' : keyColor(k), fontSize: rKeyFont }]}>{k}</Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
 
-              <View style={[styles.keyRow, { justifyContent: 'center' }]}>
+              {/* Space bar row */}
+              <View style={[styles.keyRow, { justifyContent: 'center', marginTop: KEY_GAP }]}>
                 <View
                   style={[
                     styles.spaceKey,
                     {
-                      width: Math.max(140, Math.min(260, Math.floor(keyboardWidth * 0.65))),
+                      width: Math.floor(keyboardWidth * 0.55),
+                      height: getKeySize(3) * 1.1,
                       borderColor: keyColor(' '),
                       backgroundColor: 'rgba(255,255,255,0.05)',
                     },
                   ]}
                 >
-                  <Text style={[styles.keyTextMock, { color: keyColor(' '), fontSize: keyFontSize }]}>SPACE</Text>
+                  <Text style={[styles.keyTextMock, { color: keyColor(' '), fontSize: getKeyFont(3) }]}>SPACE</Text>
                 </View>
               </View>
             </View>
@@ -995,48 +1059,85 @@ export default function TypingScreen() {
           </View>
         </View>
 
+        {/* Topic selector lives OUTSIDE ScrollView to avoid overflow clipping on web */}
+        <View style={[styles.controlsRow, { paddingHorizontal: 16, paddingTop: 12, zIndex: 999 }]}>
+          <View style={styles.topicSelector}>
+            <Text style={[styles.topicLabel, { color: muted }]}>TOPIC:</Text>
+            <View style={{ position: 'relative' }}>
+              <Pressable
+                style={[styles.topicDropdown, {
+                  borderColor: showTopicDropdown ? '#059669' : border,
+                  backgroundColor: cardBg,
+                  maxWidth: 110,
+                  flexShrink: 1,
+                }]}
+                onPress={() => !isExam && setShowTopicDropdown(v => !v)}
+              >
+                <Text style={[styles.topicText, { color: '#fff', flex: 1 }]}>{currentTopic}</Text>
+                <Ionicons name={showTopicDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={muted} />
+              </Pressable>
+              {showTopicDropdown && (
+                <>
+                  {/* Dismiss overlay */}
+                  <Pressable
+                    style={{ position: 'absolute', top: -1000, left: -1000, right: -2000, bottom: -2000, zIndex: 998 }}
+                    onPress={() => setShowTopicDropdown(false)}
+                  />
+                  <View style={[styles.topicDropdownList, { backgroundColor: '#0a1628', borderColor: '#1e3a5f', zIndex: 999 }]}>
+                    {PRACTICE_TOPICS.map((t) => {
+                      const isSel = currentTopic === t.id;
+                      return (
+                        <TouchableOpacity
+                          key={t.id}
+                          activeOpacity={0.7}
+                          style={[styles.topicDropdownItem, isSel && styles.topicDropdownItemSelected]}
+                          onPress={() => handleTopicChange(t.id)}
+                        >
+                          <Text style={[styles.topicDropdownItemText, { color: isSel ? '#10b981' : '#e2e8f0' }]}>
+                            {t.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+            </View>
+            {!isExam && (
+              <Pressable style={styles.nextBtn} onPress={handleNextPassage}>
+                <Text style={styles.nextBtnText}>Next passage</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <View style={styles.rightControls}>
+            {isExam ? (
+              <View style={styles.keyDepressionBox}>
+                <Text style={[styles.keyDepressionLabel, { color: muted }]}>KEY DEPRESSIONS:</Text>
+                <Text style={[styles.keyDepressionValue, { color: text }]}>{typedText.length} / 2000</Text>
+              </View>
+            ) : (
+              <View style={[styles.fontControls, { borderColor: border, backgroundColor: cardBg }]}>
+                <Pressable onPress={() => setFontSize(Math.max(12, fontSize - 2))}>
+                  <Ionicons name="remove" size={16} color={muted} />
+                </Pressable>
+                <Text style={[styles.fontSizeText, { color: muted }]}>{fontSize}px</Text>
+                <Pressable onPress={() => setFontSize(Math.min(48, fontSize + 2))}>
+                  <Ionicons name="add" size={16} color={muted} />
+                </Pressable>
+              </View>
+            )}
+            <Pressable style={styles.clockBtn}>
+              <Ionicons name="time-outline" size={20} color={text} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Passage + Input in its own ScrollView */}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.practiceScrollContent}
         >
-          {/* Controls - Hide some controls in exam mode and show key depression goal */}
-          <View style={styles.controlsRow}>
-            <View style={styles.topicSelector}>
-              <Text style={[styles.topicLabel, { color: text }]}>TOPIC:</Text>
-              <View style={[styles.topicDropdown, { borderColor: border, backgroundColor: cardBg }]}>
-                <Text style={[styles.topicText, { color: text }]}>{currentTopic}</Text>
-                <Ionicons name="chevron-down" size={16} color={muted} />
-              </View>
-              {!isExam && (
-                <Pressable style={styles.nextBtn} onPress={handleNextPassage}>
-                  <Text style={styles.nextBtnText}>Next passage</Text>
-                </Pressable>
-              )}
-            </View>
-
-            <View style={styles.rightControls}>
-              {isExam ? (
-                <View style={styles.keyDepressionBox}>
-                  <Text style={[styles.keyDepressionLabel, { color: muted }]}>KEY DEPRESSIONS:</Text>
-                  <Text style={[styles.keyDepressionValue, { color: text }]}>{typedText.length} / 2000</Text>
-                </View>
-              ) : (
-                <View style={[styles.fontControls, { borderColor: border, backgroundColor: cardBg }]}>
-                  <Pressable onPress={() => setFontSize(Math.max(12, fontSize - 2))}>
-                    <Ionicons name="remove" size={16} color={muted} />
-                  </Pressable>
-                  <Text style={[styles.fontSizeText, { color: muted }]}>{fontSize}px</Text>
-                  <Pressable onPress={() => setFontSize(Math.min(48, fontSize + 2))}>
-                    <Ionicons name="add" size={16} color={muted} />
-                  </Pressable>
-                </View>
-              )}
-              <Pressable style={styles.clockBtn}>
-                <Ionicons name="time-outline" size={20} color={text} />
-              </Pressable>
-            </View>
-          </View>
-
           {/* Typing Area */}
           <Pressable
             style={styles.typingContent}
@@ -1807,26 +1908,52 @@ const styles = StyleSheet.create({
   mainBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   // Practice Mode
-  practiceHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
+  practiceHeaderLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   backBtn: { marginRight: 12 },
-  practiceTitle: { fontSize: 18, fontWeight: '700' },
-  statsRow: { flexDirection: 'row', gap: 20 },
+  practiceTitle: { fontSize: 16, fontWeight: '700', flexShrink: 1 },
+  statsRow: { flexDirection: 'row', gap: 6, flexShrink: 0 },
   statItem: { alignItems: 'center' },
   statLabel: { fontSize: 9, fontWeight: '800', color: '#94a3b8', marginBottom: 2 },
   statValue: { fontSize: 14, fontWeight: '800', color: '#fff' },
   statValueGreen: { fontSize: 14, fontWeight: '800', color: '#10b981' },
   practiceScrollContent: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40 },
-  controlsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
-  topicSelector: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  topicLabel: { fontSize: 12, fontWeight: '800' },
-  topicDropdown: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, gap: 8 },
+  controlsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 6 },
+  topicSelector: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  topicLabel: { fontSize: 10, fontWeight: '800' },
+  topicDropdown: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6, borderWidth: 1, gap: 4 },
+  topicDropdownList: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    minWidth: 160,
+    borderRadius: 8,
+    borderWidth: 1,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    overflow: 'hidden',
+  },
+  topicDropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderLeftWidth: 3,
+    borderLeftColor: 'transparent',
+  },
+  topicDropdownItemSelected: {
+    backgroundColor: 'rgba(16,185,129,0.12)',
+    borderLeftColor: '#10b981',
+  },
+  topicDropdownItemText: { fontSize: 13, fontWeight: '600' },
   topicText: { fontSize: 13, fontWeight: '700' },
-  nextBtn: { backgroundColor: '#064e3b', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  nextBtn: { backgroundColor: '#064e3b', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   nextBtnText: { color: '#10b981', fontSize: 12, fontWeight: '700' },
-  rightControls: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  fontControls: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, borderWidth: 1, gap: 10 },
+  rightControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  fontControls: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 3, borderRadius: 4, borderWidth: 1, gap: 4 },
   fontSizeText: { fontSize: 12, fontWeight: '700' },
-  clockBtn: { padding: 4 },
+  clockBtn: { padding: 2 },
   typingContent: { flex: 1, minHeight: 400 },
   passageContainer: { position: 'relative' },
   passageText: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', lineHeight: 36, letterSpacing: 0.5 },
@@ -1932,11 +2059,11 @@ const styles = StyleSheet.create({
   reviewTextBox: { padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: 'rgba(51, 65, 85, 0.2)' },
   reviewText: { fontSize: 12, lineHeight: 20, letterSpacing: 0.5, color: '#fff' },
   reviewDesc: { fontSize: 12, lineHeight: 18, color: '#94a3b8' },
-  keyboardMock: { width: 250, height: 250, paddingHorizontal: 8, paddingVertical: 14, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
-  keyRow: { flexDirection: 'row', justifyContent: 'center', gap: 2, flexWrap: 'wrap' },
-  keyMock: { width: 22, height: 28, borderRadius: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  spaceKey: { width: 190, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  keyTextMock: { fontSize: 10, fontWeight: '800', color: '#fff' },
+  keyboardMock: { width: '100%', paddingVertical: 10, alignSelf: 'stretch' },
+  keyRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'nowrap' },
+  keyMock: { borderRadius: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  spaceKey: { borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  keyTextMock: { fontSize: 9, fontWeight: '800', color: '#fff' },
   failedKeysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
   failedKeysLabel: { fontSize: 12, fontWeight: '700', width: '100%', marginBottom: 8, color: '#fff' },
   handRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
