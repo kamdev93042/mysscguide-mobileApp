@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLoginModal } from '../context/LoginModalContext';
-import { useForums } from '../context/ForumsContext';
+import { useForums, Comment as ForumComment } from '../context/ForumsContext';
 
 export default function ForumsScreen() {
   const navigation = useNavigation<any>();
@@ -79,6 +79,10 @@ export default function ForumsScreen() {
   };
 
   const canSubmit = newTitle.trim().length > 0;
+
+  const getTotalComments = useCallback((comments: ForumComment[]): number => {
+    return comments.reduce((total, comment) => total + 1 + getTotalComments(comment.replies), 0);
+  }, []);
 
   const handlePostSubmit = () => {
     if (!canSubmit) return;
@@ -218,7 +222,7 @@ export default function ForumsScreen() {
                      </Pressable>
                      <Pressable style={styles.actionIcon}>
                        <Ionicons name="chatbubble-outline" size={18} color={muted} />
-                       <Text style={[styles.actionNum, { color: muted }]}>{post.comments.length}</Text>
+                       <Text style={[styles.actionNum, { color: muted }]}>{getTotalComments(post.comments)}</Text>
                      </Pressable>
                      <View style={styles.actionIcon}>
                        <Ionicons name="eye-outline" size={18} color={muted} />
