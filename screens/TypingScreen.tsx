@@ -1957,7 +1957,7 @@ const styles = StyleSheet.create({
   typingContent: { flex: 1, minHeight: 400 },
   passageContainer: { position: 'relative' },
   passageText: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', lineHeight: 36, letterSpacing: 0.5 },
-  hiddenInput: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, textAlignVertical: 'top' },
+  hiddenInput: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, textAlignVertical: 'top', ...Platform.select({ web: { outlineWidth: 0 } as any, default: {} }) },
 
   // Exam Mode
   examScrollContent: { padding: 24, paddingBottom: 60 },
@@ -2011,7 +2011,7 @@ const styles = StyleSheet.create({
   examBoxHeader: { padding: 12, borderBottomWidth: 1 },
   examBoxHeaderText: { fontSize: 14, fontWeight: '700' },
   examPassageScroll: { height: 200, padding: 16 },
-  examInputArea: { minHeight: 180, padding: 16, textAlignVertical: 'top' },
+  examInputArea: { minHeight: 180, padding: 16, textAlignVertical: 'top', ...Platform.select({ web: { outlineWidth: 0 } as any, default: {} }) },
   examFooterBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderTopWidth: 1 },
   examFooterTitle: { fontSize: 15, fontWeight: '800' },
   submitBtn: { backgroundColor: '#059669', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
