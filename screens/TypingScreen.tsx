@@ -148,6 +148,14 @@ export default function TypingScreen() {
   const [activeMode, setActiveMode] = useState<'LOBBY' | 'PRACTICE' | 'EXAM_TOPICS' | 'EXAM_INSTRUCTIONS' | 'EXAM_PRACTICE'>('LOBBY');
   const [isReadyDecl, setIsReadyDecl] = useState(false);
   const [analysisSession, setAnalysisSession] = useState<any>(null);
+  
+  // Hero Section Mode Dropdown
+  const [showHeroModeDropdown, setShowHeroModeDropdown] = useState(false);
+  const [selectedHeroMode, setSelectedHeroMode] = useState<'SSC mode' | 'Practice mode'>('SSC mode');
+  
+  // Toast State
+  const [showSubmitToast, setShowSubmitToast] = useState(false);
+  
   const [currentTopic, setCurrentTopic] = useState('History');
   const getRandomPassage = (topic: string) => {
     const list = PASSAGES[topic] || PASSAGES['General'];
@@ -444,6 +452,12 @@ export default function TypingScreen() {
 
     setAnalysisSession(finalSession);
     setIsSubmitConfirmVisible(false);
+    
+    // Show success toast
+    setShowSubmitToast(true);
+    setTimeout(() => {
+      setShowSubmitToast(false);
+    }, 3000);
   };
 
 
@@ -512,6 +526,29 @@ export default function TypingScreen() {
 
     return (
       <View style={[styles.analysisContainer, { backgroundColor: '#020617' }]}>
+        {showSubmitToast && (
+          <View style={{
+            position: 'absolute',
+            top: insets.top ? insets.top + 16 : 16,
+            right: 16,
+            backgroundColor: '#fff',
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderRadius: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+            elevation: 8,
+            zIndex: 9999,
+            gap: 8,
+          }}>
+            <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+            <Text style={{ color: '#1e293b', fontSize: 14, fontWeight: '600' }}>Test submitted successfully</Text>
+          </View>
+        )}
         <View style={styles.analysisHeader}>
           <TouchableOpacity 
             style={styles.analysisBackBtn} 
@@ -1385,14 +1422,53 @@ export default function TypingScreen() {
         <View style={[styles.heroCard, { backgroundColor: '#059669' }]}>
           <View style={styles.heroContent}>
             <View style={styles.heroLeft}>
-              <View style={styles.heroBadgeRow}>
+              <View style={[styles.heroBadgeRow, { zIndex: 10 }]}>
                 <View style={styles.heroBadge}>
                   <Ionicons name="trending-up" size={12} color="#fff" />
                   <Text style={styles.heroBadgeText}>Your progress</Text>
                 </View>
-                <View style={styles.heroBadge}>
-                  <Text style={styles.heroBadgeText}>SSC mode</Text>
-                  <Ionicons name="chevron-down" size={12} color="#fff" />
+                <View style={{ position: 'relative', zIndex: 10 }}>
+                  <Pressable 
+                    style={styles.heroBadge}
+                    onPress={() => setShowHeroModeDropdown(!showHeroModeDropdown)}
+                  >
+                    <Text style={styles.heroBadgeText}>{selectedHeroMode}</Text>
+                    <Ionicons name={showHeroModeDropdown ? "chevron-up" : "chevron-down"} size={12} color="#fff" />
+                  </Pressable>
+                  
+                  {showHeroModeDropdown && (
+                    <View style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: 4,
+                      backgroundColor: '#0f172a',
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#1e293b',
+                      overflow: 'hidden',
+                      minWidth: 120,
+                    }}>
+                      <Pressable 
+                        style={{ paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#1e293b' }}
+                        onPress={() => {
+                          setSelectedHeroMode('SSC mode');
+                          setShowHeroModeDropdown(false);
+                        }}
+                      >
+                        <Text style={{ color: selectedHeroMode === 'SSC mode' ? '#10b981' : '#fff', fontSize: 12, fontWeight: '600' }}>SSC mode</Text>
+                      </Pressable>
+                      <Pressable 
+                        style={{ paddingVertical: 8, paddingHorizontal: 12 }}
+                        onPress={() => {
+                          setSelectedHeroMode('Practice mode');
+                          setShowHeroModeDropdown(false);
+                        }}
+                      >
+                        <Text style={{ color: selectedHeroMode === 'Practice mode' ? '#10b981' : '#fff', fontSize: 12, fontWeight: '600' }}>Practice mode</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
               </View>
 
