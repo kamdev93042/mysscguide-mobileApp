@@ -4,14 +4,17 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  Pressable,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLoginModal } from '../context/LoginModalContext';
+import { authApi } from '../services/api';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -20,11 +23,27 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    setUserEmail(email.trim());
-    setUserPhone(phone || '');
-    navigation.navigate('OTP');
+  const handleLogin = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+
+    setUserEmail(trimmedEmail);
+    setUserPhone(phone.trim());
+
+    try {
+      setLoading(true);
+      await authApi.sendOtp(trimmedEmail);
+      setLoading(false);
+      navigation.navigate('OTP');
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Login Error', error instanceof Error ? error.message : 'Failed to send OTP');
+    }
   };
 
   return (
@@ -67,12 +86,16 @@ export default function LoginScreen() {
             onChangeText={setPhone}
           />
 
-          <Pressable style={styles.otpLink}>
+          <Pressable style={styles.otpLink} onPress={handleLogin}>
             <Text style={styles.otpText}>Login with OTP</Text>
           </Pressable>
 
-          <Pressable style={styles.loginBtn} onPress={handleLogin}>
-            <Text style={styles.loginText}>Login</Text>
+          <Pressable style={[styles.loginBtn, loading && { opacity: 0.7 }]} onPress={handleLogin} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.loginText}>Login</Text>
+            )}
           </Pressable>
 
           <View style={styles.orRow}>

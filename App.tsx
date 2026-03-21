@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -9,6 +10,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SplashProvider } from './context/SplashContext';
 import { MocksProvider } from './context/MocksContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -39,6 +41,7 @@ const TAB_SCREENS = [
   { name: 'Tests', label: 'Tests', icon: 'document-text', component: TestsScreen },
   { name: 'Mnemonics', label: 'Mnemonics', icon: 'bulb', component: MnemonicsScreen },
   { name: 'Typing', label: 'Typing', icon: 'keypad', component: TypingScreen },
+  { name: 'Contests', label: 'Contests', icon: 'trophy', component: ContestScreen },
   { name: 'Forums', label: 'Forums', icon: 'people', component: ForumsScreen },
 ];
 
@@ -130,6 +133,29 @@ import { MnemonicsProvider } from './context/MnemonicsContext';
 import { ForumsProvider } from './context/ForumsContext';
 
 export default function App() {
+  const [isReady, setIsReady] = useState(false);
+  const [initialRoute, setInitialRoute] = useState('Login');
+
+  useEffect(() => {
+    async function checkLoginState() {
+      try {
+        const loggedIn = await AsyncStorage.getItem('isLoggedIn');
+        if (loggedIn === 'true') {
+          setInitialRoute('Main');
+        }
+      } catch (e) {
+        console.error('Failed to check login state', e);
+      } finally {
+        setIsReady(true);
+      }
+    }
+    checkLoginState();
+  }, []);
+
+  if (!isReady) {
+    return null; // Render nothing (or a basic splash screen) while checking auth
+  }
+
   return (
     <ThemeProvider>
       <LoginModalProvider>
@@ -144,7 +170,7 @@ export default function App() {
               screenOptions={{
                 headerShown: false,
               }}
-              initialRouteName="Login"
+              initialRouteName={initialRoute}
             >
               <Stack.Screen name="Login" component={LoginScreen} />
               <Stack.Screen name="OTP" component={OtpVerificationScreen} />
