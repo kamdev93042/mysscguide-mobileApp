@@ -40,6 +40,9 @@ export default function ContestScreen() {
     <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
       <View style={[styles.appHeader, { borderBottomColor: border }]}>
         <View style={styles.logoRow}>
+          <Pressable onPress={() => navigation.goBack()} style={{ marginRight: 12 }} hitSlop={12}>
+            <Ionicons name="arrow-back" size={24} color={text} />
+          </Pressable>
           <Image
             source={require('../assets/sscguidelogo.png')}
             style={styles.headerLogo}

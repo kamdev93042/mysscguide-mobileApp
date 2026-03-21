@@ -14,7 +14,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ProfileScreen from './screens/ProfileScreen';
-import PlaceholderScreen from './screens/PlaceholderScreen';
 import OtpVerificationScreen from './screens/OtpVerificationScreen';
 import NameScreen from './screens/NameScreen';
 import NotificationScreen from './screens/NotificationScreen';
@@ -23,7 +22,6 @@ import MocksScreen from './screens/MocksScreen';
 import SplashScreen from './screens/SplashScreen';
 import CreateMockScreen from './screens/CreateMockScreen';
 import MockInstructionScreen from './screens/MockInstructionScreen';
-import MockPracticeScreen from './screens/MockPracticeScreen';
 import TypingScreen from './screens/TypingScreen';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -31,20 +29,20 @@ import ContestScreen from './screens/ContestScreen';
 import MnemonicsScreen from './screens/MnemonicsScreen';
 import ForumsScreen from './screens/ForumsScreen';
 import ForumPostScreen from './screens/ForumPostScreen';
+import TestsScreen from './screens/TestsScreen';
+
+const MockPracticeScreen = require('./screens/MockPracticeScreen').default;
 
 const Stack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const TAB_SCREENS = [
-  { name: 'Mocks', label: 'Mocks', icon: 'document-text', component: MocksScreen },
-  { name: 'PYQs', label: 'PYQs', icon: 'document-text', component: PyqsScreen },
+  { name: 'Tests', label: 'Tests', icon: 'document-text', component: TestsScreen },
   { name: 'Mnemonics', label: 'Mnemonics', icon: 'bulb', component: MnemonicsScreen },
   { name: 'Typing', label: 'Typing', icon: 'keypad', component: TypingScreen },
   { name: 'Contests', label: 'Contests', icon: 'trophy', component: ContestScreen },
   { name: 'Forums', label: 'Forums', icon: 'people', component: ForumsScreen },
-
-
 ];
 
 function HomeStackNavigator() {
@@ -186,6 +184,9 @@ export default function App() {
               />
               <Stack.Screen name="MockPractice" component={MockPracticeScreen} />
               <Stack.Screen name="ForumPost" component={ForumPostScreen} />
+              <Stack.Screen name="Mocks" component={MocksScreen} />
+              <Stack.Screen name="PYQs" component={PyqsScreen} />
+              <Stack.Screen name="Contests" component={ContestScreen} />
             </Stack.Navigator>
             <SplashScreen />
             </NavigationContainer>

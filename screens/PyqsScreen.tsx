@@ -1,6 +1,6 @@
 import { ScrollView, View, Text, StyleSheet, Pressable, Modal, Image, Platform } from 'react-native';
-import { useState, createElement } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useState, createElement, useEffect } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 let DateTimePicker: any = null;
 if (Platform.OS !== 'web') {
@@ -75,9 +75,28 @@ const FILTER_DATA_RM = {
   Year: ['All Years', '2025', '2024', '2023', '2022', '2021', '2020', '2019'],
 };
 
+type SubmissionResult = {
+  sourceTab: 'PYQ' | 'RankMaker';
+  testTitle: string;
+  attempted: number;
+  correct: number;
+  wrong: number;
+  unattempted: number;
+  score: number;
+  sectionBreakup?: Array<{
+    section: string;
+    correct: number;
+    wrong: number;
+    attempted: number;
+    score: number;
+  }>;
+  submittedAt: string;
+};
+
 export default function PyqsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { isDark, toggleTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<'RankMaker' | 'PYQ'>('RankMaker');
@@ -96,6 +115,7 @@ export default function PyqsScreen() {
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateObj, setDateObj] = useState(new Date());
+  const [resultHistory, setResultHistory] = useState<SubmissionResult[]>([]);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const card = isDark ? '#1e293b' : '#ffffff';
@@ -106,11 +126,25 @@ export default function PyqsScreen() {
 
   const filterData = activeTab === 'PYQ' ? FILTER_DATA_PYQ : FILTER_DATA_RM;
 
+  useEffect(() => {
+    const submissionResult = route.params?.submissionResult as SubmissionResult | undefined;
+    if (!submissionResult) {
+      return;
+    }
+
+    setResultHistory((prev) => [submissionResult, ...prev].slice(0, 10));
+    setActiveTab(submissionResult.sourceTab === 'PYQ' ? 'PYQ' : 'RankMaker');
+    navigation.setParams({ submissionResult: undefined });
+  }, [navigation, route.params?.submissionResult]);
+
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: border }]}>
         <View style={styles.logoRow}>
+          <Pressable onPress={() => navigation.goBack()} style={{ marginRight: 12 }} hitSlop={12}>
+            <Ionicons name="arrow-back" size={24} color={text} />
+          </Pressable>
           <Image 
             source={require('../assets/sscguidelogo.png')} 
             style={styles.headerLogo}
@@ -243,7 +277,12 @@ export default function PyqsScreen() {
                 </View>
                 <Pressable 
                   style={[styles.startBtn, { backgroundColor: primary }]}
-                  onPress={() => navigation.navigate('MockInstruction', { mockData: { title: item.title, questions: parseInt(item.questions), duration: parseInt(item.duration) }})}
+                  onPress={() =>
+                    navigation.navigate('MockInstruction', {
+                      mockData: { title: item.title, questions: parseInt(item.questions), duration: parseInt(item.duration) },
+                      sourceTab: 'PYQ',
+                    })
+                  }
                 >
                   <Text style={[styles.startBtnText, { color: '#fff' }]}>Start</Text>
                 </Pressable>
@@ -279,7 +318,12 @@ export default function PyqsScreen() {
                 </View>
                 <Pressable 
                   style={[styles.startBtn, { backgroundColor: primary }]}
-                  onPress={() => navigation.navigate('MockInstruction', { mockData: { title: item.title, questions: parseInt(item.questions), duration: parseInt(item.duration) }})}
+                  onPress={() =>
+                    navigation.navigate('MockInstruction', {
+                      mockData: { title: item.title, questions: parseInt(item.questions), duration: parseInt(item.duration) },
+                      sourceTab: 'RankMaker',
+                    })
+                  }
                 >
                   <Text style={[styles.startBtnText, { color: '#fff' }]}>Start</Text>
                 </Pressable>
@@ -300,15 +344,43 @@ export default function PyqsScreen() {
 
         {/* Recent history section */}
         <Text style={[styles.sectionTitle, { color: text, marginTop: 16 }]}>Recent History</Text>
-        <View style={[styles.historyCard, { backgroundColor: isDark ? '#020617' : '#f1f5f9', borderColor: border }]}>
-          <View style={styles.historyIconCircle}>
-            <Ionicons name="time-outline" size={22} color={muted} />
+        {resultHistory.length > 0 ? (
+          <View style={styles.resultList}>
+            {resultHistory.map((result, idx) => (
+              <View key={`${result.testTitle}-${result.submittedAt}-${idx}`} style={[styles.resultCard, { backgroundColor: card, borderColor: border }]}>
+                <View style={styles.resultHeaderRow}>
+                  <Text style={[styles.resultTitle, { color: text }]} numberOfLines={1}>{result.testTitle}</Text>
+                  <Text style={[styles.resultTab, { color: primary }]}>{result.sourceTab}</Text>
+                </View>
+                <Text style={[styles.resultMeta, { color: muted }]}>Submitted: {result.submittedAt}</Text>
+                <View style={styles.resultStatsRow}>
+                  <Text style={[styles.resultScore, { color: primary }]}>Score: {result.score.toFixed(2)}</Text>
+                  <Text style={[styles.resultMeta, { color: muted }]}>Correct {result.correct} · Wrong {result.wrong}</Text>
+                </View>
+                <Text style={[styles.resultMeta, { color: muted }]}>Attempted {result.attempted} · Unattempted {result.unattempted}</Text>
+                {result.sectionBreakup && result.sectionBreakup.length > 0 && (
+                  <View style={styles.sectionBreakupWrap}>
+                    {result.sectionBreakup.map((sectionItem) => (
+                      <Text key={`${result.submittedAt}-${sectionItem.section}`} style={[styles.sectionBreakupText, { color: muted }]}>
+                        {sectionItem.section}: {sectionItem.score.toFixed(2)} ({sectionItem.correct}C/{sectionItem.wrong}W)
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))}
           </View>
-          <Text style={[styles.historyTitle, { color: text }]}>No history found</Text>
-          <Text style={[styles.historySub, { color: muted }]}>
-            Start attempting previous year papers to see your history here.
-          </Text>
-        </View>
+        ) : (
+          <View style={[styles.historyCard, { backgroundColor: isDark ? '#020617' : '#f1f5f9', borderColor: border }]}>
+            <View style={styles.historyIconCircle}>
+              <Ionicons name="time-outline" size={22} color={muted} />
+            </View>
+            <Text style={[styles.historyTitle, { color: text }]}>No history found</Text>
+            <Text style={[styles.historySub, { color: muted }]}> 
+              Start attempting previous year papers to see your history here.
+            </Text>
+          </View>
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -660,6 +732,57 @@ const styles = StyleSheet.create({
   modalOptionText: { fontSize: 15, fontWeight: '500' },
 
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  resultList: {
+    gap: 10,
+    marginTop: 4,
+  },
+  resultCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+  },
+  resultHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  resultTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+    marginRight: 10,
+  },
+  resultTab: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  resultMeta: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  resultStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  resultScore: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  sectionBreakupWrap: {
+    marginTop: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148,163,184,0.25)',
+    gap: 2,
+  },
+  sectionBreakupText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   historyCard: {
     borderRadius: 20,
     borderWidth: 1,

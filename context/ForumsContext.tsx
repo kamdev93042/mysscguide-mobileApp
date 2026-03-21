@@ -6,6 +6,8 @@ export type Comment = {
   authorInitial: string;
   text: string;
   timestamp: string;
+  replyTo?: string;
+  replies: Comment[];
 };
 
 export type ForumPostData = {
@@ -47,7 +49,7 @@ const INITIAL_POSTS: ForumPostData[] = [
     views: 4,
     timestamp: '28/02/2026',
     comments: [
-      { id: 'c1', author: 'Vinay', authorInitial: 'V', text: 'Welcome to the platform!', timestamp: '28/02/2026' }
+      { id: 'c1', author: 'Vinay', authorInitial: 'V', text: 'Welcome to the platform!', timestamp: '28/02/2026', replies: [] }
     ],
     userVote: null,
   },
@@ -56,13 +58,13 @@ const INITIAL_POSTS: ForumPostData[] = [
     author: 'Anjali Sharma',
     authorInitial: 'A',
     title: 'How to tackle English Comprehension?',
-    subtitle: "I always run out of time during the reading comprehension sections. Does anyone have tips for reading faster without losing accuracy?",
+    subtitle: 'I always run out of time during the reading comprehension sections. Does anyone have tips for reading faster without losing accuracy?',
     tags: ['english', 'tips'],
     likes: 12,
     views: 45,
     timestamp: '1w ago',
     comments: [
-      { id: 'c2', author: 'Rahul', authorInitial: 'R', text: 'Skim the questions first!', timestamp: '1w ago' }
+      { id: 'c2', author: 'Rahul', authorInitial: 'R', text: 'Skim the questions first!', timestamp: '1w ago', replies: [] }
     ],
     userVote: null,
   },
@@ -85,6 +87,7 @@ type ForumsContextType = {
   posts: ForumPostData[];
   addPost: (title: string, subtitle: string, tags: string[], author: string) => void;
   addComment: (postId: string, text: string, author: string) => void;
+  addReply: (postId: string, parentCommentId: string, text: string, author: string, replyTo: string) => void;
   incrementLike: (postId: string) => void;
 };
 
@@ -92,6 +95,7 @@ const ForumsContext = createContext<ForumsContextType>({
   posts: [],
   addPost: () => {},
   addComment: () => {},
+  addReply: () => {},
   incrementLike: () => {},
 });
 
@@ -99,6 +103,35 @@ export const useForums = () => useContext(ForumsContext);
 
 export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [posts, setPosts] = useState<ForumPostData[]>(INITIAL_POSTS);
+
+  const createComment = (text: string, author: string, replyTo?: string): Comment => {
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      author,
+      authorInitial: author.charAt(0).toUpperCase(),
+      text,
+      timestamp: 'Just now',
+      replyTo,
+      replies: [],
+    };
+  };
+
+  const addReplyToTree = (comments: Comment[], parentCommentId: string, reply: Comment): Comment[] => {
+    return comments.map(comment => {
+      if (comment.id === parentCommentId) {
+        return { ...comment, replies: [...comment.replies, reply] };
+      }
+
+      if (comment.replies.length === 0) {
+        return comment;
+      }
+
+      return {
+        ...comment,
+        replies: addReplyToTree(comment.replies, parentCommentId, reply),
+      };
+    });
+  };
 
   const addPost = (title: string, subtitle: string, tags: string[], author: string) => {
     const newPost: ForumPostData = {
@@ -118,16 +151,20 @@ export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const addComment = (postId: string, text: string, author: string) => {
-    const newComment: Comment = {
-      id: Date.now().toString(),
-      author,
-      authorInitial: author.charAt(0).toUpperCase(),
-      text,
-      timestamp: 'Just now',
-    };
+    const newComment = createComment(text, author);
     setPosts(prev => prev.map(post => {
       if (post.id === postId) {
         return { ...post, comments: [...post.comments, newComment] };
+      }
+      return post;
+    }));
+  };
+
+  const addReply = (postId: string, parentCommentId: string, text: string, author: string, replyTo: string) => {
+    const newReply = createComment(text, author, replyTo);
+    setPosts(prev => prev.map(post => {
+      if (post.id === postId) {
+        return { ...post, comments: addReplyToTree(post.comments, parentCommentId, newReply) };
       }
       return post;
     }));
@@ -147,14 +184,14 @@ export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           newLikes += 1;
           newVote = 'like';
         }
-        
+
         return { ...item, likes: newLikes, userVote: newVote };
       })
     );
   };
 
   return (
-    <ForumsContext.Provider value={{ posts, addPost, addComment, incrementLike }}>
+    <ForumsContext.Provider value={{ posts, addPost, addComment, addReply, incrementLike }}>
       {children}
     </ForumsContext.Provider>
   );
