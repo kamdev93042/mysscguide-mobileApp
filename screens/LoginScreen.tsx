@@ -4,27 +4,59 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  Pressable,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLoginModal } from '../context/LoginModalContext';
+import { authApi } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { setUserEmail, setUserPhone } = useLoginModal();
+  const { setUserEmail, setUserName, setHasLoggedIn } = useLoginModal();
 
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    setUserEmail(email.trim());
-    setUserPhone(phone || '');
-    navigation.navigate('OTP');
+  const handleLogin = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+
+    setUserEmail(trimmedEmail);
+
+    try {
+      setLoading(true);
+      
+      // Attempt to send an OTP via the native existing user route
+      try {
+        await authApi.sendLoginOtp(trimmedEmail);
+        
+        // Success! User exists. Route to OTP screen in "Login" mode.
+        setLoading(false);
+        (navigation as any).navigate('OTP', { isLoginFlow: true });
+        return;
+      } catch (loginError) {
+        console.log('User not registered in login flow, falling back to signup flow.');
+      }
+
+      // If the above fails, it means the user is new. Send standard signup OTP.
+      await authApi.sendOtp(trimmedEmail);
+      setLoading(false);
+      (navigation as any).navigate('OTP', { isLoginFlow: false });
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Login Error', error instanceof Error ? error.message : 'Failed to send OTP');
+    }
   };
 
   return (
@@ -45,34 +77,27 @@ export default function LoginScreen() {
             Login to continue your SSC exam preparation
           </Text>
 
-          <Text style={styles.label}>Email address</Text>
+          <Text style={styles.label}>Email / Mobile number</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter your email"
+            placeholder="Enter your email or mobile"
             placeholderTextColor="#9ca3af"
-            keyboardType="email-address"
+            keyboardType="default"
             autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
           />
 
-          <Text style={styles.label}>Mobile number</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your mobile number"
-            placeholderTextColor="#9ca3af"
-            keyboardType="phone-pad"
-            maxLength={10}
-            value={phone}
-            onChangeText={setPhone}
-          />
-
-          <Pressable style={styles.otpLink}>
+          <Pressable style={styles.otpLink} onPress={handleLogin}>
             <Text style={styles.otpText}>Login with OTP</Text>
           </Pressable>
 
-          <Pressable style={styles.loginBtn} onPress={handleLogin}>
-            <Text style={styles.loginText}>Login</Text>
+          <Pressable style={[styles.loginBtn, loading && { opacity: 0.7 }]} onPress={handleLogin} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.loginText}>Login</Text>
+            )}
           </Pressable>
 
           <View style={styles.orRow}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,18 +7,26 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLoginModal } from '../context/LoginModalContext';
+import { authApi } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function OtpVerificationScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { userEmail } = useLoginModal();
+  const route = useRoute<any>();
+  const isLoginFlow = route.params?.isLoginFlow || false;
+  const { userEmail, setUserName, setHasLoggedIn } = useLoginModal();
 
-  const [code, setCode] = useState(['', '', '', '']);
+  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [loading, setLoading] = useState(false);
+  const inputs = useRef<any>([]);
 
   // Use the same light look and feel as the name screen (no dark theme here)
   const bg = '#f4f4f5';
@@ -27,15 +35,58 @@ export default function OtpVerificationScreen() {
   const muted = '#6b7280';
   const border = '#e5e7eb';
 
-  const handleChange = (value, index) => {
+  const handleChange = (value: string, index: number) => {
     const next = [...code];
     next[index] = value.slice(-1);
     setCode(next);
+
+    if (value && index < 5) {
+      inputs.current[index + 1]?.focus();
+    }
   };
 
-  const handleConfirm = () => {
-    // In real app, verify OTP with backend here
-    navigation.navigate('Name');
+  const handleKeyPress = ({ nativeEvent }: any, index: number) => {
+    if (nativeEvent.key === 'Backspace' && !code[index] && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleConfirm = async () => {
+    const otpString = code.join('');
+    if (otpString.length !== 6) {
+      Alert.alert('Error', 'Please enter a 6-digit OTP');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      if (isLoginFlow) {
+        // 1. Existing User Flow -> Hits native `login-otp` which yields the token instantly
+        const loginResponse = await authApi.loginOtp(userEmail, otpString);
+
+        await AsyncStorage.setItem('userToken', loginResponse?.token || 'true');
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+
+        const fetchedName = loginResponse?.user?.username || loginResponse?.user?.fullName || loginResponse?.username;
+        if (fetchedName) {
+          setUserName(fetchedName);
+        }
+        setHasLoggedIn(true);
+
+        setLoading(false);
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      } else {
+        // 2. New User Flow -> Hits standard signup `verify-otp` and pushes to NameScreen
+        await authApi.verifyOtp(userEmail, otpString);
+
+        setLoading(false);
+        navigation.navigate('Name' as never);
+      }
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Verification Error', error instanceof Error ? error.message : 'Invalid OTP');
+    }
   };
 
   return (
@@ -46,28 +97,34 @@ export default function OtpVerificationScreen() {
       >
         <View style={[styles.card, { backgroundColor: card, borderColor: border }]}>
           <View style={styles.iconCircle}>
-            <Ionicons name="mail-open-outline" size={30} color="#059669" />
+            <Ionicons name="chatbubble-ellipses-outline" size={30} color="#059669" />
           </View>
           <Text style={[styles.title, { color: text }]}>Verification code</Text>
           <Text style={[styles.subtitle, { color: muted }]}>
-            Enter the verification code we've sent to {userEmail || 'your email'}.
+            Enter the verification code we've sent to your email {userEmail || ''}.
           </Text>
 
           <View style={styles.codeRow}>
             {code.map((digit, i) => (
               <TextInput
                 key={i}
+                ref={(ref) => { inputs.current[i] = ref; }}
                 style={[styles.codeInput, { borderColor: border, color: text }]}
                 keyboardType="number-pad"
                 maxLength={1}
                 value={digit}
                 onChangeText={(v) => handleChange(v, i)}
+                onKeyPress={(e) => handleKeyPress(e, i)}
               />
             ))}
           </View>
 
-          <Pressable style={styles.confirmBtn} onPress={handleConfirm}>
-            <Text style={styles.confirmText}>Confirm</Text>
+          <Pressable style={[styles.confirmBtn, loading && { opacity: 0.7 }]} onPress={handleConfirm} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.confirmText}>Confirm</Text>
+            )}
           </Pressable>
 
           <Pressable style={styles.resendRow}>
@@ -105,13 +162,13 @@ const styles = StyleSheet.create({
   codeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '80%',
+    width: '100%',
     marginBottom: 24,
   },
   codeInput: {
-    width: 52,
+    width: 44,
     height: 52,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     textAlign: 'center',
     fontSize: 20,

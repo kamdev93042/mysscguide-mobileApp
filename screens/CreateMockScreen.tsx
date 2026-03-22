@@ -58,7 +58,7 @@ export default function CreateMockScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { isDark, toggleTheme } = useTheme();
-  const { addChallenge } = useMocks();
+  const { createNewChallenge, isLoading } = useMocks();
   const { width: screenWidth } = useWindowDimensions();
 
   const [step, setStep] = useState(1);
@@ -209,29 +209,48 @@ export default function CreateMockScreen() {
     setTopicDifficulties({});
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const finalName = mockName.trim() || 'Custom Mock';
-    // Format metadata based on difficulties
-    let e = 0, m = 0, h = 0;
-    Object.values(topicDifficulties).forEach(diffs => {
-      if (diffs.includes('E')) e++;
-      if (diffs.includes('M')) m++;
-      if (diffs.includes('H')) h++;
+    
+    // Map subjects and topics
+    const mappedSubjects: any[] = [];
+    selectedSubjects.forEach(subId => {
+      const sub = SUBJECTS.find(s => s.id === subId);
+      if (!sub) return;
+      
+      const subTopics: any[] = [];
+      selectedTopics.forEach(t => {
+         // if topic belongs to this subject
+         if (TOPICS_BY_SUBJECT[subId]?.includes(t)) {
+            const diffs = topicDifficulties[t] || [];
+            const mappedDiffs = diffs.map(d => d === 'E' ? 'easy' : d === 'M' ? 'medium' : d === 'H' ? 'hard' : d);
+            subTopics.push({
+               name: t,
+               difficulties: mappedDiffs.length > 0 ? mappedDiffs : ['medium'] // default to medium if none
+            });
+         }
+      });
+      
+      if (subTopics.length > 0) {
+         mappedSubjects.push({ subject: sub.title, topics: subTopics });
+      }
     });
     
-    let difficultyMeta = '';
-    if (e) difficultyMeta += `${e}E `;
-    if (m) difficultyMeta += `${m}M `;
-    if (h) difficultyMeta += `${h}H`;
-    
-    addChallenge({
-      id: Math.random().toString(36).substring(7),
-      title: finalName,
-      meta: `${numQuestions} Questions · ${timeLimit} Min · ${difficultyMeta.trim() || 'Mixed'}`,
-      author: 'BY YOU · JUST NOW',
-    });
-    setStep(1);
-    navigation.goBack();
+    try {
+      await createNewChallenge({
+        title: finalName,
+        subjects: mappedSubjects,
+        questionCount: numQuestions,
+        timeLimit: timeLimit,
+        isPublic: isPublic,
+      });
+      
+      setStep(1);
+      navigation.goBack();
+    } catch (e) {
+      console.error(e);
+      // Let it fail silently or show alert if we had one
+    }
   };
 
   const nextStep = () => {
@@ -741,12 +760,12 @@ export default function CreateMockScreen() {
           ))}
         </View>
         <Pressable
-          style={[s.nextBtn, { backgroundColor: green }, isNextDisabled() && { opacity: 0.4 }]}
+          style={[s.nextBtn, { backgroundColor: green }, (isNextDisabled() || isLoading) && { opacity: 0.4 }]}
           onPress={nextStep}
-          disabled={isNextDisabled()}
+          disabled={isNextDisabled() || isLoading}
         >
           {step === totalSteps && <Ionicons name="rocket" size={16} color="#fff" style={{ marginRight: 6 }} />}
-          <Text style={s.nextBtnText}>{step === totalSteps ? 'Create Challenge' : 'Continue'}</Text>
+          <Text style={s.nextBtnText}>{step === totalSteps ? (isLoading ? 'Creating...' : 'Create Challenge') : 'Continue'}</Text>
           {step < totalSteps && <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />}
         </Pressable>
       </View>

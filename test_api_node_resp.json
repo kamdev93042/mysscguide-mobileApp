@@ -1,0 +1,197 @@
+{
+  "challenges": [
+    {
+      "id": "78891424-1c57-4b4f-8367-ca3cd8f40731",
+      "creatorId": "c7ed9ea5-da49-4877-9d6c-9fa081398b79",
+      "creatorName": "Kamu",
+      "title": "Thermo",
+      "questionCount": 25,
+      "timeLimit": 15,
+      "createdAt": "2026-03-19T14:27:42.186Z",
+      "userAttempted": false
+    },
+    {
+      "id": "3b4e5f8c-0d83-4d81-b863-8bc77c1a8025",
+      "creatorId": "c7ed9ea5-da49-4877-9d6c-9fa081398b79",
+      "creatorName": "Kamu",
+      "title": "Temp",
+      "questionCount": 11,
+      "timeLimit": 15,
+      "createdAt": "2026-03-19T14:19:03.84Z",
+      "userAttempted": false
+    },
+    {
+      "id": "60fad0c2-4e91-4550-9d53-0728210e059a",
+      "creatorId": "bc13c3be-34f4-445a-b634-222019b850e0",
+      "creatorName": "Nikhil Maurya",
+      "title": "kjnk",
+      "questionCount": 1,
+      "timeLimit": 15,
+      "createdAt": "2026-03-14T14:51:37.549Z",
+      "userAttempted": false
+    },
+    {
+      "id": "4f9cd371-01e8-4a51-a5c7-62934a6510f2",
+      "creatorId": "e944ac7c-7606-4d52-bc5b-fc17f077f611",
+      "creatorName": "Kamdev Kumar",
+      "title": "Distance n Time #1",
+      "questionCount": 12,
+      "timeLimit": 15,
+      "createdAt": "2026-03-11T19:22:56.525Z",
+      "userAttempted": false
+    },
+    {
+      "id": "f44106ef-45d4-4f5d-bfcf-950a8901a6d2",
+      "creatorId": "bc13c3be-34f4-445a-b634-222019b850e0",
+      "creatorName": "Nikhil Maurya",
+      "title": "nikhil gg",
+      "questionCount": 18,
+      "timeLimit": 15,
+      "createdAt": "2026-03-06T19:30:42.819Z",
+      "userAttempted": false
+    },
+    {
+      "id": "85523532-943e-4b73-a96e-68f7a47b4563",
+      "creatorId": "a2ac85a8-c704-4a3a-b24b-5b4b7684127d",
+      "creatorName": "Yash Maurya",
+      "title": "fast",
+      "questionCount": 6,
+      "timeLimit": 15,
+      "createdAt": "2026-03-06T19:09:45.271Z",
+      "userAttempted": false
+    },
+    {
+      "id": "428813ae-f697-418e-b263-4806d256ab64",
+      "creatorId": "a2ac85a8-c704-4a3a-b24b-5b4b7684127d",
+      "creatorName": "Yash Maurya",
+      "title": "yet publick one bro",
+      "questionCount": 15,
+      "timeLimit": 15,
+      "createdAt": "2026-03-06T16:36:09.738Z",
+      "userAttempted": false
+    },
+    {
+      "id": "e870fbb8-bc78-4bb6-b6f8-6ae57b00a73d",
+      "creatorId": "bc13c3be-34f4-445a-b634-222019b850e0",
+      "creatorName": "Nikhil Maurya",
+      "title": "yet another public",
+      "questionCount": 23,
+      "timeLimit": 15,
+      "createdAt": "2026-03-06T12:26:40.513Z",
+      "userAttempted": false
+    },
+    {
+      "id": "ff6d1a8f-dd8b-4800-8d57-e80f90e1e664",
+      "creatorId": "bc13c3be-34f4-445a-b634-222019b850e0",
+      "creatorName": "Nikhil Maurya",
+      "title": "one more challenge",
+      "questionCount": 22,
+      "timeLimit": 15,
+      "createdAt": "2026-03-06T12:14:23.46Z",
+      "userAttempted": false
+    },
+    {
+      "id": "a3965dac-5560-4a40-932d-544e70e70694",
+      "creatorId": "bc13c3be-34f4-445a-b634-222019b850e0",
+      "creatorName": "Nikhil Maurya",
+      "title": "public challenge again",
+      "questionCount": 24,
+      "timeLimit": 15,
+      "createdAt": "2026-03-06T12:12:57.629Z",
+      "userAttempted": false
+    },
+    {
+      "id": "93bbcaeb-961a-416a-93b3-e1cd6eba8e0d",
+      "creatorId": "60309e15-7a27-4ed2-b11d-799b5eb27499",
+      "creatorName": "Sumit Maurya",
+      "title": "dhdh",
+      "questionCount": 25,
+      "timeLimit": 15,
+      "createdAt": "2026-03-06T11:51:41.364Z",
+      "userAttempted": false
+    },
+    {
+      "id": "9f397caa-6201-440a-9ad4-a75c06dddb8c",
+      "creatorId": "bc13c3be-34f4-445a-b634-222019b850e0",
+      "creatorName": "Nikhil Maurya",
+      "title": "invite someone",
+      "questionCount": 25,
+      "timeLimit": 15,
+      "createdAt": "2026-03-06T04:50:24.666Z",
+      "userAttempted": false
+    },
+    {
+      "id": "c04cfa66-95a3-4d48-b47e-0be876f1a93c",
+      "creatorId": "a2ac85a8-c704-4a3a-b24b-5b4b7684127d",
+      "creatorName": "Yash Maurya",
+      "title": "new public",
+      "questionCount": 15,
+      "timeLimit": 15,
+      "createdAt": "2026-03-05T22:07:10.112Z",
+      "userAttempted": false
+    },
+    {
+      "id": "83b3d02a-9fad-442a-a60b-231f6fb12912",
+      "creatorId": "bc13c3be-34f4-445a-b634-222019b850e0",
+      "creatorName": "Nikhil Maurya",
+      "title": "Mixture hard ",
+      "questionCount": 13,
+      "timeLimit": 15,
+      "createdAt": "2026-03-05T17:25:18.126Z",
+      "userAttempted": false
+    },
+    {
+      "id": "3e3d5bd2-fd6e-4b51-90d8-d18c1d563cde",
+      "creatorId": "60309e15-7a27-4ed2-b11d-799b5eb27499",
+      "creatorName": "Sumit Maurya",
+      "title": "hello",
+      "questionCount": 10,
+      "timeLimit": 15,
+      "createdAt": "2026-03-05T06:29:38.427Z",
+      "userAttempted": false
+    },
+    {
+      "id": "434a7844-3f8c-4f6c-a97b-c35773d89193",
+      "creatorId": "60309e15-7a27-4ed2-b11d-799b5eb27499",
+      "creatorName": "Sumit Maurya",
+      "title": "ggg",
+      "questionCount": 22,
+      "timeLimit": 15,
+      "createdAt": "2026-03-04T08:39:37.154Z",
+      "userAttempted": false
+    },
+    {
+      "id": "748cad93-62cf-46a9-8721-f651362cb030",
+      "creatorId": "bc13c3be-34f4-445a-b634-222019b850e0",
+      "creatorName": "Nikhil Maurya",
+      "title": "autoselect",
+      "questionCount": 15,
+      "timeLimit": 15,
+      "createdAt": "2026-03-04T08:34:01.3Z",
+      "userAttempted": false
+    },
+    {
+      "id": "77adadd3-a342-42bc-9924-e6d084083289",
+      "creatorId": "60309e15-7a27-4ed2-b11d-799b5eb27499",
+      "creatorName": "Sumit Maurya",
+      "title": "tr",
+      "questionCount": 1,
+      "timeLimit": 15,
+      "createdAt": "2026-03-02T09:05:13.987Z",
+      "userAttempted": false
+    },
+    {
+      "id": "adf38d55-421c-4dd6-9164-c48af7e5a880",
+      "creatorId": "60309e15-7a27-4ed2-b11d-799b5eb27499",
+      "creatorName": "Sumit Maurya",
+      "title": "rth",
+      "questionCount": 22,
+      "timeLimit": 15,
+      "createdAt": "2026-03-02T09:03:48.37Z",
+      "userAttempted": false
+    }
+  ],
+  "hasMore": false,
+  "nextCursor": null,
+  "status": "success"
+}
