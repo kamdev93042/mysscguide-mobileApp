@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLoginModal } from '../context/LoginModalContext';
 import { authApi } from '../services/api';
@@ -20,6 +20,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function OtpVerificationScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const route = useRoute<any>();
+  const isLoginFlow = route.params?.isLoginFlow || false;
   const { userEmail, setUserName, setHasLoggedIn } = useLoginModal();
 
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -55,42 +57,32 @@ export default function OtpVerificationScreen() {
       Alert.alert('Error', 'Please enter a 6-digit OTP');
       return;
     }
-    
+
     try {
       setLoading(true);
-      await authApi.verifyOtp(userEmail, otpString);
 
-      // Attempt to login seamlessly using our deterministic dummy password
-      try {
-        const loginResponse = await authApi.login(userEmail);
-        
-        // If login succeeded, they are an existing user! 
-        // Save the session and go to Main.
+      if (isLoginFlow) {
+        // 1. Existing User Flow -> Hits native `login-otp` which yields the token instantly
+        const loginResponse = await authApi.loginOtp(userEmail, otpString);
+
         await AsyncStorage.setItem('userToken', loginResponse?.token || 'true');
         await AsyncStorage.setItem('isLoggedIn', 'true');
-        
+
         const fetchedName = loginResponse?.user?.username || loginResponse?.user?.fullName || loginResponse?.username;
         if (fetchedName) {
-           setUserName(fetchedName);
+          setUserName(fetchedName);
         }
         setHasLoggedIn(true);
 
         setLoading(false);
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Main' }],
-        });
-        return; // Don't proceed to Name Screen
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      } else {
+        // 2. New User Flow -> Hits standard signup `verify-otp` and pushes to NameScreen
+        await authApi.verifyOtp(userEmail, otpString);
 
-      } catch (loginError) {
-        console.error('Login Error during OTP verification (Proceeding to Signup fallback):', loginError);
-        // Login failed, which means they are a new user and need to signup.
-        // Proceed to Name screen.
-        console.log('User not registered yet, sending to NameScreen');
+        setLoading(false);
+        navigation.navigate('Name' as never);
       }
-
-      setLoading(false);
-      navigation.navigate('Name');
     } catch (error) {
       setLoading(false);
       Alert.alert('Verification Error', error instanceof Error ? error.message : 'Invalid OTP');

@@ -1,5 +1,5 @@
-import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, Image } from 'react-native';
-import { useState } from 'react';
+import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, Image, RefreshControl } from 'react-native';
+import { useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -84,7 +84,21 @@ export default function MocksScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { isDark, toggleTheme } = useTheme();
-  const { myChallenges } = useMocks();
+  const { 
+    myChallenges, 
+    publicChallenges, 
+    recentAttempts, 
+    isLoading, 
+    fetchMyChallenges, 
+    fetchPublicChallenges, 
+    fetchRecentAttempts 
+  } = useMocks();
+
+  const onRefresh = useCallback(() => {
+    fetchMyChallenges();
+    fetchPublicChallenges();
+    fetchRecentAttempts();
+  }, [fetchMyChallenges, fetchPublicChallenges, fetchRecentAttempts]);
 
   const [showAllPublic, setShowAllPublic] = useState(false);
   const [showAllMy, setShowAllMy] = useState(false);
@@ -129,6 +143,7 @@ export default function MocksScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={primary} />}
       >
         {/* Hero mock banner like web but mobile-optimized */}
         <View style={[styles.heroCard, { backgroundColor: primary }]}>
@@ -234,7 +249,7 @@ export default function MocksScreen() {
           </Pressable>
         </View>
         <View style={styles.challengeList}>
-          {(showAllPublic ? PUBLIC_CHALLENGES : PUBLIC_CHALLENGES.slice(0, 3)).map((c) => (
+          {(showAllPublic ? publicChallenges : publicChallenges.slice(0, 3)).map((c) => (
             <View
               key={c.id}
               style={[styles.challengeListItem, { backgroundColor: cardSoft }]}
@@ -250,7 +265,7 @@ export default function MocksScreen() {
               <Pressable
                 style={[styles.challengeStartBtn, { backgroundColor: card, borderWidth: 1, borderColor: border }]}
                 onPress={() => navigation.navigate('MockInstruction', {
-                  mockData: { title: c.title, questions: 15, duration: 15 }
+                  mockData: { title: c.title, questions: c.questionCount || 15, duration: c.timeLimit || 15 }
                 })}
               >
                 <Text style={[styles.challengeStartText, { color: text }]}>Start</Text>
@@ -259,7 +274,7 @@ export default function MocksScreen() {
           ))}
         </View>
 
-        {PUBLIC_CHALLENGES.length > 3 && (
+        {publicChallenges.length > 3 && (
           <Pressable
             style={{ paddingVertical: 12, alignItems: 'center' }}
             onPress={() => setShowAllPublic(!showAllPublic)}
@@ -271,19 +286,50 @@ export default function MocksScreen() {
         )}
 
         {/* Recent history section */}
-        <Text style={[styles.sectionTitle, { color: text, marginTop: 16 }]}>Recent History</Text>
-        <View style={[styles.historyCard, { backgroundColor: cardSoft, borderColor: border }]}>
-          <View style={styles.historyIconCircle}>
-            <Ionicons name="time-outline" size={22} color={muted} />
-          </View>
-          <Text style={[styles.historyTitle, { color: text }]}>No history found</Text>
-          <Text style={[styles.historySub, { color: muted }]}>
-            Start attempting mocks to see your performance summary here.
-          </Text>
-          <Pressable style={[styles.historyBtn, { borderColor: primary }]}>
-            <Text style={[styles.historyBtnText, { color: primary }]}>Start a Mock</Text>
-          </Pressable>
-        </View>
+        {recentAttempts.length > 0 ? (
+          <>
+            <Text style={[styles.sectionTitle, { color: text, marginTop: 16 }]}>Recent History</Text>
+            <View style={styles.challengeList}>
+              {recentAttempts.slice(0, 3).map((attempt: any) => (
+                <View
+                  key={attempt._id || Math.random().toString()}
+                  style={[styles.challengeListItem, { backgroundColor: cardSoft, borderColor: border, borderWidth: 1 }]}
+                >
+                  <View style={[styles.challengeIconWrap, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
+                    <Ionicons name="checkmark-done-outline" size={20} color={muted} />
+                  </View>
+                  <View style={styles.challengeInfo}>
+                    <Text style={[styles.challengeTitle, { color: text }]} numberOfLines={1}>{attempt.testId?.title || 'Custom Mock Attempt'}</Text>
+                    <Text style={[styles.challengeMeta, { color: muted }]} numberOfLines={1}>Score: {attempt.score || 0}</Text>
+                    <Text style={[styles.challengeAuthor, { color: muted, fontSize: 10 }]} numberOfLines={1}>{new Date(attempt.createdAt || Date.now()).toLocaleDateString()}</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.challengeStartBtn, { backgroundColor: card, borderWidth: 1, borderColor: border }]}
+                    onPress={() => {}}
+                  >
+                    <Text style={[styles.challengeStartText, { color: text, fontSize: 12 }]}>Review</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.sectionTitle, { color: text, marginTop: 16 }]}>Recent History</Text>
+            <View style={[styles.historyCard, { backgroundColor: cardSoft, borderColor: border }]}>
+              <View style={styles.historyIconCircle}>
+                <Ionicons name="time-outline" size={22} color={muted} />
+              </View>
+              <Text style={[styles.historyTitle, { color: text }]}>No history found</Text>
+              <Text style={[styles.historySub, { color: muted }]}>
+                Start attempting mocks to see your performance summary here.
+              </Text>
+              <Pressable style={[styles.historyBtn, { borderColor: primary }]} onPress={() => navigation.navigate('CreateMock')}>
+                <Text style={[styles.historyBtnText, { color: primary }]}>Start a Mock</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>

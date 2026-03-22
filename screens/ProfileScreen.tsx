@@ -29,7 +29,7 @@ export default function ProfileScreen() {
       try {
         const token = await AsyncStorage.getItem('userToken');
         if (token && token !== 'true') {
-          const res = await userApi.getProfile(token);
+          const res = await userApi.getProfile();
           // Standardize payload extraction if it's wrapped or flat
           setProfileData(res?.user || res);
         }
