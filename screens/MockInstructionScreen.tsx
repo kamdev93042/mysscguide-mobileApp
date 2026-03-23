@@ -39,6 +39,7 @@ export default function MockInstructionScreen() {
       navigation.navigate('MockPractice', {
         mockData,
         sourceTab: route.params?.sourceTab,
+        testKey: route.params?.testKey,
       });
     }
   };

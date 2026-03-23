@@ -102,6 +102,7 @@ export default function MocksScreen() {
 
   const [showAllPublic, setShowAllPublic] = useState(false);
   const [showAllMy, setShowAllMy] = useState(false);
+  const [showLockedNotice, setShowLockedNotice] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const card = isDark ? '#020617' : '#ffffff';
@@ -180,7 +181,11 @@ export default function MocksScreen() {
                 if (item.id === 'create') {
                   navigation.navigate('CreateMock');
                 } else if (item.id === 'archives') {
-                  navigation.navigate('PYQs');
+                  navigation.navigate('PYQs', { activeTab: 'PYQ' });
+                } else if (item.id === 'rank') {
+                  navigation.navigate('PYQs', { activeTab: 'RankMaker' });
+                } else if (item.id === 'prescription') {
+                  setShowLockedNotice(true);
                 }
               }}
             >
@@ -194,6 +199,18 @@ export default function MocksScreen() {
             </Pressable>
           ))}
         </View>
+
+        {showLockedNotice && (
+          <View style={[styles.lockedNotice, { backgroundColor: isDark ? '#1e293b' : '#ecfdf5', borderColor: isDark ? '#334155' : '#a7f3d0' }]}>
+            <View style={styles.lockedNoticeLeft}>
+              <Ionicons name="lock-closed" size={16} color={primary} />
+              <Text style={[styles.lockedNoticeText, { color: text }]}>Doctor&apos;s Prescription is locked for now. Coming soon.</Text>
+            </View>
+            <Pressable onPress={() => setShowLockedNotice(false)} hitSlop={8}>
+              <Ionicons name="close" size={16} color={muted} />
+            </Pressable>
+          </View>
+        )}
 
         {/* My Challenges list */}
         {myChallenges.length > 0 && (
@@ -416,6 +433,29 @@ const styles = StyleSheet.create({
   },
   exploreTitle: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
   exploreSub: { fontSize: 11, lineHeight: 16 },
+  lockedNotice: {
+    marginTop: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  lockedNoticeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  lockedNoticeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
