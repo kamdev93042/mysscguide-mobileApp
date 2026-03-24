@@ -6,11 +6,14 @@ import {
   Pressable,
   ScrollView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { pyqApi } from '../services/api';
 
 export default function MockInstructionScreen() {
   const insets = useSafeAreaInsets();
@@ -25,6 +28,7 @@ export default function MockInstructionScreen() {
   };
 
   const [hasAgreed, setHasAgreed] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   const bg = isDark ? '#000000' : '#ffffff';
   const card = bg;
@@ -34,8 +38,44 @@ export default function MockInstructionScreen() {
   const tableBorder = isDark ? '#1e293b' : '#e2e8f0';
   const footerBg = isDark ? '#0f172a' : '#f1f5f9';
 
-  const handleContinue = () => {
-    if (hasAgreed) {
+  const handleContinue = async () => {
+    if (!hasAgreed || isInitializing) return;
+
+    if (route.params?.sourceTab === 'PYQ' && route.params?.testPaperId) {
+      setIsInitializing(true);
+      try {
+        const res = await pyqApi.initPyq(route.params.testPaperId);
+        
+        const dynamicMockData = {
+          ...mockData,
+          questions: res?.questionCount || mockData.questions,
+          duration: res?.timeLimit ? Math.floor(res.timeLimit / 60) : mockData.duration,
+        };
+
+        navigation.navigate('MockPractice', {
+          mockData: dynamicMockData,
+          sourceTab: route.params?.sourceTab,
+          testKey: route.params?.testKey,
+          testPaperId: route.params?.testPaperId,
+        });
+        
+        setIsInitializing(false);
+      } catch (error: any) {
+        console.error('Failed to init PYQ:', error);
+        
+        let errorMsg = 'Failed to initialize test. Please try again.';
+        if (error.message) {
+           errorMsg = error.message;
+        }
+
+        if (Platform.OS === 'web') {
+           window.alert(errorMsg);
+        } else {
+           Alert.alert('Error', errorMsg);
+        }
+        setIsInitializing(false);
+      }
+    } else {
       navigation.navigate('MockPractice', {
         mockData,
         sourceTab: route.params?.sourceTab,
@@ -239,12 +279,12 @@ export default function MockInstructionScreen() {
         </Pressable>
         
         <Pressable
-          style={[styles.beginBtn, !hasAgreed && styles.beginBtnDisabled]}
+          style={[styles.beginBtn, (!hasAgreed || isInitializing) && styles.beginBtnDisabled]}
           onPress={handleContinue}
-          disabled={!hasAgreed}
+          disabled={!hasAgreed || isInitializing}
         >
-          <Text style={[styles.beginBtnText, !hasAgreed && styles.beginBtnTextDisabled]}>
-            I am ready to begin
+          <Text style={[styles.beginBtnText, (!hasAgreed || isInitializing) && styles.beginBtnTextDisabled]}>
+            {isInitializing ? 'Initializing...' : 'I am ready to begin'}
           </Text>
         </Pressable>
       </View>

@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommonActions, StackActions, useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { pyqApi } from '../services/api';
+import { ActivityIndicator } from 'react-native';
 
 const SECTION_TITLES = ['PART-A', 'PART-B', 'PART-C', 'PART-D'] as const;
 const EXAM_DURATION_SECONDS = 60 * 60;
@@ -26,6 +28,8 @@ type Question = {
   questionText: string;
   options: string[];
   correctOption: number;
+  realId?: string | number;
+  realOptions?: any[];
 };
 
 type SourceTab = 'PYQ' | 'RankMaker';
@@ -112,7 +116,10 @@ export default function MockPracticeScreen() {
     ? Number(mockData.questions)
     : 25;
 
-  const examQuestions = useMemo(() => buildQuestions(totalQuestions), [totalQuestions]);
+  const [examQuestions, setExamQuestions] = useState<Question[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(true);
+  const [apiMetadata, setApiMetadata] = useState<{ attemptId?: string; originalQuestions?: any[], timeLimit?: number }>({});
+
   const sectionNames = useMemo(
     () => Array.from(new Set(examQuestions.map((q) => q.section))) as SectionTitle[],
     [examQuestions]
@@ -120,13 +127,13 @@ export default function MockPracticeScreen() {
 
   const initialQuestionIndex =
     resumeState && Number.isInteger(resumeState.currentQuestionIndex)
-      ? Math.min(Math.max(resumeState.currentQuestionIndex, 0), Math.max(examQuestions.length - 1, 0))
+      ? Math.max(resumeState.currentQuestionIndex, 0)
       : 0;
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(initialQuestionIndex);
   const [selectedOptions, setSelectedOptions] = useState<Record<number, number>>(resumeState?.selectedOptions || {});
   const [visitedQuestions, setVisitedQuestions] = useState<Record<number, boolean>>(
-    resumeState?.visitedQuestions || { [examQuestions[initialQuestionIndex]?.id || examQuestions[0].id]: true }
+    resumeState?.visitedQuestions || {}
   );
   const [reviewedQuestions, setReviewedQuestions] = useState<Record<number, boolean>>(resumeState?.reviewedQuestions || {});
   const [timeLeft, setTimeLeft] = useState(
@@ -135,19 +142,140 @@ export default function MockPracticeScreen() {
       : EXAM_DURATION_SECONDS
   );
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionTitle>(resumeState?.activeSection || sectionNames[0]);
+  const [activeSection, setActiveSection] = useState<SectionTitle>(resumeState?.activeSection || SECTION_TITLES[0]);
   const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Hindi'>(resumeState?.selectedLanguage || 'English');
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const [isReportDropdownOpen, setIsReportDropdownOpen] = useState(false);
   const [activePaletteTab, setActivePaletteTab] = useState<'symbols' | 'instructions'>('symbols');
   const [isSubmitModalVisible, setIsSubmitModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const extractNestedString = (val: any): string | null => {
+    if (typeof val === 'string' && val.trim() !== '') return val;
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'object' && val !== null) {
+      if (val.text && typeof val.text === 'string') return val.text;
+      if (val.optionText && typeof val.optionText === 'string') return val.optionText;
+      if (val.english && typeof val.english === 'string') return val.english;
+      if (val.hindi && typeof val.hindi === 'string') return val.hindi;
+      if (val.value && typeof val.value === 'string') return val.value;
+      if (val.en && typeof val.en === 'string') return val.en;
+      if (val.hi && typeof val.hi === 'string') return val.hi;
+    }
+    return null;
+  };
+
+  const parseLanguageContent = (content: any, lang: 'English' | 'Hindi'): string => {
+    if (!content) return '';
+    let obj = content;
+    if (typeof content === 'string') {
+      try { obj = JSON.parse(content); } catch { return content; }
+    }
+    if (typeof obj === 'object' && obj !== null) {
+      const isHindi = lang === 'Hindi';
+      const tryNodes = isHindi 
+        ? [obj.hi, obj.hindi, obj?.content?.hindi, obj?.content?.hi, obj.en, obj.english, obj?.content?.english, obj.text, obj.optionText, obj]
+        : [obj.en, obj.english, obj?.content?.english, obj?.content?.en, obj.text, obj.optionText, obj];
+      
+      for (const node of tryNodes) {
+        const extracted = extractNestedString(node);
+        if (extracted) return extracted;
+      }
+      return JSON.stringify(obj);
+    }
+    return String(content);
+  };
   const [zoomLevel, setZoomLevel] = useState(
     typeof resumeState?.zoomLevel === 'number' ? resumeState.zoomLevel : 1
   );
   const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
   const [infoModalType, setInfoModalType] = useState<'symbols' | 'instructions'>('instructions');
   const [isPauseConfirmVisible, setIsPauseConfirmVisible] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPaper = async () => {
+      if (sourceTab !== 'PYQ' || !route.params?.testPaperId) {
+        const qs = buildQuestions(totalQuestions);
+        if (isMounted) {
+           setExamQuestions(qs);
+           setVisitedQuestions(prev => ({ ...prev, [qs[initialQuestionIndex]?.id]: true }));
+           setActiveSection(qs[initialQuestionIndex]?.section || SECTION_TITLES[0]);
+           setLoadingQuestions(false);
+        }
+        return;
+      }
+
+      try {
+        let res;
+        if (resumeState) {
+          res = await pyqApi.resumePyq(route.params.testPaperId);
+        } else {
+          res = await pyqApi.startPyq(route.params.testPaperId);
+        }
+        
+        const qList = res.questions || [];
+        const sectionSize = qList.length > 0 ? Math.ceil(qList.length / SECTION_TITLES.length) : 25;
+        
+        const mappedQs = qList.map((q: any, i: number) => {
+          let rawOptions: any[] = [];
+          if (Array.isArray(q.options)) {
+            rawOptions = q.options;
+          } else if (typeof q.options === 'string') {
+            try { 
+              const parsed = JSON.parse(q.options);
+              if (Array.isArray(parsed)) rawOptions = parsed;
+            } catch {}
+          }
+
+          return {
+            id: i + 1,
+            realId: q._id || q.id || q.questionId,
+            section: q.section || SECTION_TITLES[Math.floor(i / sectionSize)] || SECTION_TITLES[SECTION_TITLES.length - 1],
+            questionText: q.questionText || q.questionData?.text || q.content || `Question ${i+1}`,
+            options: rawOptions.map(o => typeof o === 'string' ? o : JSON.stringify(o)),
+            realOptions: rawOptions,
+            correctOption: -1,
+          };
+        });
+
+        if (isMounted) {
+           if (mappedQs.length > 0) {
+             setExamQuestions(mappedQs);
+             if (res.config?.timeLimit) {
+               const timeLimitInSeconds = res.config.timeLimit < 300 ? res.config.timeLimit * 60 : res.config.timeLimit;
+               setTimeLeft(timeLimitInSeconds);
+             } else if (mockData?.duration) {
+               const durationInSeconds = mockData.duration < 300 ? mockData.duration * 60 : mockData.duration;
+               setTimeLeft(durationInSeconds);
+             }
+             setApiMetadata({
+               attemptId: res.attemptId,
+               originalQuestions: qList,
+               timeLimit: res.config?.timeLimit || mockData?.duration,
+             });
+             setActiveSection(mappedQs[initialQuestionIndex]?.section || SECTION_TITLES[0]);
+             setVisitedQuestions(prev => ({ ...prev, [mappedQs[initialQuestionIndex]?.id || 1]: true }));
+           } else {
+             const qs = buildQuestions(totalQuestions);
+             setExamQuestions(qs);
+             setVisitedQuestions(prev => ({ ...prev, [qs[initialQuestionIndex]?.id]: true }));
+             setActiveSection(qs[initialQuestionIndex]?.section || SECTION_TITLES[0]);
+           }
+           setLoadingQuestions(false);
+        }
+      } catch (e) {
+        console.error('Fetch questions error:', e);
+        if (isMounted) {
+           setLoadingQuestions(false);
+           Alert.alert('Error', 'Failed to load test paper. Please try again later.');
+           navigation.goBack();
+        }
+      }
+    };
+    fetchPaper();
+    return () => { isMounted = false; };
+  }, [sourceTab, route.params?.testPaperId, totalQuestions]);
 
   const bg = isDark ? '#111827' : '#edf0f4';
   const card = isDark ? '#1f2937' : '#ffffff';
@@ -242,9 +370,39 @@ export default function MockPracticeScreen() {
     };
   };
 
-  const submitAndReturnToSeries = (mode: 'manual' | 'auto') => {
+  const submitAndReturnToSeries = async (mode: 'manual' | 'auto') => {
     const result = buildSubmissionResult();
-    setIsSubmitting(false);
+    setIsSubmitting(true);
+
+    if (sourceTab === 'PYQ' && route.params?.testPaperId) {
+      try {
+        const parsedLimit = apiMetadata.timeLimit || mockData?.duration || EXAM_DURATION_SECONDS;
+        const totalDurationSeconds = parsedLimit < 300 ? parsedLimit * 60 : parsedLimit;
+        const timeSpent = totalDurationSeconds - timeLeft;
+        const answers = Object.keys(selectedOptions).map(qIdStr => {
+          const qId = Number(qIdStr);
+          const q = examQuestions.find(eq => eq.id === qId);
+          let selectedOptionId = '';
+          if (q && selectedOptions[qId] !== undefined) {
+             const optObj = q.realOptions && q.realOptions[selectedOptions[qId]];
+             selectedOptionId = optObj ? (optObj._id || optObj.id || String(selectedOptions[qId])) : String(selectedOptions[qId]);
+          }
+          return {
+            questionId: q?.realId || String(qId),
+            selectedOptionId,
+            timeTaken: 10
+          };
+        });
+
+        await pyqApi.submitPyq(route.params.testPaperId, {
+          answers,
+          totalTimeTaken: timeSpent > 0 ? timeSpent : 0,
+          sectionTimeSpent: []
+        });
+      } catch (e) {
+        console.error('API Submit Failed:', e);
+      }
+    }
 
     const state = navigation.getState?.();
     const routes = state?.routes || [];
@@ -283,7 +441,7 @@ export default function MockPracticeScreen() {
     });
   };
 
-  const pauseAndReturnToSeries = () => {
+  const pauseAndReturnToSeries = async () => {
     const pausedPayload = {
       testKey,
       sourceTab,
@@ -300,6 +458,37 @@ export default function MockPracticeScreen() {
       },
       pausedAt: new Date().toISOString(),
     };
+
+    if (sourceTab === 'PYQ' && route.params?.testPaperId) {
+      try {
+        const parsedLimit = apiMetadata.timeLimit || mockData?.duration || EXAM_DURATION_SECONDS;
+        const totalDurationSeconds = parsedLimit < 300 ? parsedLimit * 60 : parsedLimit;
+        const timeSpent = totalDurationSeconds - timeLeft;
+        const answers = Object.keys(selectedOptions).map(qIdStr => {
+          const qId = Number(qIdStr);
+          const q = examQuestions.find(eq => eq.id === qId);
+          let selectedOptionId = '';
+          if (q && selectedOptions[qId] !== undefined) {
+             const optObj = q.realOptions && q.realOptions[selectedOptions[qId]];
+             selectedOptionId = optObj ? (optObj._id || optObj.id || String(selectedOptions[qId])) : String(selectedOptions[qId]);
+          }
+          return {
+            questionId: q?.realId || String(qId),
+            selectedOptionId,
+            timeTaken: 10
+          };
+        });
+
+        await pyqApi.pausePyq(route.params.testPaperId, {
+          answers,
+          totalTimeTaken: timeSpent > 0 ? timeSpent : 0,
+          nextQuestionIndex: currentQuestionIndex,
+          skippedQuestionIds: examQuestions.filter(q => selectedOptions[q.id] === undefined && visitedQuestions[q.id]).map(q => q.realId || String(q.id))
+        });
+      } catch (e) {
+        console.error('API Pause Failed:', e);
+      }
+    }
 
     const state = navigation.getState?.();
     const routes = state?.routes || [];
@@ -500,7 +689,10 @@ export default function MockPracticeScreen() {
   const sectionAnsweredCount = sectionQuestions.filter((q) => selectedOptions[q.id] !== undefined).length;
   const sectionReviewCount = sectionQuestions.filter((q) => !!reviewedQuestions[q.id]).length;
   const sectionNotAnsweredCount = sectionQuestions.length - sectionAnsweredCount;
-  const isLongQuestion = currentQuestion.questionText.length > 260;
+  const isLongQuestion = (currentQuestion?.questionText?.length || 0) > 260;
+
+  const displayQuestionText = parseLanguageContent(currentQuestion?.questionText, selectedLanguage);
+  const displayOptions = (currentQuestion?.options || []).map(o => parseLanguageContent(o, selectedLanguage));
 
   const submitTableRows = sectionNames.map((section) => {
     const questions = examQuestions.filter((q) => q.section === section);
@@ -541,6 +733,14 @@ export default function MockPracticeScreen() {
       borderColor: '#2563eb',
     };
   };
+
+  if (loadingQuestions || !currentQuestion) {
+    return (
+      <View style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: Platform.OS === 'ios' ? insets.top : 10 }]}> 
@@ -719,12 +919,12 @@ export default function MockPracticeScreen() {
               scrollEnabled={isLongQuestion}
             >
               <Text style={[styles.questionText, { color: text, fontSize: 16 * zoomLevel, lineHeight: 25 * zoomLevel }]}>
-                {currentQuestion.questionText}
+                {displayQuestionText}
               </Text>
             </ScrollView>
 
             <View style={styles.optionsWrap}>
-              {currentQuestion.options.map((option, optionIndex) => {
+              {displayOptions.map((option, optionIndex) => {
                 const isSelected = selectedOptions[currentQuestion.id] === optionIndex;
                 return (
                   <Pressable
@@ -749,7 +949,7 @@ export default function MockPracticeScreen() {
                       </View>
                     </View>
                     <Text style={[styles.optionText, { color: text, fontSize: 14 * zoomLevel, lineHeight: 22 * zoomLevel }]}>
-                      {option.replace(/^Option\s[A-D]:\s*/, '')}
+                      {String(option).replace(/^Option\s[A-D]:\s*/, '')}
                     </Text>
                   </Pressable>
                 );
