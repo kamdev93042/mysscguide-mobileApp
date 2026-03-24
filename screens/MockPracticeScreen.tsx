@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommonActions, StackActions, useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { pyqApi } from '../services/api';
+import { ActivityIndicator } from 'react-native';
 
 const SECTION_TITLES = ['PART-A', 'PART-B', 'PART-C', 'PART-D'] as const;
 const EXAM_DURATION_SECONDS = 60 * 60;
@@ -26,9 +28,22 @@ type Question = {
   questionText: string;
   options: string[];
   correctOption: number;
+  realId?: string | number;
+  realOptions?: any[];
 };
 
 type SourceTab = 'PYQ' | 'RankMaker';
+
+type ResumeState = {
+  currentQuestionIndex: number;
+  selectedOptions: Record<number, number>;
+  visitedQuestions: Record<number, boolean>;
+  reviewedQuestions: Record<number, boolean>;
+  timeLeft: number;
+  activeSection: SectionTitle;
+  selectedLanguage: 'English' | 'Hindi';
+  zoomLevel: number;
+};
 
 type SectionBreakup = {
   section: SectionTitle;
@@ -92,38 +107,175 @@ export default function MockPracticeScreen() {
     questions: 25,
   };
   const sourceTab: SourceTab = route.params?.sourceTab || (mockData.title.includes('Rank Maker') ? 'RankMaker' : 'PYQ');
+  const testKey: string =
+    route.params?.testKey ||
+    `${sourceTab}:${String(mockData.title || 'Mock Test')}:${String(mockData.questions || 25)}`;
+  const resumeState = route.params?.resumeState as ResumeState | undefined;
 
   const totalQuestions = Number.isFinite(Number(mockData.questions))
     ? Number(mockData.questions)
     : 25;
 
-  const examQuestions = useMemo(() => buildQuestions(totalQuestions), [totalQuestions]);
+  const [examQuestions, setExamQuestions] = useState<Question[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(true);
+  const [apiMetadata, setApiMetadata] = useState<{ attemptId?: string; originalQuestions?: any[], timeLimit?: number }>({});
+
   const sectionNames = useMemo(
     () => Array.from(new Set(examQuestions.map((q) => q.section))) as SectionTitle[],
     [examQuestions]
   );
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedOptions, setSelectedOptions] = useState<Record<number, number>>({});
-  const [visitedQuestions, setVisitedQuestions] = useState<Record<number, boolean>>({
-    [examQuestions[0].id]: true,
-  });
-  const [reviewedQuestions, setReviewedQuestions] = useState<Record<number, boolean>>({});
-  const [timeLeft, setTimeLeft] = useState(EXAM_DURATION_SECONDS);
+  const initialQuestionIndex =
+    resumeState && Number.isInteger(resumeState.currentQuestionIndex)
+      ? Math.max(resumeState.currentQuestionIndex, 0)
+      : 0;
+
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(initialQuestionIndex);
+  const [selectedOptions, setSelectedOptions] = useState<Record<number, number>>(resumeState?.selectedOptions || {});
+  const [visitedQuestions, setVisitedQuestions] = useState<Record<number, boolean>>(
+    resumeState?.visitedQuestions || {}
+  );
+  const [reviewedQuestions, setReviewedQuestions] = useState<Record<number, boolean>>(resumeState?.reviewedQuestions || {});
+  const [timeLeft, setTimeLeft] = useState(
+    typeof resumeState?.timeLeft === 'number' && resumeState.timeLeft > 0
+      ? resumeState.timeLeft
+      : EXAM_DURATION_SECONDS
+  );
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionTitle>(sectionNames[0]);
-  const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Hindi'>('English');
+  const [activeSection, setActiveSection] = useState<SectionTitle>(resumeState?.activeSection || SECTION_TITLES[0]);
+  const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Hindi'>(resumeState?.selectedLanguage || 'English');
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const [isReportDropdownOpen, setIsReportDropdownOpen] = useState(false);
   const [activePaletteTab, setActivePaletteTab] = useState<'symbols' | 'instructions'>('symbols');
   const [isSubmitModalVisible, setIsSubmitModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  const extractNestedString = (val: any): string | null => {
+    if (typeof val === 'string' && val.trim() !== '') return val;
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'object' && val !== null) {
+      if (val.text && typeof val.text === 'string') return val.text;
+      if (val.optionText && typeof val.optionText === 'string') return val.optionText;
+      if (val.english && typeof val.english === 'string') return val.english;
+      if (val.hindi && typeof val.hindi === 'string') return val.hindi;
+      if (val.value && typeof val.value === 'string') return val.value;
+      if (val.en && typeof val.en === 'string') return val.en;
+      if (val.hi && typeof val.hi === 'string') return val.hi;
+    }
+    return null;
+  };
+
+  const parseLanguageContent = (content: any, lang: 'English' | 'Hindi'): string => {
+    if (!content) return '';
+    let obj = content;
+    if (typeof content === 'string') {
+      try { obj = JSON.parse(content); } catch { return content; }
+    }
+    if (typeof obj === 'object' && obj !== null) {
+      const isHindi = lang === 'Hindi';
+      const tryNodes = isHindi 
+        ? [obj.hi, obj.hindi, obj?.content?.hindi, obj?.content?.hi, obj.en, obj.english, obj?.content?.english, obj.text, obj.optionText, obj]
+        : [obj.en, obj.english, obj?.content?.english, obj?.content?.en, obj.text, obj.optionText, obj];
+      
+      for (const node of tryNodes) {
+        const extracted = extractNestedString(node);
+        if (extracted) return extracted;
+      }
+      return JSON.stringify(obj);
+    }
+    return String(content);
+  };
+  const [zoomLevel, setZoomLevel] = useState(
+    typeof resumeState?.zoomLevel === 'number' ? resumeState.zoomLevel : 1
+  );
   const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
   const [infoModalType, setInfoModalType] = useState<'symbols' | 'instructions'>('instructions');
   const [isPauseConfirmVisible, setIsPauseConfirmVisible] = useState(false);
-  const [isTestPaused, setIsTestPaused] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPaper = async () => {
+      if (sourceTab !== 'PYQ' || !route.params?.testPaperId) {
+        const qs = buildQuestions(totalQuestions);
+        if (isMounted) {
+           setExamQuestions(qs);
+           setVisitedQuestions(prev => ({ ...prev, [qs[initialQuestionIndex]?.id]: true }));
+           setActiveSection(qs[initialQuestionIndex]?.section || SECTION_TITLES[0]);
+           setLoadingQuestions(false);
+        }
+        return;
+      }
+
+      try {
+        let res;
+        if (resumeState) {
+          res = await pyqApi.resumePyq(route.params.testPaperId);
+        } else {
+          res = await pyqApi.startPyq(route.params.testPaperId);
+        }
+        
+        const qList = res.questions || [];
+        const sectionSize = qList.length > 0 ? Math.ceil(qList.length / SECTION_TITLES.length) : 25;
+        
+        const mappedQs = qList.map((q: any, i: number) => {
+          let rawOptions: any[] = [];
+          if (Array.isArray(q.options)) {
+            rawOptions = q.options;
+          } else if (typeof q.options === 'string') {
+            try { 
+              const parsed = JSON.parse(q.options);
+              if (Array.isArray(parsed)) rawOptions = parsed;
+            } catch {}
+          }
+
+          return {
+            id: i + 1,
+            realId: q._id || q.id || q.questionId,
+            section: q.section || SECTION_TITLES[Math.floor(i / sectionSize)] || SECTION_TITLES[SECTION_TITLES.length - 1],
+            questionText: q.questionText || q.questionData?.text || q.content || `Question ${i+1}`,
+            options: rawOptions.map(o => typeof o === 'string' ? o : JSON.stringify(o)),
+            realOptions: rawOptions,
+            correctOption: -1,
+          };
+        });
+
+        if (isMounted) {
+           if (mappedQs.length > 0) {
+             setExamQuestions(mappedQs);
+             if (res.config?.timeLimit) {
+               const timeLimitInSeconds = res.config.timeLimit < 300 ? res.config.timeLimit * 60 : res.config.timeLimit;
+               setTimeLeft(timeLimitInSeconds);
+             } else if (mockData?.duration) {
+               const durationInSeconds = mockData.duration < 300 ? mockData.duration * 60 : mockData.duration;
+               setTimeLeft(durationInSeconds);
+             }
+             setApiMetadata({
+               attemptId: res.attemptId,
+               originalQuestions: qList,
+               timeLimit: res.config?.timeLimit || mockData?.duration,
+             });
+             setActiveSection(mappedQs[initialQuestionIndex]?.section || SECTION_TITLES[0]);
+             setVisitedQuestions(prev => ({ ...prev, [mappedQs[initialQuestionIndex]?.id || 1]: true }));
+           } else {
+             const qs = buildQuestions(totalQuestions);
+             setExamQuestions(qs);
+             setVisitedQuestions(prev => ({ ...prev, [qs[initialQuestionIndex]?.id]: true }));
+             setActiveSection(qs[initialQuestionIndex]?.section || SECTION_TITLES[0]);
+           }
+           setLoadingQuestions(false);
+        }
+      } catch (e) {
+        console.error('Fetch questions error:', e);
+        if (isMounted) {
+           setLoadingQuestions(false);
+           Alert.alert('Error', 'Failed to load test paper. Please try again later.');
+           navigation.goBack();
+        }
+      }
+    };
+    fetchPaper();
+    return () => { isMounted = false; };
+  }, [sourceTab, route.params?.testPaperId, totalQuestions]);
 
   const bg = isDark ? '#111827' : '#edf0f4';
   const card = isDark ? '#1f2937' : '#ffffff';
@@ -207,19 +359,50 @@ export default function MockPracticeScreen() {
     return {
       sourceTab,
       testTitle: String(mockData.title || 'Mock Test'),
+      testKey,
       attempted,
       correct,
       wrong,
       unattempted,
       score,
       sectionBreakup,
-      submittedAt: new Date().toLocaleString(),
+      submittedAt: new Date().toISOString(),
     };
   };
 
-  const submitAndReturnToSeries = (mode: 'manual' | 'auto') => {
+  const submitAndReturnToSeries = async (mode: 'manual' | 'auto') => {
     const result = buildSubmissionResult();
-    setIsSubmitting(false);
+    setIsSubmitting(true);
+
+    if (sourceTab === 'PYQ' && route.params?.testPaperId) {
+      try {
+        const parsedLimit = apiMetadata.timeLimit || mockData?.duration || EXAM_DURATION_SECONDS;
+        const totalDurationSeconds = parsedLimit < 300 ? parsedLimit * 60 : parsedLimit;
+        const timeSpent = totalDurationSeconds - timeLeft;
+        const answers = Object.keys(selectedOptions).map(qIdStr => {
+          const qId = Number(qIdStr);
+          const q = examQuestions.find(eq => eq.id === qId);
+          let selectedOptionId = '';
+          if (q && selectedOptions[qId] !== undefined) {
+             const optObj = q.realOptions && q.realOptions[selectedOptions[qId]];
+             selectedOptionId = optObj ? (optObj._id || optObj.id || String(selectedOptions[qId])) : String(selectedOptions[qId]);
+          }
+          return {
+            questionId: q?.realId || String(qId),
+            selectedOptionId,
+            timeTaken: 10
+          };
+        });
+
+        await pyqApi.submitPyq(route.params.testPaperId, {
+          answers,
+          totalTimeTaken: timeSpent > 0 ? timeSpent : 0,
+          sectionTimeSpent: []
+        });
+      } catch (e) {
+        console.error('API Submit Failed:', e);
+      }
+    }
 
     const state = navigation.getState?.();
     const routes = state?.routes || [];
@@ -239,6 +422,7 @@ export default function MockPracticeScreen() {
         ...CommonActions.setParams({
           submissionResult: result,
           submitMode: mode,
+          clearPausedTestKey: testKey,
         }),
         source: pyqsKey,
       });
@@ -253,6 +437,91 @@ export default function MockPracticeScreen() {
     navigation.navigate('PYQs', {
       submissionResult: result,
       submitMode: mode,
+      clearPausedTestKey: testKey,
+    });
+  };
+
+  const pauseAndReturnToSeries = async () => {
+    const pausedPayload = {
+      testKey,
+      sourceTab,
+      mockData,
+      resumeState: {
+        currentQuestionIndex,
+        selectedOptions,
+        visitedQuestions,
+        reviewedQuestions,
+        timeLeft,
+        activeSection,
+        selectedLanguage,
+        zoomLevel,
+      },
+      pausedAt: new Date().toISOString(),
+    };
+
+    if (sourceTab === 'PYQ' && route.params?.testPaperId) {
+      try {
+        const parsedLimit = apiMetadata.timeLimit || mockData?.duration || EXAM_DURATION_SECONDS;
+        const totalDurationSeconds = parsedLimit < 300 ? parsedLimit * 60 : parsedLimit;
+        const timeSpent = totalDurationSeconds - timeLeft;
+        const answers = Object.keys(selectedOptions).map(qIdStr => {
+          const qId = Number(qIdStr);
+          const q = examQuestions.find(eq => eq.id === qId);
+          let selectedOptionId = '';
+          if (q && selectedOptions[qId] !== undefined) {
+             const optObj = q.realOptions && q.realOptions[selectedOptions[qId]];
+             selectedOptionId = optObj ? (optObj._id || optObj.id || String(selectedOptions[qId])) : String(selectedOptions[qId]);
+          }
+          return {
+            questionId: q?.realId || String(qId),
+            selectedOptionId,
+            timeTaken: 10
+          };
+        });
+
+        await pyqApi.pausePyq(route.params.testPaperId, {
+          answers,
+          totalTimeTaken: timeSpent > 0 ? timeSpent : 0,
+          nextQuestionIndex: currentQuestionIndex,
+          skippedQuestionIds: examQuestions.filter(q => selectedOptions[q.id] === undefined && visitedQuestions[q.id]).map(q => q.realId || String(q.id))
+        });
+      } catch (e) {
+        console.error('API Pause Failed:', e);
+      }
+    }
+
+    const state = navigation.getState?.();
+    const routes = state?.routes || [];
+    const currentIndex = typeof state?.index === 'number' ? state.index : routes.length - 1;
+
+    let pyqsRouteIndex = -1;
+    for (let i = currentIndex - 1; i >= 0; i -= 1) {
+      if (routes[i]?.name === 'PYQs') {
+        pyqsRouteIndex = i;
+        break;
+      }
+    }
+
+    if (pyqsRouteIndex >= 0) {
+      const pyqsKey = routes[pyqsRouteIndex].key;
+      navigation.dispatch({
+        ...CommonActions.setParams({
+          pausedTest: pausedPayload,
+          activeTab: sourceTab,
+        }),
+        source: pyqsKey,
+      });
+
+      const popCount = currentIndex - pyqsRouteIndex;
+      if (popCount > 0) {
+        navigation.dispatch(StackActions.pop(popCount));
+      }
+      return;
+    }
+
+    navigation.navigate('PYQs', {
+      pausedTest: pausedPayload,
+      activeTab: sourceTab,
     });
   };
 
@@ -263,10 +532,6 @@ export default function MockPracticeScreen() {
   }, [activeSection, sectionNames]);
 
   useEffect(() => {
-    if (isTestPaused) {
-      return;
-    }
-
     if (timeLeft <= 0) {
       if (isSubmitting) {
         return;
@@ -289,7 +554,7 @@ export default function MockPracticeScreen() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLeft, isSubmitting, isTestPaused]);
+  }, [timeLeft, isSubmitting]);
 
   const getStatus = (questionId: number): QuestionStatus => {
     const isAnswered = selectedOptions[questionId] !== undefined;
@@ -404,7 +669,7 @@ export default function MockPracticeScreen() {
   };
 
   const handlePauseRequest = () => {
-    if (isSubmitting || isTestPaused) {
+    if (isSubmitting) {
       return;
     }
     setIsPauseConfirmVisible(true);
@@ -412,23 +677,22 @@ export default function MockPracticeScreen() {
 
   const handlePauseConfirm = () => {
     setIsPauseConfirmVisible(false);
-    setIsTestPaused(true);
     setIsLanguageDropdownOpen(false);
     setIsReportDropdownOpen(false);
     setIsPaletteVisible(false);
     setIsInfoModalVisible(false);
     setIsSubmitModalVisible(false);
-  };
-
-  const handleResumeTest = () => {
-    setIsTestPaused(false);
+    pauseAndReturnToSeries();
   };
 
   const sectionQuestions = examQuestions.filter((q) => q.section === activeSection);
   const sectionAnsweredCount = sectionQuestions.filter((q) => selectedOptions[q.id] !== undefined).length;
   const sectionReviewCount = sectionQuestions.filter((q) => !!reviewedQuestions[q.id]).length;
   const sectionNotAnsweredCount = sectionQuestions.length - sectionAnsweredCount;
-  const isLongQuestion = currentQuestion.questionText.length > 260;
+  const isLongQuestion = (currentQuestion?.questionText?.length || 0) > 260;
+
+  const displayQuestionText = parseLanguageContent(currentQuestion?.questionText, selectedLanguage);
+  const displayOptions = (currentQuestion?.options || []).map(o => parseLanguageContent(o, selectedLanguage));
 
   const submitTableRows = sectionNames.map((section) => {
     const questions = examQuestions.filter((q) => q.section === section);
@@ -470,6 +734,14 @@ export default function MockPracticeScreen() {
     };
   };
 
+  if (loadingQuestions || !currentQuestion) {
+    return (
+      <View style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: Platform.OS === 'ios' ? insets.top : 10 }]}> 
       <View style={[styles.header, { borderBottomColor: border, backgroundColor: card }]}>
@@ -492,9 +764,9 @@ export default function MockPracticeScreen() {
             <Text style={styles.timerText}>{formatTime(timeLeft).slice(3).replace(':', ' : ')}</Text>
           </View>
           <Pressable
-            style={[styles.pauseBtn, (isSubmitting || isTestPaused) && styles.pauseBtnDisabled]}
+            style={[styles.pauseBtn, isSubmitting && styles.pauseBtnDisabled]}
             onPress={handlePauseRequest}
-            disabled={isSubmitting || isTestPaused}
+            disabled={isSubmitting}
             hitSlop={6}
           >
             <Ionicons name="pause" size={13} color="#0f172a" />
@@ -546,19 +818,10 @@ export default function MockPracticeScreen() {
             <Text style={styles.infoTabLink}>INSTRUCTIONS</Text>
           </Pressable>
         </View>
-
-        <Pressable
-          style={[styles.fullscreenBtn, { borderColor: border }]}
-          onPress={() => setIsFullscreen((prev) => !prev)}
-        >
-          <Ionicons name={isFullscreen ? 'contract-outline' : 'expand-outline'} size={16} color={text} />
-          <Text style={[styles.fullscreenBtnText, { color: text }]}>{isFullscreen ? 'Exit' : 'Full'}</Text>
-        </Pressable>
       </View>
 
-      {!isFullscreen && (
-        <View style={[styles.sectionStrip, { borderBottomColor: border, backgroundColor: card }]}> 
-          <View style={styles.sectionStripContent}>
+      <View style={[styles.sectionStrip, { borderBottomColor: border, backgroundColor: card }]}> 
+        <View style={styles.sectionStripContent}>
           {sectionNames.map((section) => {
             const isActive = currentQuestion.section === section;
             return (
@@ -581,9 +844,8 @@ export default function MockPracticeScreen() {
             );
           })}
 
-          </View>
         </View>
-      )}
+      </View>
 
       <ScrollView contentContainerStyle={styles.mainContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.questionCard, { backgroundColor: card, borderColor: border }]}> 
@@ -657,12 +919,12 @@ export default function MockPracticeScreen() {
               scrollEnabled={isLongQuestion}
             >
               <Text style={[styles.questionText, { color: text, fontSize: 16 * zoomLevel, lineHeight: 25 * zoomLevel }]}>
-                {currentQuestion.questionText}
+                {displayQuestionText}
               </Text>
             </ScrollView>
 
             <View style={styles.optionsWrap}>
-              {currentQuestion.options.map((option, optionIndex) => {
+              {displayOptions.map((option, optionIndex) => {
                 const isSelected = selectedOptions[currentQuestion.id] === optionIndex;
                 return (
                   <Pressable
@@ -670,8 +932,8 @@ export default function MockPracticeScreen() {
                     style={[
                       styles.optionRow,
                       {
-                        borderColor: isSelected ? '#3b82f6' : border,
-                        backgroundColor: isSelected ? (isDark ? '#111827' : '#f8fbff') : card,
+                        borderColor: border,
+                        backgroundColor: card,
                       },
                     ]}
                     onPress={() => handleSelectOption(optionIndex)}
@@ -687,7 +949,7 @@ export default function MockPracticeScreen() {
                       </View>
                     </View>
                     <Text style={[styles.optionText, { color: text, fontSize: 14 * zoomLevel, lineHeight: 22 * zoomLevel }]}>
-                      {option.replace(/^Option\s[A-D]:\s*/, '')}
+                      {String(option).replace(/^Option\s[A-D]:\s*/, '')}
                     </Text>
                   </Pressable>
                 );
@@ -855,23 +1117,6 @@ export default function MockPracticeScreen() {
                 <Text style={styles.pauseConfirmText}>Yes, Pause</Text>
               </Pressable>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={isTestPaused}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {}}
-      >
-        <View style={styles.pausedOverlay}>
-          <View style={styles.pausedPopup}>
-            <Text style={styles.pausedTitle}>Test Paused</Text>
-            <Text style={styles.pausedText}>Timer is stopped. Tap Resume to continue your test.</Text>
-            <Pressable style={styles.resumeBtn} onPress={handleResumeTest}>
-              <Text style={styles.resumeBtnText}>Resume</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -1762,20 +2007,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  fullscreenBtn: {
-    height: 34,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fullscreenBtnText: {
-    marginLeft: 5,
-    fontSize: 12,
-    fontWeight: '700',
-  },
   submitBtn: {
     borderRadius: 10,
     paddingHorizontal: 14,
@@ -1818,9 +2049,6 @@ const styles = StyleSheet.create({
   mainContent: {
     padding: 12,
     paddingBottom: 90,
-  },
-  mainContentFullscreen: {
-    paddingTop: 8,
   },
   questionCard: {
     borderWidth: 1,
@@ -2030,51 +2258,6 @@ const styles = StyleSheet.create({
   pauseConfirmText: {
     color: '#ffffff',
     fontSize: 13,
-    fontWeight: '700',
-  },
-  pausedOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  pausedPopup: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#94a3b8',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  pausedTitle: {
-    color: '#111827',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  pausedText: {
-    color: '#334155',
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginBottom: 14,
-  },
-  resumeBtn: {
-    minWidth: 120,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#16a34a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  resumeBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
     fontWeight: '700',
   },
   submitModalCard: {

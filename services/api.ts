@@ -245,3 +245,103 @@ export const mockApi = {
     return fetchApi('/user/attempts', { method: 'GET' });
   },
 };
+
+export const pyqApi = {
+  // 0. Count Test Papers (Public)
+  async countTestPapers() {
+    return fetchApi('/test-papers/count', { method: 'GET' });
+  },
+
+  // 1 & 2. List Test Papers (With/Without Filters)
+  async listTestPapers(query: {
+    limit?: number;
+    cursor?: string;
+    examName?: string;
+    examYear?: string;
+    tier?: string;
+    shift?: string;
+    date?: string;
+  } = {}) {
+    const params = new URLSearchParams();
+    if (query.limit) params.append('limit', query.limit.toString());
+    if (query.cursor) params.append('cursor', query.cursor);
+    if (query.examName) params.append('examName', query.examName);
+    if (query.examYear) params.append('examYear', query.examYear);
+    if (query.tier) params.append('tier', query.tier);
+    if (query.shift) params.append('shift', query.shift);
+    if (query.date) params.append('date', query.date);
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return fetchApi(`/test-papers${queryString}`, { method: 'GET' });
+  },
+
+  // 3. PYQ Init (Create/Load Paper Config)
+  async initPyq(testPaperId: string) {
+    return fetchApi(`/user/test-papers/${testPaperId}/init`, { method: 'POST' });
+  },
+
+  // 4. PYQ Start (Get Questions)
+  async startPyq(testPaperId: string) {
+    return fetchApi(`/user/test-papers/${testPaperId}/start`, { method: 'GET' });
+  },
+
+  // 5. PYQ Pause (Save Partial State)
+  async pausePyq(testPaperId: string, data: {
+    answers: any[];
+    totalTimeTaken: number;
+    nextQuestionIndex: number;
+    skippedQuestionIds: string[];
+  }) {
+    return fetchApi(`/user/test-papers/${testPaperId}/pause`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 6. PYQ Resume (Restore Saved State)
+  async resumePyq(testPaperId: string) {
+    return fetchApi(`/user/test-papers/${testPaperId}/resume`, { method: 'GET' });
+  },
+
+  // 7. PYQ Submit (Final Submit)
+  async submitPyq(testPaperId: string, data: {
+    answers: any[];
+    totalTimeTaken: number;
+    sectionTimeSpent: any[];
+  }) {
+    return fetchApi(`/user/test-papers/${testPaperId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 8. PYQ Result by Paper + Attempt Number
+  async getPyqResult(testPaperId: string, attemptNumber?: number) {
+    let url = `/user/test-papers/${testPaperId}/result`;
+    if (attemptNumber) {
+      url += `?attemptNumber=${attemptNumber}`;
+    }
+    return fetchApi(url, { method: 'GET' });
+  },
+
+  // 9. PYQ Attempts History (Cursor Pagination)
+  async getPyqAttemptsHistory(query: { limit?: number; cursor?: string } = {}) {
+    const params = new URLSearchParams();
+    if (query.limit) params.append('limit', query.limit.toString());
+    if (query.cursor) params.append('cursor', query.cursor);
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return fetchApi(`/user/test-paper-attempts${queryString}`, { method: 'GET' });
+  },
+
+  // 10. PYQ Result by AttemptId
+  async getPyqAttemptResult(attemptId: string) {
+    return fetchApi(`/user/attempts/${attemptId}/result`, { method: 'GET' });
+  },
+
+  // 11. PYQ Attempt Analysis by AttemptId
+  async getPyqAttemptAnalysis(attemptId: string) {
+    return fetchApi(`/user/attempts/${attemptId}/analysis`, { method: 'GET' });
+  },
+};
+

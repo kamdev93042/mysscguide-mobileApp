@@ -1,18 +1,68 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLoginModal } from '../context/LoginModalContext';
 import { useMnemonics } from '../context/MnemonicsContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useForums } from '../context/ForumsContext';
+import { useMocks } from '../context/MocksContext';
+import { useTheme } from '../context/ThemeContext';
 import { userApi } from '../services/api';
 
-import { useTheme } from '../context/ThemeContext';
+const RESULT_HISTORY_STORAGE_KEY = 'pyqs_result_history_v1';
+
+type StoredResult = {
+  sourceTab: 'PYQ' | 'RankMaker';
+  testTitle: string;
+  attempted: number;
+  correct: number;
+  wrong: number;
+  unattempted: number;
+  score: number;
+  sectionBreakup?: Array<{
+    section: string;
+    correct: number;
+    wrong: number;
+    attempted: number;
+    score: number;
+  }>;
+  submittedAt: string;
+};
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { userName, userEmail, userPhone } = useLoginModal();
+  const { width } = useWindowDimensions();
+  const { userName, userEmail, userPhone, setUserName, setUserEmail, setUserPhone } = useLoginModal();
   const { isDark } = useTheme();
+  const { mnemonics, toggleSave } = useMnemonics();
+  const { posts } = useForums();
+  const { recentAttempts } = useMocks();
+
+  const [profileData, setProfileData] = useState<any>(null);
+  const [resultHistory, setResultHistory] = useState<StoredResult[]>([]);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    city: '',
+    state: '',
+    exam: '',
+  });
+  const [loading, setLoading] = useState(true);
+
+  const isWide = width >= 720;
 
   const bg = isDark ? '#0f172a' : '#fdfdfd';
   const card = isDark ? '#1e293b' : '#ffffff';
@@ -20,33 +70,156 @@ export default function ProfileScreen() {
   const text = isDark ? '#ffffff' : '#111827';
   const muted = isDark ? '#94a3b8' : '#6b7280';
   const border = isDark ? '#334155' : '#e5e7eb';
-  
-  const { mnemonics, toggleSave, incrementLike, incrementDislike } = useMnemonics();
-  const savedMnemonics = mnemonics.filter(m => m.isSaved);
 
-  const [profileData, setProfileData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const savedMnemonics = mnemonics.filter((m) => m.isSaved);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const loadProfileData = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const [token, storedResultsRaw] = await Promise.all([
+          AsyncStorage.getItem('userToken'),
+          AsyncStorage.getItem(RESULT_HISTORY_STORAGE_KEY),
+        ]);
+
+        const storedResults = storedResultsRaw ? JSON.parse(storedResultsRaw) : [];
+        if (Array.isArray(storedResults)) {
+          setResultHistory(storedResults);
+        }
+
         if (token && token !== 'true') {
           const res = await userApi.getProfile();
-          // Standardize payload extraction if it's wrapped or flat
           setProfileData(res?.user || res);
         }
       } catch (err) {
-        console.error('Failed to fetch profile', err);
+        console.error('Failed to load profile data', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchProfile();
+
+    loadProfileData();
   }, []);
 
   const displayName = profileData?.fullName || profileData?.username || userName || 'User';
   const initial = displayName.charAt(0).toUpperCase();
+  const identityTag = profileData?.role || profileData?.exam || 'Learner';
+
+  const totalProblemsSolved = useMemo(
+    () => resultHistory.reduce((sum, item) => sum + (item.correct || 0), 0),
+    [resultHistory]
+  );
+
+  const sectionSolvedMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    resultHistory.forEach((item) => {
+      (item.sectionBreakup || []).forEach((sectionItem) => {
+        map[sectionItem.section] = (map[sectionItem.section] || 0) + (sectionItem.correct || 0);
+      });
+    });
+    return map;
+  }, [resultHistory]);
+
+  const topSection = useMemo(() => {
+    const entries = Object.entries(sectionSolvedMap);
+    if (entries.length === 0) {
+      return { name: 'No section yet', solved: 0 };
+    }
+    const [name, solved] = entries.sort((a, b) => b[1] - a[1])[0];
+    return { name, solved };
+  }, [sectionSolvedMap]);
+
+  const totalAttempted = useMemo(
+    () => resultHistory.reduce((sum, item) => sum + (item.attempted || 0), 0),
+    [resultHistory]
+  );
+
+  const totalCorrect = useMemo(
+    () => resultHistory.reduce((sum, item) => sum + (item.correct || 0), 0),
+    [resultHistory]
+  );
+
+  const winRate = totalAttempted > 0 ? Math.round((totalCorrect / totalAttempted) * 100) : 0;
+
+  const perfectDays = useMemo(() => {
+    const set = new Set<string>();
+    resultHistory.forEach((item) => {
+      const dt = new Date(item.submittedAt);
+      if (!isNaN(dt.getTime()) && item.score > 0) {
+        set.add(dt.toDateString());
+      }
+    });
+    return set.size;
+  }, [resultHistory]);
+
+  const totalMnemonics = mnemonics.length;
+  const totalPosts = posts.length;
+  const totalUpvotes =
+    mnemonics.reduce((sum, m) => sum + (m.likes || 0), 0) +
+    posts.reduce((sum, p) => sum + (p.likes || 0), 0);
+
+  const skillTags = useMemo(() => {
+    const tags = Object.entries(sectionSolvedMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([name, solved]) => `${name} (${solved})`);
+
+    if (tags.length > 0) {
+      return tags;
+    }
+
+    return profileData?.city || profileData?.state ? ['Getting Started'] : ['No Activity Yet'];
+  }, [sectionSolvedMap, profileData?.city, profileData?.state]);
+
+  const openEditModal = () => {
+    setEditForm({
+      fullName: String(profileData?.fullName || profileData?.username || userName || ''),
+      email: String(profileData?.email || userEmail || ''),
+      phone: String(profileData?.phone || userPhone || ''),
+      city: String(profileData?.city || ''),
+      state: String(profileData?.state || ''),
+      exam: String(profileData?.exam || ''),
+    });
+    setIsEditModalVisible(true);
+  };
+
+  const updateEditField = (key: keyof typeof editForm, value: string) => {
+    setEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveProfile = () => {
+    const updatedProfile = {
+      ...(profileData ?? {}),
+      fullName: editForm.fullName.trim(),
+      username: editForm.fullName.trim(),
+      email: editForm.email.trim(),
+      phone: editForm.phone.trim(),
+      city: editForm.city.trim(),
+      state: editForm.state.trim(),
+      exam: editForm.exam.trim(),
+    };
+
+    setProfileData(updatedProfile);
+
+    if (updatedProfile.fullName) {
+      setUserName(updatedProfile.fullName);
+    }
+    if (updatedProfile.email) {
+      setUserEmail(updatedProfile.email);
+    }
+    if (updatedProfile.phone) {
+      setUserPhone(updatedProfile.phone);
+    }
+
+    setIsEditModalVisible(false);
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.loaderWrap, { backgroundColor: bg }]}>
+        <ActivityIndicator size="large" color="#059669" />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
@@ -55,7 +228,6 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header row with avatar like app page */}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <View style={styles.headerAvatar}>
@@ -63,7 +235,7 @@ export default function ProfileScreen() {
             </View>
             <View>
               <Text style={[styles.headerTitle, { color: text }]}>{displayName}</Text>
-              <Text style={[styles.headerSub, { color: muted }]}>SSC Aspirant</Text>
+              <Text style={[styles.headerSub, { color: muted }]}>{identityTag}</Text>
             </View>
           </View>
           <View style={styles.headerIcons}>
@@ -76,22 +248,22 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Problems solved circular card */}
         <View style={[styles.metricCard, { backgroundColor: card, borderColor: border }]}>
           <Text style={[styles.metricTitle, { color: text }]}>Problems Solved</Text>
           <View style={styles.circleWrap}>
             <View style={styles.circleOuter}>
-              <Text style={styles.circleValue}>1</Text>
+              <Text style={[styles.circleValue, { color: text }]}>{totalProblemsSolved}</Text>
             </View>
           </View>
-          <Text style={[styles.metricFooter, { color: muted }]}>General Awareness · 1</Text>
+          <Text style={[styles.metricFooter, { color: muted }]}>
+            {topSection.name} · {topSection.solved}
+          </Text>
         </View>
 
-        {/* Dashboard overview / profile details */}
         <View style={[styles.profileCard, { backgroundColor: card, borderColor: border }]}>
           <Text style={[styles.sectionHeader, { color: text }]}>Dashboard Overview</Text>
 
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, !isWide && styles.infoRowStack]}>
             <View style={styles.infoCol}>
               <Text style={[styles.label, { color: muted }]}>Email</Text>
               <Text style={[styles.infoLine, { color: text }]}>
@@ -117,54 +289,60 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          <Pressable style={styles.editBtn}>
+          <Pressable style={styles.editBtn} onPress={openEditModal}>
             <Text style={styles.editBtnText}>Edit Profile</Text>
           </Pressable>
 
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: border }]} />
 
           <View style={styles.communitySection}>
             <Text style={[styles.sectionLabel, { color: muted }]}>Community</Text>
             <View style={styles.communityRow}>
               <Text style={[styles.communityKey, { color: text }]}>Total Mnemonics</Text>
-              <Text style={[styles.communityValue, { color: text }]}>0</Text>
+              <Text style={[styles.communityValue, { color: text }]}>{totalMnemonics}</Text>
             </View>
             <View style={styles.communityRow}>
               <Text style={[styles.communityKey, { color: text }]}>Total Posts</Text>
-              <Text style={[styles.communityValue, { color: text }]}>0</Text>
+              <Text style={[styles.communityValue, { color: text }]}>{totalPosts}</Text>
             </View>
             <View style={styles.communityRow}>
               <Text style={[styles.communityKey, { color: text }]}>Upvotes</Text>
-              <Text style={[styles.communityValue, { color: text }]}>0</Text>
+              <Text style={[styles.communityValue, { color: text }]}>{totalUpvotes}</Text>
             </View>
           </View>
 
           <View style={styles.skillsSection}>
             <Text style={[styles.sectionLabel, { color: muted }]}>Skills</Text>
-            <View style={styles.skillPill}>
-              <Text style={styles.skillText}>General Awareness</Text>
+            <View style={styles.skillsWrap}>
+              {skillTags.map((skill) => (
+                <View
+                  key={skill}
+                  style={[styles.skillPill, { backgroundColor: isDark ? '#334155' : '#dcfce7' }]}
+                >
+                  <Text style={[styles.skillText, { color: isDark ? '#e5e7eb' : '#14532d' }]}>{skill}</Text>
+                </View>
+              ))}
             </View>
           </View>
         </View>
 
-        {/* Consistency panel at bottom */}
         <View style={[styles.consistencyCard, { backgroundColor: cardSoft, borderColor: border }]}>
           <View style={styles.consistencyHeader}>
             <Text style={[styles.consistencyTitle, { color: text }]}>CONSISTENCY</Text>
             <Text style={[styles.consistencySub, { color: muted }]}>Goal completion trend</Text>
           </View>
-          <View style={styles.consistencyStats}>
+          <View style={[styles.consistencyStats, !isWide && styles.consistencyStatsStack]}>
             <View style={styles.consistencyStatItem}>
-              <Text style={[styles.consistencyStatValue, { color: text }]}>0</Text>
+              <Text style={[styles.consistencyStatValue, { color: text }]}>{perfectDays}</Text>
               <Text style={[styles.consistencyStatLabel, { color: muted }]}>Perfect Days</Text>
             </View>
             <View style={styles.consistencyStatItem}>
-              <Text style={[styles.consistencyStatValue, { color: text }]}>0%</Text>
+              <Text style={[styles.consistencyStatValue, { color: text }]}>{winRate}%</Text>
               <Text style={[styles.consistencyStatLabel, { color: muted }]}>Win Rate</Text>
             </View>
             <View style={styles.consistencyStatItem}>
-              <Text style={[styles.consistencyStatValue, { color: text }]}>0</Text>
-              <Text style={[styles.consistencyStatLabel, { color: muted }]}>Total Goals</Text>
+              <Text style={[styles.consistencyStatValue, { color: text }]}>{recentAttempts.length + resultHistory.length}</Text>
+              <Text style={[styles.consistencyStatLabel, { color: muted }]}>Total Tests</Text>
             </View>
           </View>
           <View style={styles.consistencyGraphPlaceholder}>
@@ -174,24 +352,23 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Saved Mnemonics Section */}
         {savedMnemonics.length > 0 && (
           <View style={[styles.profileCard, { backgroundColor: card, borderColor: border, marginTop: 16 }]}>
-            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
-              <Ionicons name="bookmark" size={18} color="#059669" style={{marginRight: 8}} />
+            <View style={styles.savedHeaderRow}>
+              <Ionicons name="bookmark" size={18} color="#059669" style={{ marginRight: 8 }} />
               <Text style={[styles.sectionHeader, { color: text, marginBottom: 0 }]}>Saved Mnemonics</Text>
             </View>
-            
-            {savedMnemonics.map(item => (
-              <View key={item.id} style={styles.savedMnemonicCard}>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-                   <Text style={[styles.savedMnemonicWord, { color: text }]}>{item.word}</Text>
-                   <Pressable onPress={() => toggleSave(item.id)} hitSlop={8}>
-                     <Ionicons name="bookmark" size={18} color="#059669" />
-                   </Pressable>
+
+            {savedMnemonics.map((item) => (
+              <View key={item.id} style={[styles.savedMnemonicCard, { borderBottomColor: border }]}>
+                <View style={styles.savedTitleRow}>
+                  <Text style={[styles.savedMnemonicWord, { color: text }]}>{item.word}</Text>
+                  <Pressable onPress={() => toggleSave(item.id)} hitSlop={8}>
+                    <Ionicons name="bookmark" size={18} color="#059669" />
+                  </Pressable>
                 </View>
                 <Text style={[styles.savedMnemonicMeaning, { color: muted }]}>{item.meaning}</Text>
-                
+
                 <View style={styles.savedTrickBox}>
                   <Text style={[styles.savedTrickText, { color: text }]}>{item.trick}</Text>
                 </View>
@@ -199,14 +376,130 @@ export default function ProfileScreen() {
             ))}
           </View>
         )}
-        
       </ScrollView>
+
+      <Modal
+        visible={isEditModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setIsEditModalVisible(false)} />
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: card,
+                borderColor: border,
+                width: isWide ? 520 : width - 24,
+              },
+            ]}
+          >
+            <View style={[styles.modalHeaderRow, { borderBottomColor: border }]}>
+              <Text style={[styles.modalTitle, { color: text }]}>Edit Profile</Text>
+              <Pressable onPress={() => setIsEditModalVisible(false)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={muted} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: muted }]}>Full Name</Text>
+                <TextInput
+                  value={editForm.fullName}
+                  onChangeText={(v) => updateEditField('fullName', v)}
+                  style={[styles.fieldInput, { color: text, borderColor: border, backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}
+                  placeholder="Enter full name"
+                  placeholderTextColor={muted}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: muted }]}>Email</Text>
+                <TextInput
+                  value={editForm.email}
+                  onChangeText={(v) => updateEditField('email', v)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={[styles.fieldInput, { color: text, borderColor: border, backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}
+                  placeholder="Enter email"
+                  placeholderTextColor={muted}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: muted }]}>Phone</Text>
+                <TextInput
+                  value={editForm.phone}
+                  onChangeText={(v) => updateEditField('phone', v)}
+                  keyboardType="phone-pad"
+                  style={[styles.fieldInput, { color: text, borderColor: border, backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}
+                  placeholder="Enter phone"
+                  placeholderTextColor={muted}
+                />
+              </View>
+
+              <View style={[styles.rowFields, !isWide && styles.rowFieldsStack]}>
+                <View style={[styles.fieldBlock, styles.rowFieldChild]}>
+                  <Text style={[styles.fieldLabel, { color: muted }]}>City</Text>
+                  <TextInput
+                    value={editForm.city}
+                    onChangeText={(v) => updateEditField('city', v)}
+                    style={[styles.fieldInput, { color: text, borderColor: border, backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}
+                    placeholder="City"
+                    placeholderTextColor={muted}
+                  />
+                </View>
+                <View style={[styles.fieldBlock, styles.rowFieldChild]}>
+                  <Text style={[styles.fieldLabel, { color: muted }]}>State</Text>
+                  <TextInput
+                    value={editForm.state}
+                    onChangeText={(v) => updateEditField('state', v)}
+                    style={[styles.fieldInput, { color: text, borderColor: border, backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}
+                    placeholder="State"
+                    placeholderTextColor={muted}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: muted }]}>Exam Focus</Text>
+                <TextInput
+                  value={editForm.exam}
+                  onChangeText={(v) => updateEditField('exam', v)}
+                  style={[styles.fieldInput, { color: text, borderColor: border, backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}
+                  placeholder="e.g. SSC CGL"
+                  placeholderTextColor={muted}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={[styles.modalActions, { borderTopColor: border }]}>
+              <Pressable style={[styles.modalBtn, styles.modalCancelBtn]} onPress={() => setIsEditModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.modalBtn, styles.modalSaveBtn]} onPress={handleSaveProfile}>
+                <Text style={styles.modalSaveText}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  loaderWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   wrapper: { flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 16 },
+
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -216,6 +509,7 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
   },
   headerAvatar: {
     width: 40,
@@ -237,8 +531,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 16 },
+
   metricCard: {
     borderRadius: 20,
     padding: 20,
@@ -246,47 +539,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(5, 150, 105, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: { fontSize: 26, fontWeight: '700', color: '#059669' },
-  infoCol: { flex: 1 },
-  name: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
-  tag: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  infoLine: { fontSize: 13 },
-  editBtn: {
-    marginTop: 8,
-    borderRadius: 999,
-    backgroundColor: '#059669',
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  editBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
-  communitySection: { marginTop: 16 },
-  sectionLabel: { fontSize: 13, marginBottom: 6 },
-  communityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  communityKey: { fontSize: 13, fontWeight: '500' },
-  communityValue: { fontSize: 13, fontWeight: '600' },
-  skillsSection: { marginTop: 16 },
-  skillPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginTop: 6,
-  },
-  skillText: { fontSize: 12, fontWeight: '600', color: '#e5e7eb' },
   metricTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12 },
   circleWrap: { alignItems: 'center', marginBottom: 16, marginTop: 8 },
   circleOuter: {
@@ -298,8 +550,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  circleValue: { fontSize: 32, fontWeight: '700', color: '#ffffff' },
+  circleValue: { fontSize: 32, fontWeight: '700' },
   metricFooter: { fontSize: 13, marginTop: 4 },
+
   profileCard: {
     borderRadius: 20,
     padding: 16,
@@ -311,14 +564,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
+    gap: 10,
   },
+  infoRowStack: {
+    flexDirection: 'column',
+  },
+  infoCol: { flex: 1 },
   label: { fontSize: 12, fontWeight: '600', marginBottom: 2 },
-  
+  infoLine: { fontSize: 13 },
+
+  editBtn: {
+    marginTop: 8,
+    borderRadius: 999,
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  editBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
   divider: {
     height: 1,
-    backgroundColor: '#e5e7eb',
     marginVertical: 10,
   },
+
+  communitySection: { marginTop: 16 },
+  sectionLabel: { fontSize: 13, marginBottom: 6 },
+  communityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  communityKey: { fontSize: 13, fontWeight: '500' },
+  communityValue: { fontSize: 13, fontWeight: '600' },
+
+  skillsSection: { marginTop: 16 },
+  skillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  skillPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  skillText: { fontSize: 12, fontWeight: '600' },
+
   consistencyCard: {
     borderRadius: 20,
     padding: 16,
@@ -332,11 +624,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  consistencyStatItem: { alignItems: 'center', flex: 1 },
+  consistencyStatsStack: {
+    flexWrap: 'wrap',
+    rowGap: 10,
+  },
+  consistencyStatItem: { alignItems: 'center', flex: 1, minWidth: 90 },
   consistencyStatValue: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
   consistencyStatLabel: { fontSize: 12 },
   consistencyGraphPlaceholder: {
-    height: 120,
+    minHeight: 120,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.4)',
@@ -345,19 +641,118 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   graphText: { fontSize: 13, textAlign: 'center' },
+
+  savedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   savedMnemonicCard: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
   },
-  savedMnemonicWord: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  savedTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  savedMnemonicWord: { fontSize: 16, fontWeight: '700', marginBottom: 2, flex: 1 },
   savedMnemonicMeaning: { fontSize: 13, marginBottom: 8 },
   savedTrickBox: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: 'rgba(16,185,129,0.12)',
     padding: 10,
     borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: '#10b981',
   },
   savedTrickText: { fontSize: 13, fontStyle: 'italic', lineHeight: 20 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalCard: {
+    maxHeight: '88%',
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalBody: {
+    padding: 14,
+    gap: 10,
+  },
+  fieldBlock: {
+    marginBottom: 2,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  fieldInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  rowFields: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  rowFieldsStack: {
+    flexDirection: 'column',
+    gap: 2,
+  },
+  rowFieldChild: {
+    flex: 1,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+  },
+  modalBtn: {
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    minWidth: 86,
+    alignItems: 'center',
+  },
+  modalCancelBtn: {
+    backgroundColor: '#e5e7eb',
+  },
+  modalSaveBtn: {
+    backgroundColor: '#059669',
+  },
+  modalCancelText: {
+    color: '#111827',
+    fontWeight: '700',
+  },
+  modalSaveText: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
 });

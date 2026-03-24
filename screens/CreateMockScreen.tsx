@@ -448,18 +448,47 @@ export default function CreateMockScreen() {
         )}
 
         {/* Mode Toggle Overlay */}
-        <View style={s.modeToggleWrap}>
+        <View
+          style={[
+            s.modeToggleWrap,
+            {
+              backgroundColor: isDark ? '#0F172A' : '#e2e8f0',
+              borderColor: isDark ? '#1E293B' : '#cbd5e1',
+            },
+          ]}
+        >
           <Pressable 
-            style={[s.modeBtn, selectionMode === 'MANUAL' && s.modeBtnActive]} 
+            style={[
+              s.modeBtn,
+              selectionMode === 'MANUAL' && [
+                s.modeBtnActive,
+                { backgroundColor: isDark ? '#1E293B' : '#ffffff' },
+              ],
+            ]}
             onPress={() => setSelectionMode('MANUAL')}
           >
             <Text style={[s.modeBtnText, selectionMode === 'MANUAL' ? { color: activeGreen } : { color: mutedText }]}>MANUAL</Text>
           </Pressable>
           <Pressable 
-            style={[s.modeBtn, selectionMode === 'AUTO' && s.modeBtnActive]} 
+            style={[
+              s.modeBtn,
+              selectionMode === 'AUTO' && [
+                s.modeBtnActive,
+                { backgroundColor: isDark ? '#1E293B' : '#ffffff' },
+              ],
+            ]}
             onPress={() => setSelectionMode('AUTO')}
           >
-            <Text style={[s.modeBtnText, selectionMode === 'AUTO' ? { color: '#fff' } : { color: mutedText }]}>AUTO-SELECT</Text>
+            <Text
+              style={[
+                s.modeBtnText,
+                selectionMode === 'AUTO'
+                  ? { color: isDark ? '#fff' : activeGreen }
+                  : { color: mutedText },
+              ]}
+            >
+              AUTO-SELECT
+            </Text>
           </Pressable>
         </View>
 
@@ -578,7 +607,7 @@ export default function CreateMockScreen() {
             })}
           </>
         ) : (
-          <View style={s.autoSelectContainer}>
+           <View style={[s.autoSelectContainer, { backgroundColor: isDark ? '#1E293B' : '#ffffff', borderColor: border }]}>
              <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5', width: 80, height: 80, borderRadius: 40 }]}>
                 <Ionicons name="flash" size={40} color={activeGreen} />
              </View>

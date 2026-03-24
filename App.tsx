@@ -5,12 +5,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LoginModalProvider } from './context/LoginModalContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SplashProvider } from './context/SplashContext';
 import { MocksProvider } from './context/MocksContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -37,11 +37,13 @@ const Stack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Keep this true only while testing locally.
+const BYPASS_LOGIN_FOR_TESTING = __DEV__ && false;
+
 const TAB_SCREENS = [
   { name: 'Tests', label: 'Tests', icon: 'document-text', component: TestsScreen },
   { name: 'Mnemonics', label: 'Mnemonics', icon: 'bulb', component: MnemonicsScreen },
   { name: 'Typing', label: 'Typing', icon: 'keypad', component: TypingScreen },
-  { name: 'Contests', label: 'Contests', icon: 'trophy', component: ContestScreen },
   { name: 'Forums', label: 'Forums', icon: 'people', component: ForumsScreen },
 ];
 
@@ -133,28 +135,54 @@ import { MnemonicsProvider } from './context/MnemonicsContext';
 import { ForumsProvider } from './context/ForumsContext';
 
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
-  const [initialRoute, setInitialRoute] = useState('Login');
+  const [initialRouteName, setInitialRouteName] = useState<'Login' | 'Main'>(
+    BYPASS_LOGIN_FOR_TESTING ? 'Main' : 'Login'
+  );
+  const [hasResolvedInitialRoute, setHasResolvedInitialRoute] = useState(BYPASS_LOGIN_FOR_TESTING);
 
   useEffect(() => {
-    async function checkLoginState() {
-      try {
-        const loggedIn = await AsyncStorage.getItem('isLoggedIn');
-        if (loggedIn === 'true') {
-          setInitialRoute('Main');
-        }
-      } catch (e) {
-        console.error('Failed to check login state', e);
-      } finally {
-        setIsReady(true);
-      }
+    if (BYPASS_LOGIN_FOR_TESTING) {
+      setHasResolvedInitialRoute(true);
+      setInitialRouteName('Main');
+      return;
     }
-    checkLoginState();
-  }, []);
 
-  if (!isReady) {
-    return null; // Render nothing (or a basic splash screen) while checking auth
-  }
+    let isMounted = true;
+
+    const hydrateAuthState = async () => {
+      try {
+        const [isLoggedIn, userToken] = await Promise.all([
+          AsyncStorage.getItem('isLoggedIn'),
+          AsyncStorage.getItem('userToken'),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (isLoggedIn === 'true' && userToken) {
+          setInitialRouteName('Main');
+        } else {
+          setInitialRouteName('Login');
+        }
+      } catch (error) {
+        console.error('Failed to restore auth state', error);
+        if (isMounted) {
+          setInitialRouteName('Login');
+        }
+      } finally {
+        if (isMounted) {
+          setHasResolvedInitialRoute(true);
+        }
+      }
+    };
+
+    hydrateAuthState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <ThemeProvider>
@@ -165,29 +193,31 @@ export default function App() {
               <ForumsProvider>
                 <NavigationContainer>
             <StatusBar style="auto" />
-            <Stack.Navigator
-              id={undefined}
-              screenOptions={{
-                headerShown: false,
-              }}
-              initialRouteName={initialRoute}
-            >
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="OTP" component={OtpVerificationScreen} />
-              <Stack.Screen name="Name" component={NameScreen} />
-              <Stack.Screen name="Main" component={MainTabs} />
-              <Stack.Screen name="CreateMock" component={CreateMockScreen} />
-              <Stack.Screen 
-                name="MockInstruction" 
-                component={MockInstructionScreen}
-                options={{ presentation: 'modal' }}
-              />
-              <Stack.Screen name="MockPractice" component={MockPracticeScreen} />
-              <Stack.Screen name="ForumPost" component={ForumPostScreen} />
-              <Stack.Screen name="Mocks" component={MocksScreen} />
-              <Stack.Screen name="PYQs" component={PyqsScreen} />
-              <Stack.Screen name="Contests" component={ContestScreen} />
-            </Stack.Navigator>
+            {hasResolvedInitialRoute && (
+              <Stack.Navigator
+                id={undefined}
+                screenOptions={{
+                  headerShown: false,
+                }}
+                initialRouteName={initialRouteName}
+              >
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="OTP" component={OtpVerificationScreen} />
+                <Stack.Screen name="Name" component={NameScreen} />
+                <Stack.Screen name="Main" component={MainTabs} />
+                <Stack.Screen name="CreateMock" component={CreateMockScreen} />
+                <Stack.Screen 
+                  name="MockInstruction" 
+                  component={MockInstructionScreen}
+                  options={{ presentation: 'modal' }}
+                />
+                <Stack.Screen name="MockPractice" component={MockPracticeScreen} />
+                <Stack.Screen name="ForumPost" component={ForumPostScreen} />
+                <Stack.Screen name="Mocks" component={MocksScreen} />
+                <Stack.Screen name="PYQs" component={PyqsScreen} />
+                <Stack.Screen name="Contests" component={ContestScreen} />
+              </Stack.Navigator>
+            )}
             <SplashScreen />
             </NavigationContainer>
                </ForumsProvider>

@@ -9,49 +9,11 @@ if (Platform.OS !== 'web') {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { pyqApi } from '../services/api';
 
-const PYQ_LIST = [
-  {
-    id: '1',
-    title: 'SSC CGL 2025 Tier1',
-    shift: 'Shift 3',
-    date: '26 Sep 2025',
-    questions: '100 Questions',
-    duration: '60 min',
-  },
-  {
-    id: '2',
-    title: 'SSC CGL 2025 Tier1',
-    shift: 'Shift 2',
-    date: '26 Sep 2025',
-    questions: '100 Questions',
-    duration: '60 min',
-  },
-  {
-    id: '3',
-    title: 'SSC CGL 2025 Tier1',
-    shift: 'Shift 1',
-    date: '25 Sep 2025',
-    questions: '100 Questions',
-    duration: '60 min',
-  },
-  {
-    id: '4',
-    title: 'SSC CGL 2024 Tier1',
-    shift: 'Shift 3',
-    date: '10 Sep 2024',
-    questions: '100 Questions',
-    duration: '60 min',
-  },
-  {
-    id: '5',
-    title: 'SSC CGL 2024 Tier1',
-    shift: 'Shift 2',
-    date: '10 Sep 2024',
-    questions: '100 Questions',
-    duration: '60 min',
-  },
-];
+const PAUSED_TESTS_STORAGE_KEY = 'pyqs_paused_tests_v1';
+const RESULT_HISTORY_STORAGE_KEY = 'pyqs_result_history_v1';
 
 const RANK_MAKER_LIST = [
   { id: 'rm1', title: 'Rank Maker Series — Test 1', questions: '100 Questions', duration: '60 min' },
@@ -77,6 +39,7 @@ const FILTER_DATA_RM = {
 
 type SubmissionResult = {
   sourceTab: 'PYQ' | 'RankMaker';
+  testKey?: string;
   testTitle: string;
   attempted: number;
   correct: number;
@@ -93,6 +56,25 @@ type SubmissionResult = {
   submittedAt: string;
 };
 
+type ResumeState = {
+  currentQuestionIndex: number;
+  selectedOptions: Record<number, number>;
+  visitedQuestions: Record<number, boolean>;
+  reviewedQuestions: Record<number, boolean>;
+  timeLeft: number;
+  activeSection: string;
+  selectedLanguage: 'English' | 'Hindi';
+  zoomLevel: number;
+};
+
+type PausedTestPayload = {
+  testKey: string;
+  sourceTab: 'PYQ' | 'RankMaker';
+  mockData: { title: string; questions: number; duration: number };
+  resumeState: ResumeState;
+  pausedAt: string;
+};
+
 export default function PyqsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -101,7 +83,11 @@ export default function PyqsScreen() {
 
   const [activeTab, setActiveTab] = useState<'RankMaker' | 'PYQ'>('RankMaker');
 
-  const [showAllPyqs, setShowAllPyqs] = useState(false);
+  const [pyqList, setPyqList] = useState<any[]>([]);
+  const [pyqCursor, setPyqCursor] = useState<string | null>(null);
+  const [loadingPyqs, setLoadingPyqs] = useState(false);
+  const [hasMorePyqs, setHasMorePyqs] = useState(true);
+
   const [showAllRM, setShowAllRM] = useState(false);
 
   const [filters, setFilters] = useState({
@@ -116,6 +102,9 @@ export default function PyqsScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateObj, setDateObj] = useState(new Date());
   const [resultHistory, setResultHistory] = useState<SubmissionResult[]>([]);
+  const [pausedTests, setPausedTests] = useState<Record<string, PausedTestPayload>>({});
+  const [hasLoadedPausedTests, setHasLoadedPausedTests] = useState(false);
+  const [hasLoadedResultHistory, setHasLoadedResultHistory] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const card = isDark ? '#1e293b' : '#ffffff';
@@ -126,6 +115,139 @@ export default function PyqsScreen() {
 
   const filterData = activeTab === 'PYQ' ? FILTER_DATA_PYQ : FILTER_DATA_RM;
 
+  const fetchPyqs = async (reset = false) => {
+    if (loadingPyqs || (!hasMorePyqs && !reset)) return;
+    setLoadingPyqs(true);
+    
+    try {
+      const query: any = { limit: 10 };
+      if (!reset && pyqCursor) query.cursor = pyqCursor;
+      
+      if (filters.Exam && filters.Exam !== 'Exam' && !filters.Exam.startsWith('All')) query.examName = filters.Exam;
+      if (filters.Tier && filters.Tier !== 'Tier' && !filters.Tier.startsWith('All')) query.tier = filters.Tier;
+      if (filters.Year && filters.Year !== 'Year' && !filters.Year.startsWith('All')) query.examYear = filters.Year;
+      if (filters.Shift && filters.Shift !== 'Shift' && !filters.Shift.startsWith('All')) query.shift = filters.Shift;
+      if (filters.Date && filters.Date !== 'Date') query.date = filters.Date;
+
+      const res = await pyqApi.listTestPapers(query);
+      if (res && res.data) {
+        setPyqList(prev => reset ? res.data : [...prev, ...res.data]);
+        setPyqCursor(res.nextCursor || null);
+        setHasMorePyqs(!!res.nextCursor);
+      }
+    } catch (error) {
+      console.error('Failed to fetch PYQs:', error);
+    } finally {
+      setLoadingPyqs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'PYQ') {
+      fetchPyqs(true);
+    }
+  }, [filters, activeTab]);
+
+  const loadResultHistory = async () => {
+    try {
+      const res = await pyqApi.getPyqAttemptsHistory({ limit: 10 });
+      if (res && res.data) {
+        const historyData = res.data.map((h: any) => ({
+          sourceTab: 'PYQ',
+          testKey: h.attemptId,
+          testTitle: h.testPaper?.metaData?.title || `PYQ Test`,
+          attempted: h.results?.attempted || 0,
+          correct: h.results?.correct || 0,
+          wrong: h.results?.incorrect || 0,
+          unattempted: h.results?.unattempted || 0,
+          score: h.results?.score || 0,
+          submittedAt: new Date(h.createdAt || Date.now()).toLocaleDateString(),
+        }));
+        setResultHistory(historyData);
+      }
+    } catch (error) {
+      console.error('Failed to load result history via API, checking async storage', error);
+      // Fallback to async storage
+      const raw = await AsyncStorage.getItem(RESULT_HISTORY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as SubmissionResult[];
+        if (Array.isArray(parsed)) setResultHistory(parsed.slice(0, 10));
+      }
+    } finally {
+      setHasLoadedResultHistory(true);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPausedTests = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(PAUSED_TESTS_STORAGE_KEY);
+        if (!raw) {
+          return;
+        }
+        const parsed = JSON.parse(raw) as Record<string, PausedTestPayload>;
+        if (isMounted && parsed && typeof parsed === 'object') {
+          setPausedTests(parsed);
+        }
+      } catch (error) {
+        console.error('Failed to load paused tests', error);
+      } finally {
+        if (isMounted) {
+          setHasLoadedPausedTests(true);
+        }
+      }
+    };
+
+    loadPausedTests();
+    loadResultHistory();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedPausedTests) {
+      return;
+    }
+
+    const persistPausedTests = async () => {
+      try {
+        if (Object.keys(pausedTests).length === 0) {
+          await AsyncStorage.removeItem(PAUSED_TESTS_STORAGE_KEY);
+          return;
+        }
+        await AsyncStorage.setItem(PAUSED_TESTS_STORAGE_KEY, JSON.stringify(pausedTests));
+      } catch (error) {
+        console.error('Failed to persist paused tests', error);
+      }
+    };
+
+    persistPausedTests();
+  }, [pausedTests, hasLoadedPausedTests]);
+
+  useEffect(() => {
+    if (!hasLoadedResultHistory) {
+      return;
+    }
+
+    const persistResultHistory = async () => {
+      try {
+        if (resultHistory.length === 0) {
+          await AsyncStorage.removeItem(RESULT_HISTORY_STORAGE_KEY);
+          return;
+        }
+        await AsyncStorage.setItem(RESULT_HISTORY_STORAGE_KEY, JSON.stringify(resultHistory));
+      } catch (error) {
+        console.error('Failed to persist result history', error);
+      }
+    };
+
+    persistResultHistory();
+  }, [resultHistory, hasLoadedResultHistory]);
+
   useEffect(() => {
     const submissionResult = route.params?.submissionResult as SubmissionResult | undefined;
     if (!submissionResult) {
@@ -134,8 +256,49 @@ export default function PyqsScreen() {
 
     setResultHistory((prev) => [submissionResult, ...prev].slice(0, 10));
     setActiveTab(submissionResult.sourceTab === 'PYQ' ? 'PYQ' : 'RankMaker');
-    navigation.setParams({ submissionResult: undefined });
+    if (submissionResult.testKey) {
+      setPausedTests((prev) => {
+        const next = { ...prev };
+        delete next[submissionResult.testKey as string];
+        return next;
+      });
+    }
+    navigation.setParams({ submissionResult: undefined, clearPausedTestKey: undefined });
   }, [navigation, route.params?.submissionResult]);
+
+  useEffect(() => {
+    const pausedTest = route.params?.pausedTest as PausedTestPayload | undefined;
+    if (!pausedTest) {
+      return;
+    }
+
+    setPausedTests((prev) => ({ ...prev, [pausedTest.testKey]: pausedTest }));
+    navigation.setParams({ pausedTest: undefined });
+  }, [navigation, route.params?.pausedTest]);
+
+  useEffect(() => {
+    const clearPausedTestKey = route.params?.clearPausedTestKey as string | undefined;
+    if (!clearPausedTestKey) {
+      return;
+    }
+
+    setPausedTests((prev) => {
+      const next = { ...prev };
+      delete next[clearPausedTestKey];
+      return next;
+    });
+    navigation.setParams({ clearPausedTestKey: undefined });
+  }, [navigation, route.params?.clearPausedTestKey]);
+
+  useEffect(() => {
+    const requestedTab = route.params?.activeTab as 'PYQ' | 'RankMaker' | undefined;
+    if (!requestedTab) {
+      return;
+    }
+
+    setActiveTab(requestedTab);
+    navigation.setParams({ activeTab: undefined });
+  }, [navigation, route.params?.activeTab]);
 
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
@@ -260,7 +423,21 @@ export default function PyqsScreen() {
         {/* Test List Section */}
         {activeTab === 'PYQ' ? (
           <>
-            {(showAllPyqs ? PYQ_LIST : PYQ_LIST.slice(0, 3)).map((item) => (
+            {pyqList.map((paper) => (
+              (() => {
+                const item = {
+                  id: paper._id || paper.id,
+                  title: paper.metaData?.title || 'PYQ Test',
+                  date: paper.date || 'N/A',
+                  shift: paper.shift || 'N/A',
+                  tier: paper.tier || 'N/A',
+                  questions: paper.questionCount ? `${paper.questionCount} Questions` : '100 Questions',
+                  duration: paper.timeLimit ? `${Math.floor(paper.timeLimit / 60)} min` : '60 min',
+                  examName: paper.metaData?.examName || 'CGL',
+                };
+                const testKey = `PYQ:${item.id}`;
+                const pausedState = pausedTests[testKey];
+                return (
               <View
                 key={item.id}
                 style={[styles.testCard, { backgroundColor: card, borderColor: border }]}
@@ -268,33 +445,59 @@ export default function PyqsScreen() {
                 <View style={styles.testInfoCol}>
                   <View style={styles.testMetaTopRow}>
                     <Ionicons name="document-text-outline" size={14} color={muted} />
-                    <Text style={[styles.testExamName, { color: muted }]}>CGL</Text>
+                    <Text style={[styles.testExamName, { color: muted }]}>{item.examName}</Text>
                   </View>
                   <Text style={[styles.testTitle, { color: text }]}>{item.title}</Text>
                   <Text style={[styles.testMetaDetails, { color: muted }]}>
                     {item.questions} · {item.duration} · Held on {item.date} ({item.shift})
                   </Text>
+                  {pausedState && (
+                    <Text style={[styles.pausedHint, { color: '#f59e0b' }]}>Status: Resume Test</Text>
+                  )}
                 </View>
                 <Pressable 
-                  style={[styles.startBtn, { backgroundColor: primary }]}
-                  onPress={() =>
+                  style={[styles.startBtn, { backgroundColor: pausedState ? '#f59e0b' : primary }]}
+                  onPress={() => {
+                    if (pausedState) {
+                      navigation.navigate('MockPractice', {
+                        mockData: pausedState.mockData,
+                        sourceTab: 'PYQ',
+                        testKey,
+                        resumeState: pausedState.resumeState,
+                      });
+                      return;
+                    }
+
                     navigation.navigate('MockInstruction', {
                       mockData: { title: item.title, questions: parseInt(item.questions), duration: parseInt(item.duration) },
                       sourceTab: 'PYQ',
-                    })
-                  }
+                      testKey,
+                      testPaperId: item.id
+                    });
+                  }}
                 >
-                  <Text style={[styles.startBtnText, { color: '#fff' }]}>Start</Text>
+                  <Text style={[styles.startBtnText, { color: '#fff' }]}>{pausedState ? 'Resume Test' : 'Start'}</Text>
                 </Pressable>
               </View>
+                );
+              })()
             ))}
-            {PYQ_LIST.length > 3 && (
+            {pyqList.length === 0 && !loadingPyqs && (
+              <View style={[styles.historyCard, { backgroundColor: isDark ? '#020617' : '#f1f5f9', borderColor: border }]}>
+                <View style={styles.historyIconCircle}>
+                  <Ionicons name="funnel-outline" size={22} color={muted} />
+                </View>
+                <Text style={[styles.historyTitle, { color: text }]}>No PYQs found</Text>
+                <Text style={[styles.historySub, { color: muted }]}>Try changing your filters to see available papers.</Text>
+              </View>
+            )}
+            {hasMorePyqs && (
               <Pressable
                 style={{ paddingVertical: 12, alignItems: 'center' }}
-                onPress={() => setShowAllPyqs(!showAllPyqs)}
+                onPress={() => fetchPyqs(false)}
               >
                 <Text style={{ color: primary, fontWeight: '700', fontSize: 13 }}>
-                  {showAllPyqs ? 'View Less' : 'Load More'}
+                  {loadingPyqs ? 'Loading...' : 'Load More'}
                 </Text>
               </Pressable>
             )}
@@ -302,6 +505,10 @@ export default function PyqsScreen() {
         ) : (
           <>
             {(showAllRM ? RANK_MAKER_LIST : RANK_MAKER_LIST.slice(0, 3)).map((item) => (
+              (() => {
+                const testKey = `RankMaker:${item.id}`;
+                const pausedState = pausedTests[testKey];
+                return (
               <View
                 key={item.id}
                 style={[styles.testCard, { backgroundColor: card, borderColor: border }]}
@@ -315,19 +522,35 @@ export default function PyqsScreen() {
                   <Text style={[styles.testMetaDetails, { color: muted }]}>
                     {item.questions} · {item.duration}
                   </Text>
+                  {pausedState && (
+                    <Text style={[styles.pausedHint, { color: '#f59e0b' }]}>Status: Resume Test</Text>
+                  )}
                 </View>
                 <Pressable 
-                  style={[styles.startBtn, { backgroundColor: primary }]}
-                  onPress={() =>
+                  style={[styles.startBtn, { backgroundColor: pausedState ? '#f59e0b' : primary }]}
+                  onPress={() => {
+                    if (pausedState) {
+                      navigation.navigate('MockPractice', {
+                        mockData: pausedState.mockData,
+                        sourceTab: 'RankMaker',
+                        testKey,
+                        resumeState: pausedState.resumeState,
+                      });
+                      return;
+                    }
+
                     navigation.navigate('MockInstruction', {
                       mockData: { title: item.title, questions: parseInt(item.questions), duration: parseInt(item.duration) },
                       sourceTab: 'RankMaker',
-                    })
-                  }
+                      testKey,
+                    });
+                  }}
                 >
-                  <Text style={[styles.startBtnText, { color: '#fff' }]}>Start</Text>
+                  <Text style={[styles.startBtnText, { color: '#fff' }]}>{pausedState ? 'Resume Test' : 'Start'}</Text>
                 </Pressable>
               </View>
+                );
+              })()
             ))}
             {RANK_MAKER_LIST.length > 3 && (
               <Pressable
@@ -352,7 +575,7 @@ export default function PyqsScreen() {
                   <Text style={[styles.resultTitle, { color: text }]} numberOfLines={1}>{result.testTitle}</Text>
                   <Text style={[styles.resultTab, { color: primary }]}>{result.sourceTab}</Text>
                 </View>
-                <Text style={[styles.resultMeta, { color: muted }]}>Submitted: {result.submittedAt}</Text>
+                <Text style={[styles.resultMeta, { color: muted }]}>Submitted: {formatSubmittedAt(result.submittedAt)}</Text>
                 <View style={styles.resultStatsRow}>
                   <Text style={[styles.resultScore, { color: primary }]}>Score: {result.score.toFixed(2)}</Text>
                   <Text style={[styles.resultMeta, { color: muted }]}>Correct {result.correct} · Wrong {result.wrong}</Text>
@@ -448,10 +671,7 @@ export default function PyqsScreen() {
                     </Pressable>
                     <Pressable onPress={() => {
                          setShowDatePicker(false);
-                         const dd = String(dateObj.getDate()).padStart(2, '0');
-                         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-                         const yyyy = dateObj.getFullYear();
-                         setFilters((prev) => ({ ...prev, Date: `${dd}-${mm}-${yyyy}` }));
+                         setFilters((prev) => ({ ...prev, Date: formatDate(dateObj) }));
                     }} hitSlop={10}>
                        <Text style={{ color: primary, fontSize: 16, fontWeight: '700' }}>Confirm</Text>
                     </Pressable>
@@ -478,10 +698,7 @@ export default function PyqsScreen() {
             setShowDatePicker(false);
             if (selectedDate && event.type === 'set') {
               setDateObj(selectedDate);
-              const dd = String(selectedDate.getDate()).padStart(2, '0');
-              const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
-              const yyyy = selectedDate.getFullYear();
-              setFilters((prev) => ({ ...prev, Date: `${dd}-${mm}-${yyyy}` }));
+              setFilters((prev) => ({ ...prev, Date: formatDate(selectedDate) }));
             }
           }}
         />
@@ -502,10 +719,7 @@ export default function PyqsScreen() {
                     <Text style={{ fontSize: 18, fontWeight: '700', color: text }}>Select Date</Text>
                     <Pressable onPress={() => {
                          setShowDatePicker(false);
-                         const dd = String(dateObj.getDate()).padStart(2, '0');
-                         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-                         const yyyy = dateObj.getFullYear();
-                         setFilters((prev) => ({ ...prev, Date: `${dd}-${mm}-${yyyy}` }));
+                         setFilters((prev) => ({ ...prev, Date: formatDate(dateObj) }));
                     }} hitSlop={10}>
                        <Text style={{ color: primary, fontSize: 16, fontWeight: '700' }}>Confirm</Text>
                     </Pressable>

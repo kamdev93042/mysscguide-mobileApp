@@ -7,7 +7,10 @@ import {
   ScrollView,
   useWindowDimensions,
   Image,
+  TextInput,
 } from 'react-native';
+// Simple persistent storage key for today's target todos
+const TODO_STORAGE_KEY = 'dashboard_todays_target_todos_v1';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,6 +48,41 @@ export default function DashboardScreen() {
   const { isDark, toggleTheme } = useTheme();
   const [slideIndex, setSlideIndex] = useState(0);
   const scrollRef = useRef(null);
+
+  // To-do list state
+  const [todos, setTodos] = useState<string[]>([]);
+  const [newTodo, setNewTodo] = useState('');
+  const [todosLoaded, setTodosLoaded] = useState(false);
+  const [isAddingTodo, setIsAddingTodo] = useState(false);
+  // Load todos from storage on mount
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const raw = await (await import('@react-native-async-storage/async-storage')).default.getItem(TODO_STORAGE_KEY);
+        if (raw && isMounted) {
+          setTodos(JSON.parse(raw));
+        }
+      } catch {}
+      if (isMounted) setTodosLoaded(true);
+    })();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Persist todos when changed (after load)
+  useEffect(() => {
+    if (!todosLoaded) return;
+    (async () => {
+      try {
+        const storage = (await import('@react-native-async-storage/async-storage')).default;
+        if (todos.length === 0) {
+          await storage.removeItem(TODO_STORAGE_KEY);
+        } else {
+          await storage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
+        }
+      } catch {}
+    })();
+  }, [todos, todosLoaded]);
 
   const displayName = userName || 'User';
   const bg = isDark ? '#0f172a' : '#f8fafc';
@@ -165,18 +203,132 @@ export default function DashboardScreen() {
           ))}
         </View>
 
-        {/* Today's Target */}
-        <View style={[styles.blockCard, { backgroundColor: cardBg, borderColor: border }]}>
-          <View style={[styles.blockIconWrap, { backgroundColor: 'rgba(5, 150, 105, 0.2)' }]}>
-            <Ionicons name="flag" size={22} color="#059669" />
-          </View>
+        {/* Today's Target with To-Do List */}
+        <View style={[styles.blockCard, { backgroundColor: cardBg, borderColor: border }]}> 
+          <View style={[styles.blockIconWrap, { backgroundColor: 'rgba(5, 150, 105, 0.2)' }]}> 
+            <Ionicons name="flag" size={22} color="#059669" /> 
+          </View> 
           <Text style={[styles.blockTitle, { color: text }]}>TODAY'S TARGET</Text>
-          <Text style={[styles.blockSub, { color: muted }]}>
-            Your day is clear. Start fresh!
-          </Text>
-          <Pressable style={styles.blockBtn}>
-            <Text style={styles.blockBtnText}>+ NEW TARGET</Text>
-          </Pressable>
+          {/* To-Do List */}
+          <View style={{ width: '100%', marginTop: 12, marginBottom: 8 }}>
+            {todos.length === 0 && !isAddingTodo && (
+              <View style={{ paddingVertical: 10, alignItems: 'center' }}>
+                <Text style={[styles.blockSub, { color: muted, textAlign: 'center', fontStyle: 'italic' }]}>
+                  Your day is clear. Add your first target!
+                </Text>
+              </View>
+            )}
+            {todos.map((todo, idx) => (
+              <View 
+                key={idx} 
+                style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  marginBottom: 8,
+                  backgroundColor: isDark ? '#33415550' : '#f1f5f9',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#47556950' : '#e2e8f0',
+                }}
+              >
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#059669', marginRight: 10 }} />
+                <Text style={{ flex: 1, color: text, fontSize: 14, fontWeight: '500' }}>{todo}</Text>
+                <Pressable
+                  onPress={() => setTodos(todos.filter((_, i) => i !== idx))}
+                  style={{ marginLeft: 8, padding: 2 }}
+                  hitSlop={8}
+                  accessibilityLabel="Delete task"
+                >
+                  <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+
+          {/* New Target Button - only shown when not adding */}
+          {!isAddingTodo && (
+            <Pressable style={styles.blockBtn} onPress={() => setIsAddingTodo(true)}>
+              <Text style={styles.blockBtnText}>+ NEW TARGET</Text>
+            </Pressable>
+          )}
+
+          {/* Add New To-Do Input Row - only shown when isAddingTodo is true */}
+          {isAddingTodo && (
+            <View style={{ width: '100%', marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TextInput
+                  autoFocus
+                  value={newTodo}
+                  onChangeText={setNewTodo}
+                  placeholder="Task name (e.g. Solve 50 Quant)..."
+                  placeholderTextColor={muted}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDark ? '#334155' : '#fff',
+                    color: text,
+                    borderRadius: 10,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    borderWidth: 1,
+                    borderColor: '#059669',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 2,
+                    elevation: 2,
+                  }}
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (newTodo.trim()) {
+                      setTodos([newTodo.trim(), ...todos]);
+                      setNewTodo('');
+                      setIsAddingTodo(false);
+                    } else {
+                      setIsAddingTodo(false);
+                    }
+                  }}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10, gap: 12 }}>
+                <Pressable
+                  onPress={() => {
+                    setNewTodo('');
+                    setIsAddingTodo(false);
+                  }}
+                  style={{ paddingVertical: 6, paddingHorizontal: 12 }}
+                >
+                  <Text style={{ color: muted, fontWeight: '600', fontSize: 13 }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    if (newTodo.trim()) {
+                      setTodos([newTodo.trim(), ...todos]);
+                      setNewTodo('');
+                      setIsAddingTodo(false);
+                    } else {
+                      setIsAddingTodo(false);
+                    }
+                  }}
+                  style={{ 
+                    backgroundColor: '#059669', 
+                    paddingVertical: 6, 
+                    paddingHorizontal: 16, 
+                    borderRadius: 6,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 2,
+                    elevation: 3,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Add Target</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Daily Challenge */}

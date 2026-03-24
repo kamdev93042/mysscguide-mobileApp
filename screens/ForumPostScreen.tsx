@@ -31,6 +31,7 @@ export default function ForumPostScreen() {
   const text = isDark ? '#fff' : '#1e293b'; 
   const muted = isDark ? '#94a3b8' : '#64748b'; 
   const border = isDark ? '#1e293b' : '#e2e8f0';
+  const primary = '#059669';
 
   const getTotalComments = (comments: Comment[]): number => {
     return comments.reduce((total, comment) => total + 1 + getTotalComments(comment.replies), 0);
@@ -62,11 +63,11 @@ export default function ForumPostScreen() {
     return (
       <View key={comment.id} style={[styles.commentBlock, { marginLeft: indent }]}>
         <View style={styles.commentItem}>
-          <View style={styles.commentAvatar}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{comment.authorInitial}</Text>
+          <View style={[styles.commentAvatar, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
+            <Text style={{ color: primary, fontSize: 13, fontWeight: '800' }}>{comment.authorInitial}</Text>
           </View>
-          <View style={[styles.commentBubble, { backgroundColor: cardBg }]}> 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+          <View style={[styles.commentBubble, { backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderColor: isDark ? '#334155' : '#e2e8f0', borderWidth: 1 }]}> 
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
               <Text style={[styles.commentAuthor, { color: text }]}>{comment.author}</Text>
               <Text style={[styles.commentTime, { color: muted }]}>{comment.timestamp}</Text>
             </View>
@@ -74,7 +75,7 @@ export default function ForumPostScreen() {
               {comment.replyTo ? <Text style={styles.replyToHandle}>@{comment.replyTo} </Text> : null}
               {comment.text}
             </Text>
-            <Pressable onPress={() => handleReplyPress(comment)} style={styles.replyBtn}>
+            <Pressable onPress={() => handleReplyPress(comment)} style={styles.replyBtn} hitSlop={8}>
               <Text style={styles.replyBtnText}>Reply</Text>
             </Pressable>
           </View>
@@ -106,8 +107,8 @@ export default function ForumPostScreen() {
         {/* Post Details */}
         <View style={styles.postArea}>
             <View style={styles.postAuthorRow}>
-                <View style={[styles.authorAvatar, { backgroundColor: cardBg }]}>
-                <Text style={styles.authorInitial}>{post.authorInitial}</Text>
+                <View style={[styles.authorAvatar, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
+                  <Text style={[styles.authorInitial, { color: primary }]}>{post.authorInitial}</Text>
                 </View>
                 <View>
                 <Text style={[styles.postAuthorName, { color: text }]}>{post.author}</Text>
@@ -121,8 +122,8 @@ export default function ForumPostScreen() {
             {post.tags.length > 0 && (
                 <View style={styles.tagsRow}>
                 {post.tags.map((tag, idx) => (
-                    <View key={idx} style={[styles.tagPill, { backgroundColor: cardBg }]}>
-                    <Text style={[styles.tagText, { color: muted }]}>#{tag}</Text>
+                    <View key={idx} style={[styles.tagPill, { backgroundColor: isDark ? '#05966930' : '#dcfce7' }]}>
+                    <Text style={[styles.tagText, { color: '#059669' }]}>#{tag}</Text>
                     </View>
                 ))}
                 </View>
@@ -172,7 +173,7 @@ export default function ForumPostScreen() {
             multiline
           />
           <Pressable 
-              style={[styles.sendBtn, !commentText.trim() && { opacity: 0.5 }]} 
+              style={[styles.sendBtn, { backgroundColor: primary }, !commentText.trim() && { opacity: 0.5 }]} 
               onPress={handleSendComment}
               disabled={!commentText.trim()}
           >
@@ -191,45 +192,45 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 24 },
   postArea: { padding: 16 },
   postAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  authorAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  authorInitial: { color: '#10b981', fontWeight: '800', fontSize: 18 },
+  authorAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  authorInitial: { color: '#059669', fontWeight: '800', fontSize: 16 },
   postAuthorName: { fontSize: 15, fontWeight: '700' },
   postTime: { fontSize: 12 },
-  postTitle: { fontSize: 22, fontWeight: '800', marginBottom: 12, lineHeight: 30 },
-  postSub: { fontSize: 15, lineHeight: 24, marginBottom: 16 },
+  postTitle: { fontSize: 24, fontWeight: '800', marginBottom: 12, lineHeight: 32 },
+  postSub: { fontSize: 16, lineHeight: 26, marginBottom: 20, opacity: 0.9 },
   tagsRow: { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
   tagPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  tagText: { fontSize: 13, fontWeight: '600' },
+  tagText: { fontSize: 13, fontWeight: '700' },
   actionsRow: { flexDirection: 'row', paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, gap: 24 },
   actionIcon: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionNum: { fontSize: 14, fontWeight: '600' },
+  actionNum: { fontSize: 15, fontWeight: '700' },
   commentsArea: { padding: 16 },
-  commentsTitle: { fontSize: 18, fontWeight: '800', marginBottom: 16 },
-  commentBlock: { marginBottom: 12 },
-  commentItem: { flexDirection: 'row', marginBottom: 16 },
-  commentAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#0ea5e9', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  commentBubble: { flex: 1, padding: 12, borderRadius: 12, borderTopLeftRadius: 2 },
-  commentAuthor: { fontSize: 13, fontWeight: '700' },
-  commentTime: { fontSize: 11 },
-  commentText: { fontSize: 14, lineHeight: 20 },
-  replyToHandle: { color: '#0ea5e9', fontWeight: '700' },
-  replyBtn: { marginTop: 8, alignSelf: 'flex-start' },
-  replyBtnText: { color: '#0ea5e9', fontWeight: '700', fontSize: 12 },
-  repliesWrap: { marginTop: 2 },
-  inputRow: { padding: 16, borderTopWidth: 1, alignItems: 'stretch' },
+  commentsTitle: { fontSize: 18, fontWeight: '800', marginBottom: 20 },
+  commentBlock: { marginBottom: 16 },
+  commentItem: { flexDirection: 'row', marginBottom: 4 },
+  commentAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 4 },
+  commentBubble: { flex: 1, padding: 16, borderRadius: 16, borderTopLeftRadius: 4 },
+  commentAuthor: { fontSize: 14, fontWeight: '800' },
+  commentTime: { fontSize: 12 },
+  commentText: { fontSize: 15, lineHeight: 22, marginTop: 4 },
+  replyToHandle: { color: '#059669', fontWeight: '800' },
+  replyBtn: { marginTop: 10, alignSelf: 'flex-start' },
+  replyBtnText: { color: '#059669', fontWeight: '700', fontSize: 13 },
+  repliesWrap: { marginTop: 8 },
+  inputRow: { padding: 16, borderTopWidth: 1, alignItems: 'stretch', paddingBottom: Platform.OS === 'ios' ? 24 : 16 },
   replyingBanner: {
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  replyingText: { fontSize: 13, fontWeight: '700' },
-  cancelReplyText: { fontSize: 12, fontWeight: '600' },
+  replyingText: { fontSize: 14, fontWeight: '700' },
+  cancelReplyText: { fontSize: 13, fontWeight: '700' },
   inputComposerRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  inputField: { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, minHeight: 44, maxHeight: 100, fontSize: 14, marginRight: 12 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#10b981', justifyContent: 'center', alignItems: 'center' }
+  inputField: { flex: 1, borderWidth: 1, borderRadius: 24, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 14, minHeight: 48, maxHeight: 120, fontSize: 15, marginRight: 12 },
+  sendBtn: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' }
 });
