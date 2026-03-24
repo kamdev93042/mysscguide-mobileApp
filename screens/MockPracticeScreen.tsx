@@ -148,7 +148,6 @@ export default function MockPracticeScreen() {
   const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
   const [infoModalType, setInfoModalType] = useState<'symbols' | 'instructions'>('instructions');
   const [isPauseConfirmVisible, setIsPauseConfirmVisible] = useState(false);
-  const [isTestPaused, setIsTestPaused] = useState(false);
 
   const bg = isDark ? '#111827' : '#edf0f4';
   const card = isDark ? '#1f2937' : '#ffffff';
@@ -239,7 +238,7 @@ export default function MockPracticeScreen() {
       unattempted,
       score,
       sectionBreakup,
-      submittedAt: new Date().toLocaleString(),
+      submittedAt: new Date().toISOString(),
     };
   };
 
@@ -344,10 +343,6 @@ export default function MockPracticeScreen() {
   }, [activeSection, sectionNames]);
 
   useEffect(() => {
-    if (isTestPaused) {
-      return;
-    }
-
     if (timeLeft <= 0) {
       if (isSubmitting) {
         return;
@@ -370,7 +365,7 @@ export default function MockPracticeScreen() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLeft, isSubmitting, isTestPaused]);
+  }, [timeLeft, isSubmitting]);
 
   const getStatus = (questionId: number): QuestionStatus => {
     const isAnswered = selectedOptions[questionId] !== undefined;
@@ -485,7 +480,7 @@ export default function MockPracticeScreen() {
   };
 
   const handlePauseRequest = () => {
-    if (isSubmitting || isTestPaused) {
+    if (isSubmitting) {
       return;
     }
     setIsPauseConfirmVisible(true);
@@ -499,10 +494,6 @@ export default function MockPracticeScreen() {
     setIsInfoModalVisible(false);
     setIsSubmitModalVisible(false);
     pauseAndReturnToSeries();
-  };
-
-  const handleResumeTest = () => {
-    setIsTestPaused(false);
   };
 
   const sectionQuestions = examQuestions.filter((q) => q.section === activeSection);
@@ -573,9 +564,9 @@ export default function MockPracticeScreen() {
             <Text style={styles.timerText}>{formatTime(timeLeft).slice(3).replace(':', ' : ')}</Text>
           </View>
           <Pressable
-            style={[styles.pauseBtn, (isSubmitting || isTestPaused) && styles.pauseBtnDisabled]}
+            style={[styles.pauseBtn, isSubmitting && styles.pauseBtnDisabled]}
             onPress={handlePauseRequest}
-            disabled={isSubmitting || isTestPaused}
+            disabled={isSubmitting}
             hitSlop={6}
           >
             <Ionicons name="pause" size={13} color="#0f172a" />
@@ -926,23 +917,6 @@ export default function MockPracticeScreen() {
                 <Text style={styles.pauseConfirmText}>Yes, Pause</Text>
               </Pressable>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={isTestPaused}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {}}
-      >
-        <View style={styles.pausedOverlay}>
-          <View style={styles.pausedPopup}>
-            <Text style={styles.pausedTitle}>Test Paused</Text>
-            <Text style={styles.pausedText}>Timer is stopped. Tap Resume to continue your test.</Text>
-            <Pressable style={styles.resumeBtn} onPress={handleResumeTest}>
-              <Text style={styles.resumeBtnText}>Resume</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -2084,51 +2058,6 @@ const styles = StyleSheet.create({
   pauseConfirmText: {
     color: '#ffffff',
     fontSize: 13,
-    fontWeight: '700',
-  },
-  pausedOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  pausedPopup: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#94a3b8',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  pausedTitle: {
-    color: '#111827',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  pausedText: {
-    color: '#334155',
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginBottom: 14,
-  },
-  resumeBtn: {
-    minWidth: 120,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#16a34a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  resumeBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
     fontWeight: '700',
   },
   submitModalCard: {

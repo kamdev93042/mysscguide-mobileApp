@@ -40,6 +40,7 @@ export default function ForumsScreen() {
   const text = isDark ? '#fff' : '#1e293b'; 
   const muted = isDark ? '#94a3b8' : '#64748b'; 
   const border = isDark ? '#1e293b' : '#e2e8f0';
+  const primary = '#059669';
 
   useFocusEffect(
     useCallback(() => {
@@ -188,11 +189,17 @@ export default function ForumsScreen() {
           {visiblePosts.map((post) => (
              <Pressable 
                 key={post.id} 
-                style={[styles.postItem, { borderColor: border }]}
+                style={[
+                  styles.postItem, 
+                  { 
+                    backgroundColor: isDark ? '#1e293b' : '#fff',
+                    borderColor: isDark ? '#334155' : '#e2e8f0',
+                  }
+                ]}
                 onPress={() => navigation.navigate('ForumPost', { post })}
              >
                 <View style={styles.postAuthorRow}>
-                  <View style={[styles.authorAvatar, { backgroundColor: cardBg }]}>
+                  <View style={[styles.authorAvatar, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
                     <Text style={styles.authorInitial}>{post.authorInitial}</Text>
                   </View>
                   <View>
@@ -202,13 +209,13 @@ export default function ForumsScreen() {
                 </View>
                 
                 <Text style={[styles.postTitle, { color: text }]}>{post.title}</Text>
-                <Text style={[styles.postSub, { color: muted }]} numberOfLines={2}>{post.subtitle}</Text>
+                <Text style={[styles.postSub, { color: muted }]} numberOfLines={3}>{post.subtitle}</Text>
                 
                 {post.tags.length > 0 && (
                   <View style={styles.tagsRow}>
                     {post.tags.map((tag, idx) => (
-                      <View key={idx} style={[styles.tagPill, { backgroundColor: cardBg }]}>
-                        <Text style={[styles.tagText, { color: muted }]}>#{tag}</Text>
+                      <View key={idx} style={[styles.tagPill, { backgroundColor: isDark ? '#05966930' : '#dcfce7' }]}>
+                        <Text style={[styles.tagText, { color: '#059669' }]}>#{tag}</Text>
                       </View>
                     ))}
                   </View>
@@ -271,7 +278,7 @@ export default function ForumsScreen() {
                  <View style={styles.inputGroup}>
                    <Text style={[styles.label, { color: text }]}>Title <Text style={{color: '#ef4444'}}>*</Text></Text>
                    <TextInput 
-                     style={[styles.input, { borderColor: border, color: text }]}
+                     style={[styles.input, { borderColor: isDark ? primary + '50' : primary, color: text, backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}
                      placeholder="What's on your mind? (e.g. CGL Strategy)"
                      placeholderTextColor={muted}
                      value={newTitle}
@@ -281,7 +288,7 @@ export default function ForumsScreen() {
                  <View style={styles.inputGroup}>
                    <Text style={[styles.label, { color: text }]}>Subtitle (optional)</Text>
                    <TextInput 
-                     style={[styles.input, styles.textArea, { borderColor: border, color: text }]}
+                     style={[styles.input, styles.textArea, { borderColor: isDark ? primary + '50' : primary, color: text, backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}
                      placeholder="Brief description or context..."
                      placeholderTextColor={muted}
                      multiline
@@ -294,7 +301,7 @@ export default function ForumsScreen() {
                      <Ionicons name="pricetag-outline" size={14} color={muted} /> Tags (comma separated, optional)
                    </Text>
                    <TextInput 
-                     style={[styles.input, { borderColor: border, color: text }]}
+                     style={[styles.input, { borderColor: isDark ? primary + '50' : primary, color: text, backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}
                      placeholder="quant, reasoning, tips"
                      placeholderTextColor={muted}
                      value={newTags}
@@ -304,10 +311,10 @@ export default function ForumsScreen() {
 
                  <View style={[styles.modalFooter, { borderTopColor: border }]}>
                     <Pressable onPress={() => setModalVisible(false)} hitSlop={10} style={{marginRight: 16}}>
-                      <Text style={{color: muted, fontWeight: '600', fontSize: 14}}>Cancel</Text>
+                      <Text style={{color: muted, fontWeight: '700', fontSize: 14}}>Cancel</Text>
                     </Pressable>
                     <Pressable 
-                      style={[styles.postBtn, !canSubmit && { opacity: 0.5 }]} 
+                      style={[styles.postBtn, { backgroundColor: primary }, !canSubmit && { opacity: 0.5 }]} 
                       onPress={handlePostSubmit}
                       disabled={!canSubmit}
                     >
@@ -377,7 +384,17 @@ const styles = StyleSheet.create({
   createBtn: { backgroundColor: '#10b981', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12 },
   createBtnText: { color: '#fff', fontWeight: '700', fontSize: 14, marginLeft: 6 },
   postsList: { paddingHorizontal: 16 },
-  postItem: { borderBottomWidth: 1, paddingBottom: 20, marginBottom: 20 },
+  postItem: { 
+    borderWidth: 1, 
+    borderRadius: 12, 
+    padding: 16, 
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   postAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   authorAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   authorInitial: { color: '#10b981', fontWeight: '800', fontSize: 16 },
