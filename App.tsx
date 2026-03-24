@@ -1,9 +1,11 @@
 import 'react-native-gesture-handler';
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LoginModalProvider } from './context/LoginModalContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SplashProvider } from './context/SplashContext';
@@ -133,6 +135,55 @@ import { MnemonicsProvider } from './context/MnemonicsContext';
 import { ForumsProvider } from './context/ForumsContext';
 
 export default function App() {
+  const [initialRouteName, setInitialRouteName] = useState<'Login' | 'Main'>(
+    BYPASS_LOGIN_FOR_TESTING ? 'Main' : 'Login'
+  );
+  const [hasResolvedInitialRoute, setHasResolvedInitialRoute] = useState(BYPASS_LOGIN_FOR_TESTING);
+
+  useEffect(() => {
+    if (BYPASS_LOGIN_FOR_TESTING) {
+      setHasResolvedInitialRoute(true);
+      setInitialRouteName('Main');
+      return;
+    }
+
+    let isMounted = true;
+
+    const hydrateAuthState = async () => {
+      try {
+        const [isLoggedIn, userToken] = await Promise.all([
+          AsyncStorage.getItem('isLoggedIn'),
+          AsyncStorage.getItem('userToken'),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (isLoggedIn === 'true' && userToken) {
+          setInitialRouteName('Main');
+        } else {
+          setInitialRouteName('Login');
+        }
+      } catch (error) {
+        console.error('Failed to restore auth state', error);
+        if (isMounted) {
+          setInitialRouteName('Login');
+        }
+      } finally {
+        if (isMounted) {
+          setHasResolvedInitialRoute(true);
+        }
+      }
+    };
+
+    hydrateAuthState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <ThemeProvider>
       <LoginModalProvider>
@@ -142,29 +193,31 @@ export default function App() {
               <ForumsProvider>
                 <NavigationContainer>
             <StatusBar style="auto" />
-            <Stack.Navigator
-              id={undefined}
-              screenOptions={{
-                headerShown: false,
-              }}
-              initialRouteName={BYPASS_LOGIN_FOR_TESTING ? 'Main' : 'Login'}
-            >
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="OTP" component={OtpVerificationScreen} />
-              <Stack.Screen name="Name" component={NameScreen} />
-              <Stack.Screen name="Main" component={MainTabs} />
-              <Stack.Screen name="CreateMock" component={CreateMockScreen} />
-              <Stack.Screen 
-                name="MockInstruction" 
-                component={MockInstructionScreen}
-                options={{ presentation: 'modal' }}
-              />
-              <Stack.Screen name="MockPractice" component={MockPracticeScreen} />
-              <Stack.Screen name="ForumPost" component={ForumPostScreen} />
-              <Stack.Screen name="Mocks" component={MocksScreen} />
-              <Stack.Screen name="PYQs" component={PyqsScreen} />
-              <Stack.Screen name="Contests" component={ContestScreen} />
-            </Stack.Navigator>
+            {hasResolvedInitialRoute && (
+              <Stack.Navigator
+                id={undefined}
+                screenOptions={{
+                  headerShown: false,
+                }}
+                initialRouteName={initialRouteName}
+              >
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="OTP" component={OtpVerificationScreen} />
+                <Stack.Screen name="Name" component={NameScreen} />
+                <Stack.Screen name="Main" component={MainTabs} />
+                <Stack.Screen name="CreateMock" component={CreateMockScreen} />
+                <Stack.Screen 
+                  name="MockInstruction" 
+                  component={MockInstructionScreen}
+                  options={{ presentation: 'modal' }}
+                />
+                <Stack.Screen name="MockPractice" component={MockPracticeScreen} />
+                <Stack.Screen name="ForumPost" component={ForumPostScreen} />
+                <Stack.Screen name="Mocks" component={MocksScreen} />
+                <Stack.Screen name="PYQs" component={PyqsScreen} />
+                <Stack.Screen name="Contests" component={ContestScreen} />
+              </Stack.Navigator>
+            )}
             <SplashScreen />
             </NavigationContainer>
                </ForumsProvider>

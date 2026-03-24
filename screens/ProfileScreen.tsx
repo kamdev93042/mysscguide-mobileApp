@@ -188,7 +188,7 @@ export default function ProfileScreen() {
 
   const handleSaveProfile = () => {
     const updatedProfile = {
-      ...profileData,
+      ...(profileData ?? {}),
       fullName: editForm.fullName.trim(),
       username: editForm.fullName.trim(),
       email: editForm.email.trim(),

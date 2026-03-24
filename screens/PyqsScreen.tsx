@@ -141,6 +141,8 @@ export default function PyqsScreen() {
   const [dateObj, setDateObj] = useState(new Date());
   const [resultHistory, setResultHistory] = useState<SubmissionResult[]>([]);
   const [pausedTests, setPausedTests] = useState<Record<string, PausedTestPayload>>({});
+  const [hasLoadedPausedTests, setHasLoadedPausedTests] = useState(false);
+  const [hasLoadedResultHistory, setHasLoadedResultHistory] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const card = isDark ? '#1e293b' : '#ffffff';
@@ -230,6 +232,14 @@ export default function PyqsScreen() {
     return normalizedTitle.includes(normalizedToken);
   };
 
+  const formatSubmittedAt = (value: string) => {
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return value;
+    }
+    return parsedDate.toLocaleString();
+  };
+
   const filteredPyqList = PYQ_LIST.filter((item) => {
     const examFilter = filters.Exam !== 'Exam' ? filters.Exam : null;
     const tierFilter = filters.Tier !== 'Tier' ? filters.Tier : null;
@@ -262,6 +272,10 @@ export default function PyqsScreen() {
         }
       } catch (error) {
         console.error('Failed to load paused tests', error);
+      } finally {
+        if (isMounted) {
+          setHasLoadedPausedTests(true);
+        }
       }
     };
 
@@ -287,6 +301,10 @@ export default function PyqsScreen() {
         }
       } catch (error) {
         console.error('Failed to load result history', error);
+      } finally {
+        if (isMounted) {
+          setHasLoadedResultHistory(true);
+        }
       }
     };
 
@@ -298,6 +316,10 @@ export default function PyqsScreen() {
   }, []);
 
   useEffect(() => {
+    if (!hasLoadedPausedTests) {
+      return;
+    }
+
     const persistPausedTests = async () => {
       try {
         if (Object.keys(pausedTests).length === 0) {
@@ -311,9 +333,13 @@ export default function PyqsScreen() {
     };
 
     persistPausedTests();
-  }, [pausedTests]);
+  }, [pausedTests, hasLoadedPausedTests]);
 
   useEffect(() => {
+    if (!hasLoadedResultHistory) {
+      return;
+    }
+
     const persistResultHistory = async () => {
       try {
         if (resultHistory.length === 0) {
@@ -327,7 +353,7 @@ export default function PyqsScreen() {
     };
 
     persistResultHistory();
-  }, [resultHistory]);
+  }, [resultHistory, hasLoadedResultHistory]);
 
   useEffect(() => {
     const submissionResult = route.params?.submissionResult as SubmissionResult | undefined;
@@ -645,7 +671,7 @@ export default function PyqsScreen() {
                   <Text style={[styles.resultTitle, { color: text }]} numberOfLines={1}>{result.testTitle}</Text>
                   <Text style={[styles.resultTab, { color: primary }]}>{result.sourceTab}</Text>
                 </View>
-                <Text style={[styles.resultMeta, { color: muted }]}>Submitted: {result.submittedAt}</Text>
+                <Text style={[styles.resultMeta, { color: muted }]}>Submitted: {formatSubmittedAt(result.submittedAt)}</Text>
                 <View style={styles.resultStatsRow}>
                   <Text style={[styles.resultScore, { color: primary }]}>Score: {result.score.toFixed(2)}</Text>
                   <Text style={[styles.resultMeta, { color: muted }]}>Correct {result.correct} · Wrong {result.wrong}</Text>
