@@ -30,6 +30,8 @@ import MnemonicsScreen from './screens/MnemonicsScreen';
 import ForumsScreen from './screens/ForumsScreen';
 import ForumPostScreen from './screens/ForumPostScreen';
 import TestsScreen from './screens/TestsScreen';
+import TestAnalysisScreen from './screens/TestAnalysisScreen';
+import DailyChallengeScreen from './screens/DailyChallengeScreen';
 
 const MockPracticeScreen = require('./screens/MockPracticeScreen').default;
 
@@ -51,7 +53,6 @@ function HomeStackNavigator() {
   return (
     <HomeStack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="DashboardMain" component={DashboardScreen} />
-      <HomeStack.Screen name="Notifications" component={NotificationScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -205,6 +206,7 @@ export default function App() {
                 <Stack.Screen name="OTP" component={OtpVerificationScreen} />
                 <Stack.Screen name="Name" component={NameScreen} />
                 <Stack.Screen name="Main" component={MainTabs} />
+                <Stack.Screen name="Notifications" component={NotificationScreen} />
                 <Stack.Screen name="CreateMock" component={CreateMockScreen} />
                 <Stack.Screen 
                   name="MockInstruction" 
@@ -212,6 +214,8 @@ export default function App() {
                   options={{ presentation: 'modal' }}
                 />
                 <Stack.Screen name="MockPractice" component={MockPracticeScreen} />
+                <Stack.Screen name="TestAnalysis" component={TestAnalysisScreen} />
+                <Stack.Screen name="DailyChallenge" component={DailyChallengeScreen} />
                 <Stack.Screen name="ForumPost" component={ForumPostScreen} />
                 <Stack.Screen name="Mocks" component={MocksScreen} />
                 <Stack.Screen name="PYQs" component={PyqsScreen} />

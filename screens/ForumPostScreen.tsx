@@ -105,7 +105,7 @@ export default function ForumPostScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Post Details */}
-        <View style={styles.postArea}>
+        <View style={[styles.postArea, styles.postCard, { backgroundColor: cardBg, borderColor: border }]}> 
             <View style={styles.postAuthorRow}>
                 <View style={[styles.authorAvatar, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
                   <Text style={[styles.authorInitial, { color: primary }]}>{post.authorInitial}</Text>
@@ -117,7 +117,7 @@ export default function ForumPostScreen() {
             </View>
             
             <Text style={[styles.postTitle, { color: text }]}>{post.title}</Text>
-            <Text style={[styles.postSub, { color: text }]}>{post.subtitle}</Text>
+            <Text style={[styles.postSub, { color: muted }]}>{post.subtitle}</Text>
             
             {post.tags.length > 0 && (
                 <View style={styles.tagsRow}>
@@ -129,7 +129,7 @@ export default function ForumPostScreen() {
                 </View>
             )}
 
-            <View style={[styles.actionsRow, { borderBottomColor: border }]}>
+            <View style={[styles.actionsRow, { borderTopColor: border }]}> 
                 <Pressable style={styles.actionIcon} onPress={() => incrementLike(post.id)}>
                     <Ionicons name={post.userVote === 'like' ? 'heart' : 'heart-outline'} size={20} color={post.userVote === 'like' ? '#ec4899' : muted} />
                     <Text style={[styles.actionNum, { color: muted }]}>{post.likes} Likes</Text>
@@ -190,31 +190,47 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 12, borderBottomWidth: 1 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
   scroll: { paddingBottom: 24 },
-  postArea: { padding: 16 },
-  postAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  authorAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  authorInitial: { color: '#059669', fontWeight: '800', fontSize: 16 },
-  postAuthorName: { fontSize: 15, fontWeight: '700' },
+  postArea: { marginHorizontal: 14, marginTop: 12, marginBottom: 8, padding: 14 },
+  postCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  postAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  authorAvatar: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  authorInitial: { color: '#059669', fontWeight: '800', fontSize: 14 },
+  postAuthorName: { fontSize: 16, fontWeight: '700' },
   postTime: { fontSize: 12 },
-  postTitle: { fontSize: 24, fontWeight: '800', marginBottom: 12, lineHeight: 32 },
-  postSub: { fontSize: 16, lineHeight: 26, marginBottom: 20, opacity: 0.9 },
-  tagsRow: { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
-  tagPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  tagText: { fontSize: 13, fontWeight: '700' },
-  actionsRow: { flexDirection: 'row', paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, gap: 24 },
-  actionIcon: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionNum: { fontSize: 15, fontWeight: '700' },
-  commentsArea: { padding: 16 },
-  commentsTitle: { fontSize: 18, fontWeight: '800', marginBottom: 20 },
-  commentBlock: { marginBottom: 16 },
+  postTitle: { fontSize: 24, fontWeight: '800', marginBottom: 10, lineHeight: 32, letterSpacing: 0.1 },
+  postSub: { fontSize: 16, lineHeight: 26, marginBottom: 16 },
+  tagsRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  tagPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  tagText: { fontSize: 12, fontWeight: '700' },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 12,
+    marginTop: 2,
+    borderTopWidth: 1,
+    gap: 20,
+  },
+  actionIcon: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  actionNum: { fontSize: 13, fontWeight: '700' },
+  commentsArea: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
+  commentsTitle: { fontSize: 20, fontWeight: '800', marginBottom: 14 },
+  commentBlock: { marginBottom: 12 },
   commentItem: { flexDirection: 'row', marginBottom: 4 },
-  commentAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 4 },
-  commentBubble: { flex: 1, padding: 16, borderRadius: 16, borderTopLeftRadius: 4 },
-  commentAuthor: { fontSize: 14, fontWeight: '800' },
+  commentAvatar: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 },
+  commentBubble: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderTopLeftRadius: 4 },
+  commentAuthor: { fontSize: 13, fontWeight: '800' },
   commentTime: { fontSize: 12 },
-  commentText: { fontSize: 15, lineHeight: 22, marginTop: 4 },
+  commentText: { fontSize: 14, lineHeight: 20, marginTop: 3 },
   replyToHandle: { color: '#059669', fontWeight: '800' },
-  replyBtn: { marginTop: 10, alignSelf: 'flex-start' },
+  replyBtn: { marginTop: 8, alignSelf: 'flex-start' },
   replyBtnText: { color: '#059669', fontWeight: '700', fontSize: 13 },
   repliesWrap: { marginTop: 8 },
   inputRow: { padding: 16, borderTopWidth: 1, alignItems: 'stretch', paddingBottom: Platform.OS === 'ios' ? 24 : 16 },
