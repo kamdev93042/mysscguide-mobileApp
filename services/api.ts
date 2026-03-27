@@ -10,6 +10,15 @@ const getBaseUrl = () => {
 
 export const API_BASE_URL = getBaseUrl();
 
+const isLikelyAuthErrorMessage = (message: string) =>
+  /unauthori[sz]ed|token\s+is\s+expired|invalid\s+claims|jwt|forbidden|invalid\s+token/i.test(message || '');
+
+export const isAuthSessionError = (error: any) => {
+  if (!error) return false;
+  const msg = String(error?.message || '');
+  return Boolean(error?.isAuthError) || Number(error?.status) === 401 || isLikelyAuthErrorMessage(msg);
+};
+
 /**
  * Helper function for making API requests.
  */
@@ -33,7 +42,12 @@ async function fetchApi(endpoint: string, options: RequestInit = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(data.message || data.error || `API request failed with status ${response.status}`);
+      const message = data.message || data.error || `API request failed with status ${response.status}`;
+      const err: any = new Error(message);
+      err.status = response.status;
+      err.code = data.code || data.errorCode;
+      err.isAuthError = response.status === 401 || isLikelyAuthErrorMessage(String(message));
+      throw err;
     }
 
     return data;

@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
-import { pyqApi } from '../services/api';
+import { isAuthSessionError, pyqApi } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MockInstructionScreen() {
   const insets = useSafeAreaInsets();
@@ -30,6 +31,15 @@ export default function MockInstructionScreen() {
   const [hasAgreed, setHasAgreed] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
 
+  const normalizedTitle = String(mockData?.title || '');
+  const isCglTier2 = /cgl/i.test(normalizedTitle) && /tier\s*2/i.test(normalizedTitle);
+  const isChslTier2 = /chsl/i.test(normalizedTitle) && /tier\s*2/i.test(normalizedTitle);
+  const isTier2Instruction = isCglTier2 || isChslTier2;
+  const examTierLabel = isChslTier2 ? 'SSC CHSL Tier 2' : isCglTier2 ? 'SSC CGL Tier 2' : 'SSC Test';
+  const markingScheme = isCglTier2
+    ? { correct: 3, wrong: 1 }
+    : { correct: 2, wrong: 0.5 };
+
   const bg = isDark ? '#000000' : '#ffffff';
   const card = bg;
   const text = isDark ? '#f8fafc' : '#0f172a';
@@ -45,11 +55,21 @@ export default function MockInstructionScreen() {
       setIsInitializing(true);
       try {
         const res = await pyqApi.initPyq(route.params.testPaperId);
+        const initTimeLimitRaw = Number(res?.timeLimit);
+        const initDurationMinutes = Number.isFinite(initTimeLimitRaw) && initTimeLimitRaw > 0
+          ? (initTimeLimitRaw < 300 ? initTimeLimitRaw : Math.round(initTimeLimitRaw / 60))
+          : 0;
+        const initQuestionCountRaw = Number(res?.questionCount ?? res?.totalQuestions);
+        const initQuestionCount = Number.isFinite(initQuestionCountRaw) && initQuestionCountRaw > 0
+          ? Math.round(initQuestionCountRaw)
+          : 0;
+        const fallbackDurationMinutes = Number(mockData.duration) || 60;
+        const fallbackQuestionCount = Number(mockData.questions) || 100;
         
         const dynamicMockData = {
           ...mockData,
-          questions: res?.questionCount || mockData.questions,
-          duration: res?.timeLimit ? Math.floor(res.timeLimit / 60) : mockData.duration,
+          questions: initQuestionCount || fallbackQuestionCount,
+          duration: initDurationMinutes || fallbackDurationMinutes,
         };
 
         navigation.navigate('MockPractice', {
@@ -62,6 +82,22 @@ export default function MockInstructionScreen() {
         setIsInitializing(false);
       } catch (error: any) {
         console.error('Failed to init PYQ:', error);
+
+        if (isAuthSessionError(error)) {
+          await Promise.all([
+            AsyncStorage.removeItem('userToken'),
+            AsyncStorage.removeItem('isLoggedIn'),
+          ]);
+          const msg = 'Your session expired. Please login again to continue.';
+          if (Platform.OS === 'web') {
+            window.alert(msg);
+          } else {
+            Alert.alert('Session Expired', msg);
+          }
+          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+          setIsInitializing(false);
+          return;
+        }
         
         let errorMsg = 'Failed to initialize test. Please try again.';
         if (error.message) {
@@ -106,7 +142,9 @@ export default function MockInstructionScreen() {
         <Pressable onPress={handleBack} style={styles.backBtn} hitSlop={10}>
           <Ionicons name="arrow-back" size={22} color={text} />
         </Pressable>
-        <Text style={[styles.mainTitle, { color: text }]}>General Instructions</Text>
+        <Text style={[styles.mainTitle, { color: text }]}>
+          {isTier2Instruction ? `${examTierLabel} Instructions` : 'General Instructions'}
+        </Text>
         <View style={styles.backBtnSpacer} />
       </View>
 
@@ -225,21 +263,26 @@ export default function MockInstructionScreen() {
         {renderBullet("6.", "Sections in this question paper are displayed on the top bar of the screen. Questions in a section can be viewed by clicking on the section name. The section you are currently viewing will be highlighted.")}
         {renderBullet("7.", "After clicking the Save & Next button on the last question for a section, you will automatically be taken to the first question of the next section.")}
         {renderBullet("8.", "You can shuffle between sections and questions anytime during the examination as per your convenience.")}
+        {isTier2Instruction &&
+          renderBullet(
+            "8A.",
+            `${examTierLabel} follows multi-phase section navigation in this app. After completing the current phase, the next phase starts automatically as per timer and section rules.`
+          )}
 
         <Text style={[styles.sectionHeading, { color: text, marginTop: 24 }]}>Marking Scheme:</Text>
         {renderBullet("9.", "For each question, marks will be awarded as follows:")}
         <View style={styles.indent}>
           <View style={styles.bulletRow}>
             <View style={[styles.dot, { backgroundColor: text }]} />
-            <Text style={[styles.bulletBody, { color: text }]}>Each question carries <Text style={{fontWeight: 'bold'}}>2 marks</Text>.</Text>
+            <Text style={[styles.bulletBody, { color: text }]}>Each question carries <Text style={{fontWeight: 'bold'}}>{markingScheme.correct} marks</Text>.</Text>
           </View>
           <View style={styles.bulletRow}>
             <View style={[styles.dot, { backgroundColor: text }]} />
-            <Text style={[styles.bulletBody, { color: text }]}>For each correct answer, you will get <Text style={{fontWeight: 'bold'}}>2 marks</Text>.</Text>
+            <Text style={[styles.bulletBody, { color: text }]}>For each correct answer, you will get <Text style={{fontWeight: 'bold'}}>{markingScheme.correct} marks</Text>.</Text>
           </View>
           <View style={styles.bulletRow}>
             <View style={[styles.dot, { backgroundColor: text }]} />
-            <Text style={[styles.bulletBody, { color: text }]}>For each wrong answer, <Text style={{fontWeight: 'bold'}}>0.50 marks</Text> will be deducted (negative marking).</Text>
+            <Text style={[styles.bulletBody, { color: text }]}>For each wrong answer, <Text style={{fontWeight: 'bold'}}>{markingScheme.wrong.toFixed(2)} marks</Text> will be deducted (negative marking).</Text>
           </View>
           <View style={styles.bulletRow}>
             <View style={[styles.dot, { backgroundColor: text }]} />

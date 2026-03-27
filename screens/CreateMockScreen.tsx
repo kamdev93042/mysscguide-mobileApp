@@ -307,7 +307,7 @@ export default function CreateMockScreen() {
 
   /* ═══════════════════ STEP 1: NAME ═══════════════════ */
   const renderStep1 = () => (
-    <View style={s.stepWrap}>
+    <View style={[s.stepWrap, s.step1Wrap]}>
       <View style={[s.card, { backgroundColor: card, borderColor: border }]}>
         <View style={[s.accentBar, { backgroundColor: green }]} />
         <View style={s.cardBody}>
@@ -820,9 +820,10 @@ const s = StyleSheet.create({
   progressSeg: { flex: 1, height: 5, borderRadius: 2.5 },
 
   /* Scroll */
-  scrollContent: { paddingVertical: 16, paddingHorizontal: 14 },
-  content: { alignSelf: 'center', width: '100%', maxWidth: 520 },
+  scrollContent: { paddingVertical: 16, paddingHorizontal: 14, flexGrow: 1 },
+  content: { alignSelf: 'center', width: '100%', maxWidth: 520, flexGrow: 1 },
   stepWrap: {},
+  step1Wrap: { flex: 1, justifyContent: 'center' },
 
   /* Shared */
   card: { borderRadius: 20, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },

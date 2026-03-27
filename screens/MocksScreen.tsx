@@ -1,5 +1,5 @@
-import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, Image, RefreshControl } from 'react-native';
-import { useState, useCallback } from 'react';
+import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, Image, RefreshControl, Animated } from 'react-native';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -103,6 +103,32 @@ export default function MocksScreen() {
   const [showAllPublic, setShowAllPublic] = useState(false);
   const [showAllMy, setShowAllMy] = useState(false);
   const [showLockedNotice, setShowLockedNotice] = useState(false);
+  const lockedNoticeOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!showLockedNotice) {
+      lockedNoticeOpacity.setValue(0);
+      return;
+    }
+
+    lockedNoticeOpacity.setValue(1);
+    const timer = setTimeout(() => {
+      Animated.timing(lockedNoticeOpacity, {
+        toValue: 0,
+        duration: 450,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) {
+          setShowLockedNotice(false);
+        }
+      });
+    }, 3000);
+
+    return () => {
+      clearTimeout(timer);
+      lockedNoticeOpacity.stopAnimation();
+    };
+  }, [showLockedNotice, lockedNoticeOpacity]);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const card = isDark ? '#020617' : '#ffffff';
@@ -185,6 +211,8 @@ export default function MocksScreen() {
                 } else if (item.id === 'rank') {
                   navigation.navigate('PYQs', { activeTab: 'RankMaker' });
                 } else if (item.id === 'prescription') {
+                  lockedNoticeOpacity.stopAnimation();
+                  lockedNoticeOpacity.setValue(1);
                   setShowLockedNotice(true);
                 }
               }}
@@ -201,15 +229,23 @@ export default function MocksScreen() {
         </View>
 
         {showLockedNotice && (
+          <Animated.View style={{ opacity: lockedNoticeOpacity }}>
           <View style={[styles.lockedNotice, { backgroundColor: isDark ? '#1e293b' : '#ecfdf5', borderColor: isDark ? '#334155' : '#a7f3d0' }]}>
             <View style={styles.lockedNoticeLeft}>
               <Ionicons name="lock-closed" size={16} color={primary} />
               <Text style={[styles.lockedNoticeText, { color: text }]}>Doctor&apos;s Prescription is locked for now. Coming soon.</Text>
             </View>
-            <Pressable onPress={() => setShowLockedNotice(false)} hitSlop={8}>
+            <Pressable
+              onPress={() => {
+                lockedNoticeOpacity.stopAnimation();
+                setShowLockedNotice(false);
+              }}
+              hitSlop={8}
+            >
               <Ionicons name="close" size={16} color={muted} />
             </Pressable>
           </View>
+          </Animated.View>
         )}
 
         {/* My Challenges list */}

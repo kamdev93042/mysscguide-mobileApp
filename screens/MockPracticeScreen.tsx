@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -16,9 +17,49 @@ import { CommonActions, StackActions, useNavigation, useRoute } from '@react-nav
 import { useTheme } from '../context/ThemeContext';
 import { pyqApi } from '../services/api';
 import { ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SECTION_TITLES = ['PART-A', 'PART-B', 'PART-C', 'PART-D'] as const;
+function SmartRemoteImage({
+  uri,
+  maxHeight,
+  minHeight,
+  borderRadius,
+}: {
+  uri: string;
+  maxHeight: number;
+  minHeight: number;
+  borderRadius: number;
+}) {
+  const [aspectRatio, setAspectRatio] = useState(2.2);
+
+  return (
+    <Image
+      source={{ uri }}
+      style={{
+        width: '100%',
+        aspectRatio,
+        minHeight,
+        maxHeight,
+        borderRadius,
+        backgroundColor: 'transparent',
+      }}
+      resizeMode="contain"
+      onLoad={(e) => {
+        const w = Number(e?.nativeEvent?.source?.width);
+        const h = Number(e?.nativeEvent?.source?.height);
+        if (w > 0 && h > 0) {
+          setAspectRatio(w / h);
+        }
+      }}
+    />
+  );
+}
+
+const SECTION_TITLES = ['PART-A', 'PART-B', 'PART-C', 'PART-D', 'PART-E'] as const;
+const DEFAULT_SECTION_TITLES = ['PART-A', 'PART-B', 'PART-C', 'PART-D'] as const;
 const EXAM_DURATION_SECONDS = 60 * 60;
+const PAUSED_TESTS_STORAGE_KEY = 'pyqs_paused_tests_v1';
+const RESULT_HISTORY_STORAGE_KEY = 'pyqs_result_history_v1';
 
 type SectionTitle = (typeof SECTION_TITLES)[number];
 
@@ -30,6 +71,7 @@ type Question = {
   correctOption: number;
   realId?: string | number;
   realOptions?: any[];
+  rawQuestion?: any;
 };
 
 type SourceTab = 'PYQ' | 'RankMaker';
@@ -41,6 +83,7 @@ type ResumeState = {
   reviewedQuestions: Record<number, boolean>;
   timeLeft: number;
   activeSection: SectionTitle;
+  activePhase?: number;
   selectedLanguage: 'English' | 'Hindi';
   zoomLevel: number;
 };
@@ -55,10 +98,35 @@ type SectionBreakup = {
 
 const SECTION_SUBJECTS: Record<SectionTitle, string> = {
   'PART-A': 'General Intelligence',
-  'PART-B': 'General Awareness',
-  'PART-C': 'Quantitative Aptitude',
-  'PART-D': 'English Comprehension',
+  'PART-B': 'Quantitative Aptitude',
+  'PART-C': 'English Comprehension',
+  'PART-D': 'General Awareness',
+  'PART-E': 'Computer Knowledge',
 };
+
+const CGL_TIER2_PHASES = [
+  {
+    key: 'section-1',
+    label: 'Section 1',
+    sections: ['PART-A', 'PART-B'] as SectionTitle[],
+    duration: 60 * 60,
+    nextLabel: 'Section 2',
+  },
+  {
+    key: 'section-2',
+    label: 'Section 2',
+    sections: ['PART-C', 'PART-D'] as SectionTitle[],
+    duration: 60 * 60,
+    nextLabel: 'Computer Knowledge',
+  },
+  {
+    key: 'computer-knowledge',
+    label: 'Computer Knowledge',
+    sections: ['PART-E'] as SectionTitle[],
+    duration: 15 * 60,
+    nextLabel: 'Final Submit',
+  },
+] as const;
 
 const LANGUAGE_OPTIONS = ['English', 'Hindi'] as const;
 
@@ -71,16 +139,16 @@ const SAMPLE_OPTIONS = [
 
 const buildQuestions = (count: number): Question[] => {
   const total = Math.max(4, count);
-  const perSection = Math.ceil(total / SECTION_TITLES.length);
+  const perSection = Math.ceil(total / DEFAULT_SECTION_TITLES.length);
 
   return Array.from({ length: total }, (_, index) => {
-    const sectionIndex = Math.min(Math.floor(index / perSection), SECTION_TITLES.length - 1);
+    const sectionIndex = Math.min(Math.floor(index / perSection), DEFAULT_SECTION_TITLES.length - 1);
     const sample = SAMPLE_OPTIONS[index % SAMPLE_OPTIONS.length];
     const questionNo = index + 1;
 
     return {
       id: questionNo,
-      section: SECTION_TITLES[sectionIndex],
+      section: DEFAULT_SECTION_TITLES[sectionIndex],
       questionText: `Question ${questionNo}: Select the option that is related to the third term in the same way as the second term is related to the first term.`,
       options: [
         `Option A: ${sample[0]}`,
@@ -93,6 +161,41 @@ const buildQuestions = (count: number): Question[] => {
   });
 };
 
+const buildCglTier2Questions = (examLabel: 'SSC CGL' | 'SSC CHSL' = 'SSC CGL'): Question[] => {
+  const plan: Array<{ section: SectionTitle; count: number }> = [
+    { section: 'PART-A', count: 20 },
+    { section: 'PART-B', count: 20 },
+    { section: 'PART-C', count: 20 },
+    { section: 'PART-D', count: 20 },
+    { section: 'PART-E', count: 20 },
+  ];
+
+  let runningId = 1;
+  const questions: Question[] = [];
+
+  plan.forEach(({ section, count }) => {
+    for (let idx = 0; idx < count; idx += 1) {
+      const sample = SAMPLE_OPTIONS[(runningId - 1) % SAMPLE_OPTIONS.length];
+      const subjectLabel = SECTION_SUBJECTS[section];
+      questions.push({
+        id: runningId,
+        section,
+        questionText: `Question ${runningId}: ${subjectLabel} practice question for ${examLabel} Tier 2. Choose the most suitable answer.`,
+        options: [
+          `Option A: ${sample[0]}`,
+          `Option B: ${sample[1]}`,
+          `Option C: ${sample[2]}`,
+          `Option D: ${sample[3]}`,
+        ],
+        correctOption: (runningId - 1) % 4,
+      });
+      runningId += 1;
+    }
+  });
+
+  return questions;
+};
+
 type QuestionStatus = 'unvisited' | 'notAnswered' | 'answered' | 'review' | 'answeredReview';
 
 export default function MockPracticeScreen() {
@@ -100,13 +203,16 @@ export default function MockPracticeScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { isDark } = useTheme();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const mockData = route.params?.mockData || {
     title: 'Rank Maker Series',
     questions: 25,
   };
   const sourceTab: SourceTab = route.params?.sourceTab || (mockData.title.includes('Rank Maker') ? 'RankMaker' : 'PYQ');
+  const normalizedTitle = String(mockData.title || '');
+  const isTier2Mode = /(cgl|chsl)/i.test(normalizedTitle) && /tier\s*2/i.test(normalizedTitle);
+  const tier2ExamLabel: 'SSC CGL' | 'SSC CHSL' = /chsl/i.test(normalizedTitle) ? 'SSC CHSL' : 'SSC CGL';
   const testKey: string =
     route.params?.testKey ||
     `${sourceTab}:${String(mockData.title || 'Mock Test')}:${String(mockData.questions || 25)}`;
@@ -117,6 +223,8 @@ export default function MockPracticeScreen() {
     : 25;
 
   const [examQuestions, setExamQuestions] = useState<Question[]>([]);
+  const [cglTier2Questions, setCglTier2Questions] = useState<Question[]>([]);
+  const [activePhase, setActivePhase] = useState<number>(resumeState?.activePhase || 0);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [apiMetadata, setApiMetadata] = useState<{ attemptId?: string; originalQuestions?: any[], timeLimit?: number }>({});
 
@@ -166,11 +274,172 @@ export default function MockPracticeScreen() {
   };
 
   const parseLanguageContent = (content: any, lang: 'English' | 'Hindi'): string => {
+    const decodeHtmlEntities = (text: string) => {
+      const namedMap: Record<string, string> = {
+        nbsp: ' ',
+        amp: '&',
+        lt: '<',
+        gt: '>',
+        quot: '"',
+        apos: "'",
+        rsquo: "'",
+        lsquo: "'",
+        rdquo: '"',
+        ldquo: '"',
+        mdash: '-',
+        ndash: '-',
+        hellip: '...',
+        radic: '√',
+        minus: '-',
+        plusmn: '±',
+        times: '×',
+        divide: '÷',
+        deg: '°',
+        le: '<=',
+        ge: '>=',
+        ne: '!=',
+        middot: '·',
+        bull: '•',
+      };
+
+      const decodeOnce = (input: string) => input.replace(/&([a-zA-Z]+);|&#(\d+);|&#x([0-9a-fA-F]+);/g, (match, named, dec, hex) => {
+        if (named) {
+          const key = String(named).toLowerCase();
+          if (Object.prototype.hasOwnProperty.call(namedMap, key)) {
+            return namedMap[key];
+          }
+          // Avoid leaking raw entity code to users when backend sends uncommon named entities.
+          return key;
+        }
+
+        if (dec) {
+          const n = Number(dec);
+          return Number.isFinite(n) ? String.fromCharCode(n) : match;
+        }
+
+        if (hex) {
+          const n = parseInt(hex, 16);
+          return Number.isFinite(n) ? String.fromCharCode(n) : match;
+        }
+
+        return match;
+      });
+
+      // Run twice to handle double-encoded payloads like &amp;rsquo;
+      return decodeOnce(decodeOnce(text));
+    };
+
+    const normalizeHtmlText = (text: string) => {
+      if (!text) return '';
+
+      const normalizeMathMarkup = (input: string) => {
+        if (!input) return '';
+        let out = input;
+
+        // Remove TeX inline/block delimiters while keeping math content.
+        out = out
+          .replace(/\\\(/g, '')
+          .replace(/\\\)/g, '')
+          .replace(/\\\[/g, '')
+          .replace(/\\\]/g, '')
+          .replace(/\$\$/g, '')
+          .replace(/\$/g, '');
+
+        // Convert simple fractions to readable inline form.
+        // Re-run a few times to handle nested \frac blocks gradually.
+        for (let i = 0; i < 4; i += 1) {
+          const next = out.replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, '($1)/($2)');
+          if (next === out) break;
+          out = next;
+        }
+
+        // Remove common TeX command prefixes, keep semantic text.
+        out = out
+          .replace(/\\(sin|cos|tan|cot|sec|csc|log|ln|sqrt|theta|alpha|beta|gamma|pi|mu|sigma|phi|omega)\b/gi, '$1')
+          .replace(/\\times\b/gi, '×')
+          .replace(/\\cdot\b/gi, '·')
+          .replace(/\\left\b|\\right\b/gi, '')
+          .replace(/\\degree\b/gi, '°');
+
+        // Normalize escaped braces and separators.
+        out = out
+          .replace(/\\\{/g, '{')
+          .replace(/\\\}/g, '}')
+          .replace(/\^\{([^}]+)\}/g, '^$1')
+          .replace(/_\{([^}]+)\}/g, '_$1')
+          .replace(/\\/g, '');
+
+        return out;
+      };
+
+      const decodedFirst = decodeHtmlEntities(text);
+      const withBreaks = normalizeMathMarkup(decodedFirst)
+        .replace(/<\s*br\s*\/?>/gi, '\n')
+        .replace(/<\s*\/\s*p\s*>/gi, '\n\n')
+        .replace(/<\s*p[^>]*>/gi, '')
+        .replace(/<\s*\/\s*div\s*>/gi, '\n')
+        .replace(/<\s*div[^>]*>/gi, '')
+        .replace(/<\s*li[^>]*>/gi, '• ')
+        .replace(/<\s*\/\s*li\s*>/gi, '\n')
+        .replace(/<\s*\/\s*ul\s*>/gi, '\n')
+        .replace(/<\s*\/\s*ol\s*>/gi, '\n')
+        .replace(/<[^>]*>/g, ' ');
+
+      return withBreaks
+        .split('\n')
+        .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    };
+
     if (!content) return '';
     let obj = content;
     if (typeof content === 'string') {
-      try { obj = JSON.parse(content); } catch { return content; }
+      try { obj = JSON.parse(content); } catch { return normalizeHtmlText(content); }
     }
+
+    const extractDeepText = (node: any): string | null => {
+      const visited = new Set<any>();
+      const walk = (val: any): string | null => {
+        if (val === null || val === undefined) return null;
+        if (typeof val === 'string') {
+          const t = val.trim();
+          if (!t) return null;
+          if (/^https?:\/\//i.test(t) || /^data:image\//i.test(t)) return null;
+          return t;
+        }
+        if (typeof val === 'number') return String(val);
+        if (typeof val !== 'object') return null;
+        if (visited.has(val)) return null;
+        visited.add(val);
+
+        if (Array.isArray(val)) {
+          for (const item of val) {
+            const hit = walk(item);
+            if (hit) return hit;
+          }
+          return null;
+        }
+
+        const priorityKeys = ['text', 'optionText', 'english', 'hindi', 'en', 'hi', 'content', 'questionText', 'value'];
+        for (const k of priorityKeys) {
+          if (Object.prototype.hasOwnProperty.call(val, k)) {
+            const hit = walk((val as any)[k]);
+            if (hit) return hit;
+          }
+        }
+
+        for (const entry of Object.values(val)) {
+          const hit = walk(entry);
+          if (hit) return hit;
+        }
+        return null;
+      };
+
+      return walk(node);
+    };
+
     if (typeof obj === 'object' && obj !== null) {
       const isHindi = lang === 'Hindi';
       const tryNodes = isHindi 
@@ -179,11 +448,192 @@ export default function MockPracticeScreen() {
       
       for (const node of tryNodes) {
         const extracted = extractNestedString(node);
-        if (extracted) return extracted;
+        if (extracted) return normalizeHtmlText(extracted);
       }
-      return JSON.stringify(obj);
+
+      const deepExtracted = extractDeepText(obj);
+      return normalizeHtmlText(deepExtracted || '');
     }
-    return String(content);
+    return normalizeHtmlText(String(content));
+  };
+
+  const collectImageUrls = (
+    content: any,
+    config?: { excludeKeys?: string[]; allowAnyHttpUrl?: boolean }
+  ): string[] => {
+    const urls = new Set<string>();
+    const visited = new Set<any>();
+    const excludedKeys = new Set((config?.excludeKeys || []).map((k) => k.toLowerCase()));
+    const allowAnyHttpUrl = Boolean(config?.allowAnyHttpUrl);
+
+    const addCandidate = (val: any) => {
+      if (typeof val !== 'string') return;
+      const maybe = val.trim();
+      if (!maybe) return;
+      if (/^data:image\//i.test(maybe)) {
+        urls.add(maybe);
+        return;
+      }
+
+      if (/^https?:\/\//i.test(maybe)) {
+        const hasImageExt = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(maybe);
+        const looksLikeImagePath = /\/(image|images|img|media|figure|diagram)\b/i.test(maybe);
+        if (allowAnyHttpUrl || hasImageExt || looksLikeImagePath) {
+          urls.add(maybe);
+        }
+      }
+    };
+
+    const fromHtml = (html: string) => {
+      const srcRegex = /<img[^>]+src=["']?([^"' >]+)["']?[^>]*>/gi;
+      let match: RegExpExecArray | null = null;
+      while ((match = srcRegex.exec(html)) !== null) {
+        addCandidate(match[1]);
+      }
+    };
+
+    const walk = (node: any) => {
+      if (node === null || node === undefined) return;
+      if (typeof node === 'string') {
+        const trimmed = node.trim();
+        if (!trimmed) return;
+        addCandidate(trimmed);
+        if (/<img[\s>]/i.test(trimmed)) {
+          fromHtml(trimmed);
+        }
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+          try {
+            walk(JSON.parse(trimmed));
+          } catch {
+            return;
+          }
+        }
+        return;
+      }
+
+      if (typeof node !== 'object') return;
+      if (visited.has(node)) return;
+      visited.add(node);
+
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+
+      const imageKeys = ['image', 'imageUrl', 'img', 'diagram', 'diagramUrl', 'src', 'url', 'mediaUrl'];
+      imageKeys.forEach((k) => {
+        if (Object.prototype.hasOwnProperty.call(node, k)) {
+          walk(node[k]);
+        }
+      });
+
+      Object.entries(node).forEach(([k, v]) => {
+        if (excludedKeys.has(String(k).toLowerCase())) {
+          return;
+        }
+        walk(v);
+      });
+    };
+
+    walk(content);
+    return Array.from(urls);
+  };
+
+  const parseOptionContainer = (input: any): any[] => {
+    if (!input) return [];
+    if (Array.isArray(input)) return input;
+
+    if (typeof input === 'string') {
+      const trimmed = input.trim();
+      if (!trimmed) return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        return parseOptionContainer(parsed);
+      } catch {
+        return [input];
+      }
+    }
+
+    if (typeof input === 'object') {
+      const orderedKeys = ['A', 'B', 'C', 'D', 'optionA', 'optionB', 'optionC', 'optionD', '1', '2', '3', '4'];
+      const picked = orderedKeys
+        .filter((k) => Object.prototype.hasOwnProperty.call(input, k))
+        .map((k) => input[k]);
+
+      if (picked.length > 0) {
+        return picked;
+      }
+
+      return Object.values(input);
+    }
+
+    return [];
+  };
+
+  const extractRawOptionsFromQuestion = (q: any): any[] => {
+    const pools = [
+      q?.options,
+      q?.questionData?.options,
+      q?.questionData?.optionList,
+      q?.questionData?.choices,
+      q?.choices,
+      q?.answers,
+    ];
+
+    let merged: any[] = [];
+    pools.forEach((pool) => {
+      merged = [...merged, ...parseOptionContainer(pool)];
+    });
+
+    const keyedFallback = [
+      q?.optionA, q?.optionB, q?.optionC, q?.optionD,
+      q?.option1, q?.option2, q?.option3, q?.option4,
+      q?.questionData?.optionA, q?.questionData?.optionB, q?.questionData?.optionC, q?.questionData?.optionD,
+      q?.questionData?.option1, q?.questionData?.option2, q?.questionData?.option3, q?.questionData?.option4,
+    ].filter((v) => v !== undefined && v !== null && String(v).trim() !== '');
+
+    if (merged.length === 0 && keyedFallback.length > 0) {
+      return keyedFallback;
+    }
+
+    // Keep duplicates/order intact because some papers may intentionally have similar options.
+    // Only backfill if fewer than 4 options were parsed from primary structures.
+    if (merged.length < 4 && keyedFallback.length > 0) {
+      const backfill = keyedFallback.slice(merged.length, 4);
+      merged = [...merged, ...backfill];
+    }
+
+    return merged;
+  };
+
+  const getQuestionOnlyImageUrls = (q: any): string[] => {
+    const explicitBuckets = [
+      q?.questionImage,
+      q?.questionImageUrl,
+      q?.image,
+      q?.imageUrl,
+      q?.diagram,
+      q?.diagramUrl,
+      q?.questionData?.questionImage,
+      q?.questionData?.questionImageUrl,
+      q?.questionData?.image,
+      q?.questionData?.imageUrl,
+      q?.questionData?.diagram,
+      q?.questionData?.diagramUrl,
+      q?.questionData?.media,
+      q?.questionData?.figure,
+      q?.questionData?.content?.image,
+      q?.questionData?.content?.figure,
+      q?.questionText,
+      q?.content,
+      q?.questionData?.text,
+      q?.questionData?.content,
+    ];
+
+    const urls = explicitBuckets.flatMap((bucket) =>
+      collectImageUrls(bucket, { allowAnyHttpUrl: true })
+    );
+    return Array.from(new Set(urls));
   };
   const [zoomLevel, setZoomLevel] = useState(
     typeof resumeState?.zoomLevel === 'number' ? resumeState.zoomLevel : 1
@@ -195,6 +645,41 @@ export default function MockPracticeScreen() {
   useEffect(() => {
     let isMounted = true;
     const fetchPaper = async () => {
+      if (isTier2Mode) {
+        const allPhaseQuestions = buildCglTier2Questions(tier2ExamLabel);
+        const restoredPhase = Number.isInteger(resumeState?.activePhase)
+          ? Math.min(Math.max(Number(resumeState?.activePhase), 0), CGL_TIER2_PHASES.length - 1)
+          : 0;
+        const currentPhaseConfig = CGL_TIER2_PHASES[restoredPhase];
+        const currentPhaseQuestions = allPhaseQuestions.filter((q) =>
+          currentPhaseConfig.sections.includes(q.section)
+        );
+
+        if (isMounted) {
+          setCglTier2Questions(allPhaseQuestions);
+          setActivePhase(restoredPhase);
+          setExamQuestions(currentPhaseQuestions);
+
+          const requestedIndex = Number.isInteger(resumeState?.currentQuestionIndex)
+            ? Number(resumeState?.currentQuestionIndex)
+            : 0;
+          const safeIndex = Math.min(Math.max(requestedIndex, 0), Math.max(currentPhaseQuestions.length - 1, 0));
+
+          setCurrentQuestionIndex(safeIndex);
+          setActiveSection(currentPhaseQuestions[safeIndex]?.section || currentPhaseConfig.sections[0]);
+          setVisitedQuestions((prev) => ({ ...prev, [currentPhaseQuestions[safeIndex]?.id || 1]: true }));
+
+          if (typeof resumeState?.timeLeft === 'number' && resumeState.timeLeft > 0) {
+            setTimeLeft(resumeState.timeLeft);
+          } else {
+            setTimeLeft(currentPhaseConfig.duration);
+          }
+
+          setLoadingQuestions(false);
+        }
+        return;
+      }
+
       if (sourceTab !== 'PYQ' || !route.params?.testPaperId) {
         const qs = buildQuestions(totalQuestions);
         if (isMounted) {
@@ -215,26 +700,22 @@ export default function MockPracticeScreen() {
         }
         
         const qList = res.questions || [];
-        const sectionSize = qList.length > 0 ? Math.ceil(qList.length / SECTION_TITLES.length) : 25;
+        const sectionSize = qList.length > 0 ? Math.ceil(qList.length / DEFAULT_SECTION_TITLES.length) : 25;
         
         const mappedQs = qList.map((q: any, i: number) => {
-          let rawOptions: any[] = [];
-          if (Array.isArray(q.options)) {
-            rawOptions = q.options;
-          } else if (typeof q.options === 'string') {
-            try { 
-              const parsed = JSON.parse(q.options);
-              if (Array.isArray(parsed)) rawOptions = parsed;
-            } catch {}
-          }
+          const rawOptions: any[] = extractRawOptionsFromQuestion(q);
 
           return {
             id: i + 1,
             realId: q._id || q.id || q.questionId,
-            section: q.section || SECTION_TITLES[Math.floor(i / sectionSize)] || SECTION_TITLES[SECTION_TITLES.length - 1],
+            section:
+              q.section ||
+              DEFAULT_SECTION_TITLES[Math.floor(i / sectionSize)] ||
+              DEFAULT_SECTION_TITLES[DEFAULT_SECTION_TITLES.length - 1],
             questionText: q.questionText || q.questionData?.text || q.content || `Question ${i+1}`,
             options: rawOptions.map(o => typeof o === 'string' ? o : JSON.stringify(o)),
             realOptions: rawOptions,
+            rawQuestion: q,
             correctOption: -1,
           };
         });
@@ -275,7 +756,7 @@ export default function MockPracticeScreen() {
     };
     fetchPaper();
     return () => { isMounted = false; };
-  }, [sourceTab, route.params?.testPaperId, totalQuestions]);
+  }, [sourceTab, route.params?.testPaperId, totalQuestions, isTier2Mode, tier2ExamLabel]);
 
   const bg = isDark ? '#111827' : '#edf0f4';
   const card = isDark ? '#1f2937' : '#ffffff';
@@ -311,11 +792,86 @@ export default function MockPracticeScreen() {
     navigation.navigate('PYQs');
   };
 
+  const inferMarkingSchemeForTest = () => {
+    const title = String(mockData?.title || '').toLowerCase();
+    const isTier2 = /tier\s*2/.test(title);
+
+    if (/mts/.test(title)) {
+      return { correctMark: 1, wrongMark: 0.25 };
+    }
+
+    if (/cgl/.test(title) && isTier2) {
+      return { correctMark: 3, wrongMark: 1 };
+    }
+
+    if (/chsl/.test(title) && isTier2) {
+      return { correctMark: 2, wrongMark: 0.5 };
+    }
+
+    if (/cgl|chsl|cpo/.test(title)) {
+      return { correctMark: 2, wrongMark: 0.5 };
+    }
+
+    return { correctMark: 2, wrongMark: 0.5 };
+  };
+
+  const persistSubmissionResult = async (result: any) => {
+    try {
+      const raw = await AsyncStorage.getItem(RESULT_HISTORY_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const previous = Array.isArray(parsed) ? parsed : [];
+      const next = [result, ...previous].slice(0, 10);
+      await AsyncStorage.setItem(RESULT_HISTORY_STORAGE_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error('Failed to persist submission result from MockPractice', error);
+    }
+  };
+
+  const persistPausedPayload = async (pausedPayload: any) => {
+    try {
+      const raw = await AsyncStorage.getItem(PAUSED_TESTS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const previous = parsed && typeof parsed === 'object' ? parsed : {};
+      const next = {
+        ...previous,
+        [pausedPayload.testKey]: pausedPayload,
+      };
+      await AsyncStorage.setItem(PAUSED_TESTS_STORAGE_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error('Failed to persist paused test from MockPractice', error);
+    }
+  };
+
+  const removePausedPayload = async (pausedTestKey: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(PAUSED_TESTS_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return;
+      }
+      const next = { ...parsed };
+      delete next[pausedTestKey];
+      if (Object.keys(next).length === 0) {
+        await AsyncStorage.removeItem(PAUSED_TESTS_STORAGE_KEY);
+        return;
+      }
+      await AsyncStorage.setItem(PAUSED_TESTS_STORAGE_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error('Failed to remove paused test from MockPractice', error);
+    }
+  };
+
   const buildSubmissionResult = () => {
     let correct = 0;
     let wrong = 0;
 
-    examQuestions.forEach((q) => {
+    const resultQuestions = isTier2Mode ? cglTier2Questions : examQuestions;
+    const resultSections = Array.from(new Set(resultQuestions.map((q) => q.section))) as SectionTitle[];
+
+    resultQuestions.forEach((q) => {
       const selected = selectedOptions[q.id];
       if (selected === undefined) {
         return;
@@ -328,10 +884,11 @@ export default function MockPracticeScreen() {
     });
 
     const attempted = correct + wrong;
-    const unattempted = examQuestions.length - attempted;
-    const score = correct * 2 - wrong * 0.5;
-    const sectionBreakup: SectionBreakup[] = sectionNames.map((section) => {
-      const sectionQuestions = examQuestions.filter((q) => q.section === section);
+    const unattempted = resultQuestions.length - attempted;
+    const markingScheme = inferMarkingSchemeForTest();
+    const score = correct * markingScheme.correctMark - wrong * markingScheme.wrongMark;
+    const sectionBreakup: SectionBreakup[] = resultSections.map((section) => {
+      const sectionQuestions = resultQuestions.filter((q) => q.section === section);
       let sectionCorrect = 0;
       let sectionWrong = 0;
 
@@ -352,7 +909,7 @@ export default function MockPracticeScreen() {
         correct: sectionCorrect,
         wrong: sectionWrong,
         attempted: sectionCorrect + sectionWrong,
-        score: sectionCorrect * 2 - sectionWrong * 0.5,
+        score: sectionCorrect * markingScheme.correctMark - sectionWrong * markingScheme.wrongMark,
       };
     });
 
@@ -360,6 +917,13 @@ export default function MockPracticeScreen() {
       sourceTab,
       testTitle: String(mockData.title || 'Mock Test'),
       testKey,
+      attemptId: apiMetadata.attemptId,
+      testPaperId: route.params?.testPaperId,
+      totalQuestions: resultQuestions.length,
+      durationSeconds:
+        ((Number(mockData?.duration) || 60) * 60),
+      examName: String(mockData?.title || ''),
+      markingScheme,
       attempted,
       correct,
       wrong,
@@ -371,17 +935,22 @@ export default function MockPracticeScreen() {
   };
 
   const submitAndReturnToSeries = async (mode: 'manual' | 'auto') => {
-    const result = buildSubmissionResult();
+    let result = buildSubmissionResult();
     setIsSubmitting(true);
 
-    if (sourceTab === 'PYQ' && route.params?.testPaperId) {
+    await persistSubmissionResult(result);
+    await removePausedPayload(testKey);
+
+    const submitQuestions = isTier2Mode ? cglTier2Questions : examQuestions;
+
+    if (sourceTab === 'PYQ' && route.params?.testPaperId && !isTier2Mode) {
       try {
         const parsedLimit = apiMetadata.timeLimit || mockData?.duration || EXAM_DURATION_SECONDS;
         const totalDurationSeconds = parsedLimit < 300 ? parsedLimit * 60 : parsedLimit;
         const timeSpent = totalDurationSeconds - timeLeft;
         const answers = Object.keys(selectedOptions).map(qIdStr => {
           const qId = Number(qIdStr);
-          const q = examQuestions.find(eq => eq.id === qId);
+          const q = submitQuestions.find(eq => eq.id === qId);
           let selectedOptionId = '';
           if (q && selectedOptions[qId] !== undefined) {
              const optObj = q.realOptions && q.realOptions[selectedOptions[qId]];
@@ -394,11 +963,23 @@ export default function MockPracticeScreen() {
           };
         });
 
-        await pyqApi.submitPyq(route.params.testPaperId, {
+        const submitResponse = await pyqApi.submitPyq(route.params.testPaperId, {
           answers,
           totalTimeTaken: timeSpent > 0 ? timeSpent : 0,
           sectionTimeSpent: []
         });
+
+        const resolvedAttemptId =
+          submitResponse?.attemptId ||
+          submitResponse?.data?.attemptId ||
+          submitResponse?.result?.attemptId ||
+          submitResponse?.data?.result?.attemptId;
+        if (resolvedAttemptId) {
+          result = {
+            ...result,
+            attemptId: resolvedAttemptId,
+          };
+        }
       } catch (e) {
         console.error('API Submit Failed:', e);
       }
@@ -453,20 +1034,25 @@ export default function MockPracticeScreen() {
         reviewedQuestions,
         timeLeft,
         activeSection,
+        activePhase,
         selectedLanguage,
         zoomLevel,
       },
       pausedAt: new Date().toISOString(),
     };
 
-    if (sourceTab === 'PYQ' && route.params?.testPaperId) {
+    const pauseQuestions = isTier2Mode ? cglTier2Questions : examQuestions;
+
+    await persistPausedPayload(pausedPayload);
+
+    if (sourceTab === 'PYQ' && route.params?.testPaperId && !isTier2Mode) {
       try {
         const parsedLimit = apiMetadata.timeLimit || mockData?.duration || EXAM_DURATION_SECONDS;
         const totalDurationSeconds = parsedLimit < 300 ? parsedLimit * 60 : parsedLimit;
         const timeSpent = totalDurationSeconds - timeLeft;
         const answers = Object.keys(selectedOptions).map(qIdStr => {
           const qId = Number(qIdStr);
-          const q = examQuestions.find(eq => eq.id === qId);
+          const q = pauseQuestions.find(eq => eq.id === qId);
           let selectedOptionId = '';
           if (q && selectedOptions[qId] !== undefined) {
              const optObj = q.realOptions && q.realOptions[selectedOptions[qId]];
@@ -479,11 +1065,15 @@ export default function MockPracticeScreen() {
           };
         });
 
+        const skippedQuestionIds: string[] = pauseQuestions
+          .filter(q => selectedOptions[q.id] === undefined && visitedQuestions[q.id])
+          .map(q => `${q.realId ?? q.id}`);
+
         await pyqApi.pausePyq(route.params.testPaperId, {
           answers,
           totalTimeTaken: timeSpent > 0 ? timeSpent : 0,
           nextQuestionIndex: currentQuestionIndex,
-          skippedQuestionIds: examQuestions.filter(q => selectedOptions[q.id] === undefined && visitedQuestions[q.id]).map(q => q.realId || String(q.id))
+          skippedQuestionIds,
         });
       } catch (e) {
         console.error('API Pause Failed:', e);
@@ -537,15 +1127,32 @@ export default function MockPracticeScreen() {
         return;
       }
       setIsSubmitModalVisible(false);
-      setIsSubmitting(true);
-      Alert.alert('Time up', 'Your test has been auto-submitted as the timer reached zero.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            submitAndReturnToSeries('auto');
+      if (isTier2Mode && activePhase < CGL_TIER2_PHASES.length - 1) {
+        const nextPhase = activePhase + 1;
+        const nextPhaseConfig = CGL_TIER2_PHASES[nextPhase];
+        const nextPhaseQuestions = cglTier2Questions.filter((q) => nextPhaseConfig.sections.includes(q.section));
+        setActivePhase(nextPhase);
+        setExamQuestions(nextPhaseQuestions);
+        setCurrentQuestionIndex(0);
+        setActiveSection(nextPhaseConfig.sections[0]);
+        setVisitedQuestions((prev) => ({ ...prev, [nextPhaseQuestions[0]?.id || 1]: true }));
+        setTimeLeft(nextPhaseConfig.duration);
+
+        Alert.alert(
+          'Time up',
+          `${CGL_TIER2_PHASES[activePhase].label} auto-submitted. ${nextPhaseConfig.label} has started.`
+        );
+      } else {
+        setIsSubmitting(true);
+        Alert.alert('Time up', 'Your test has been auto-submitted as the timer reached zero.', [
+          {
+            text: 'OK',
+            onPress: () => {
+              submitAndReturnToSeries('auto');
+            },
           },
-        },
-      ]);
+        ]);
+      }
       return;
     }
 
@@ -554,7 +1161,7 @@ export default function MockPracticeScreen() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLeft, isSubmitting]);
+  }, [timeLeft, isSubmitting, isTier2Mode, activePhase, cglTier2Questions]);
 
   const getStatus = (questionId: number): QuestionStatus => {
     const isAnswered = selectedOptions[questionId] !== undefined;
@@ -585,6 +1192,12 @@ export default function MockPracticeScreen() {
       .padStart(2, '0')}`;
   };
 
+  const formatTimerPill = (seconds: number) => {
+    const totalMinutes = Math.floor(seconds / 60);
+    const secs = Math.max(seconds % 60, 0);
+    return `${totalMinutes.toString().padStart(2, '0')} : ${secs.toString().padStart(2, '0')}`;
+  };
+
   const navigateToQuestion = (index: number) => {
     setCurrentQuestionIndex(index);
     setVisitedQuestions((prev) => ({
@@ -601,8 +1214,40 @@ export default function MockPracticeScreen() {
     setIsSubmitModalVisible(true);
   };
 
+  const moveToNextCglPhase = () => {
+    const nextPhase = activePhase + 1;
+    const nextPhaseConfig = CGL_TIER2_PHASES[nextPhase];
+    const nextPhaseQuestions = cglTier2Questions.filter((q) => nextPhaseConfig.sections.includes(q.section));
+
+    setActivePhase(nextPhase);
+    setExamQuestions(nextPhaseQuestions);
+    setCurrentQuestionIndex(0);
+    setActiveSection(nextPhaseConfig.sections[0]);
+    setVisitedQuestions((prev) => ({ ...prev, [nextPhaseQuestions[0]?.id || 1]: true }));
+    setTimeLeft(nextPhaseConfig.duration);
+  };
+
+  const handlePhaseTabPress = (targetPhase: number) => {
+    if (!isTier2Mode) {
+      return;
+    }
+    if (targetPhase === activePhase) {
+      return;
+    }
+    if (targetPhase > activePhase) {
+      setIsSubmitModalVisible(true);
+      return;
+    }
+  };
+
   const handleFinalSubmit = () => {
     if (isSubmitting) {
+      return;
+    }
+
+    if (isTier2Mode && activePhase < CGL_TIER2_PHASES.length - 1) {
+      setIsSubmitModalVisible(false);
+      moveToNextCglPhase();
       return;
     }
 
@@ -689,10 +1334,26 @@ export default function MockPracticeScreen() {
   const sectionAnsweredCount = sectionQuestions.filter((q) => selectedOptions[q.id] !== undefined).length;
   const sectionReviewCount = sectionQuestions.filter((q) => !!reviewedQuestions[q.id]).length;
   const sectionNotAnsweredCount = sectionQuestions.length - sectionAnsweredCount;
-  const isLongQuestion = (currentQuestion?.questionText?.length || 0) > 260;
-
   const displayQuestionText = parseLanguageContent(currentQuestion?.questionText, selectedLanguage);
   const displayOptions = (currentQuestion?.options || []).map(o => parseLanguageContent(o, selectedLanguage));
+  const questionImages = getQuestionOnlyImageUrls(currentQuestion?.rawQuestion);
+  const optionImageUrlsByIndex = displayOptions.map((_option, optionIndex) =>
+    Array.from(
+      new Set([
+        ...collectImageUrls(currentQuestion?.realOptions?.[optionIndex], { allowAnyHttpUrl: true }),
+        ...collectImageUrls(currentQuestion?.options?.[optionIndex], { allowAnyHttpUrl: true }),
+      ])
+    ).filter((url) => !questionImages.includes(url))
+  );
+  const optionImageCount = optionImageUrlsByIndex.filter((urls) => urls.length > 0).length;
+  const preferCompactOptionImages = optionImageCount >= 3 || screenHeight < 780;
+  const optionImageMinHeight = preferCompactOptionImages ? 62 : 80;
+  const optionImageMaxHeight = preferCompactOptionImages
+    ? (questionImages.length > 0 ? 86 : 96)
+    : 170;
+  const questionImageMinHeight = optionImageCount >= 3 ? 90 : 120;
+  const questionImageMaxHeight = optionImageCount >= 3 ? 170 : 320;
+  const currentPhaseConfig = isTier2Mode ? CGL_TIER2_PHASES[activePhase] : null;
 
   const submitTableRows = sectionNames.map((section) => {
     const questions = examQuestions.filter((q) => q.section === section);
@@ -725,12 +1386,12 @@ export default function MockPracticeScreen() {
       return { bg: '#eab308', textColor: '#111827', borderColor: '#eab308' };
     }
     if (status === 'notAnswered') {
-      return { bg: '#2563eb', textColor: '#ffffff', borderColor: '#2563eb' };
+      return { bg: '#1d4ed8', textColor: '#ffffff', borderColor: '#1d4ed8' };
     }
     return {
-      bg: '#2563eb',
+      bg: '#1d4ed8',
       textColor: '#ffffff',
-      borderColor: '#2563eb',
+      borderColor: '#1d4ed8',
     };
   };
 
@@ -742,6 +1403,8 @@ export default function MockPracticeScreen() {
     );
   }
 
+  const showPartsStrip = !(isTier2Mode && CGL_TIER2_PHASES[activePhase]?.label === 'Computer Knowledge');
+
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: Platform.OS === 'ios' ? insets.top : 10 }]}> 
       <View style={[styles.header, { borderBottomColor: border, backgroundColor: card }]}>
@@ -751,7 +1414,9 @@ export default function MockPracticeScreen() {
 
         <View style={styles.titleWrap}>
           <Text style={[styles.headerTitle, { color: text }]} numberOfLines={1}>
-            {mockData.title}
+            {isTier2Mode && currentPhaseConfig
+              ? `${mockData.title} - ${currentPhaseConfig.label}`
+              : mockData.title}
           </Text>
           <Text style={[styles.headerSub, { color: muted }]} numberOfLines={1}>
             Question {currentQuestionIndex + 1} of {examQuestions.length}
@@ -761,7 +1426,7 @@ export default function MockPracticeScreen() {
         <View style={styles.timerWrap}>
           <View style={styles.timerPill}>
             <Text style={styles.timerLabel}>Time Left</Text>
-            <Text style={styles.timerText}>{formatTime(timeLeft).slice(3).replace(':', ' : ')}</Text>
+            <Text style={styles.timerText}>{formatTimerPill(timeLeft)}</Text>
           </View>
           <Pressable
             style={[styles.pauseBtn, isSubmitting && styles.pauseBtnDisabled]}
@@ -797,8 +1462,8 @@ export default function MockPracticeScreen() {
         </View>
 
         <View style={styles.topRightActions}>
-          <Pressable style={[styles.submitBtn, { backgroundColor: '#2563eb' }]} onPress={handleSubmit}>
-            <Text style={styles.submitBtnText}>Submit Test</Text>
+          <Pressable style={[styles.submitBtn, { backgroundColor: '#1d4ed8' }]} onPress={handleSubmit}>
+            <Text style={styles.submitBtnText}>Submit</Text>
           </Pressable>
         </View>
       </View>
@@ -820,32 +1485,59 @@ export default function MockPracticeScreen() {
         </View>
       </View>
 
-      <View style={[styles.sectionStrip, { borderBottomColor: border, backgroundColor: card }]}> 
-        <View style={styles.sectionStripContent}>
-          {sectionNames.map((section) => {
-            const isActive = currentQuestion.section === section;
-            return (
-              <Pressable
-                key={section}
-                style={[
-                  styles.sectionTab,
-                  { borderColor: isActive ? '#16a34a' : '#2563eb', backgroundColor: isActive ? '#16a34a' : '#2563eb' },
-                ]}
-                onPress={() => {
-                  setActiveSection(section);
-                  const firstIdx = examQuestions.findIndex((q) => q.section === section);
-                  if (firstIdx >= 0) {
-                    navigateToQuestion(firstIdx);
-                  }
-                }}
-              >
-                <Text style={[styles.sectionTabText, { color: '#ffffff' }]}>{section}</Text>
-              </Pressable>
-            );
-          })}
-
+      {isTier2Mode && (
+        <View style={[styles.phaseStrip, { borderBottomColor: border, backgroundColor: card }]}>
+          <View style={styles.phaseStripContent}>
+            {CGL_TIER2_PHASES.map((phase, index) => {
+              const isActivePhase = index === activePhase;
+              const isLocked = index > activePhase;
+              return (
+                <Pressable
+                  key={phase.key}
+                  style={[
+                    styles.phaseTab,
+                    {
+                      backgroundColor: isActivePhase ? '#16a34a' : isLocked ? '#1e40af' : '#1d4ed8',
+                      borderColor: isActivePhase ? '#16a34a' : isLocked ? '#1e40af' : '#1d4ed8',
+                    },
+                  ]}
+                  onPress={() => handlePhaseTabPress(index)}
+                >
+                  <Text style={styles.phaseTabText}>{phase.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
-      </View>
+      )}
+
+      {showPartsStrip && (
+        <View style={[styles.sectionStrip, { borderBottomColor: border, backgroundColor: card }]}> 
+          <View style={styles.sectionStripContent}>
+            {sectionNames.map((section) => {
+              const isActive = currentQuestion.section === section;
+              return (
+                <Pressable
+                  key={section}
+                  style={[
+                    styles.sectionTab,
+                    { borderColor: isActive ? '#16a34a' : '#1d4ed8', backgroundColor: isActive ? '#16a34a' : '#1d4ed8' },
+                  ]}
+                  onPress={() => {
+                    setActiveSection(section);
+                    const firstIdx = examQuestions.findIndex((q) => q.section === section);
+                    if (firstIdx >= 0) {
+                      navigateToQuestion(firstIdx);
+                    }
+                  }}
+                >
+                  <Text style={[styles.sectionTabText, { color: '#ffffff' }]}>{section}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.mainContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.questionCard, { backgroundColor: card, borderColor: border }]}> 
@@ -890,7 +1582,7 @@ export default function MockPracticeScreen() {
                       onPress={() => handleLanguageSelect(language)}
                     >
                       <Text style={[styles.inlineDropdownItemText, { color: text }]}>{language}</Text>
-                      {isSelected && <Ionicons name="checkmark" size={16} color="#2563eb" />}
+                      {isSelected && <Ionicons name="checkmark" size={16} color="#1d4ed8" />}
                     </Pressable>
                   );
                 })}
@@ -911,26 +1603,38 @@ export default function MockPracticeScreen() {
               </View>
             )}
 
-            <ScrollView
-              style={styles.questionTextScroll}
-              contentContainerStyle={styles.questionTextScrollContent}
-              nestedScrollEnabled
-              showsVerticalScrollIndicator={isLongQuestion}
-              scrollEnabled={isLongQuestion}
-            >
-              <Text style={[styles.questionText, { color: text, fontSize: 16 * zoomLevel, lineHeight: 25 * zoomLevel }]}>
-                {displayQuestionText}
-              </Text>
-            </ScrollView>
+            <View style={styles.questionBodyWrap}>
+              {displayQuestionText.length > 0 && (
+                <Text style={[styles.questionText, { color: text, fontSize: 16 * zoomLevel, lineHeight: 25 * zoomLevel }]}> 
+                  {displayQuestionText}
+                </Text>
+              )}
+
+              {questionImages.length > 0 && (
+                <View style={styles.questionMediaWrap}>
+                  {questionImages.map((url, idx) => (
+                    <SmartRemoteImage
+                      key={`qimg-${currentQuestion.id}-${idx}`}
+                      uri={url}
+                      minHeight={questionImageMinHeight}
+                      maxHeight={questionImageMaxHeight}
+                      borderRadius={10}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
 
             <View style={styles.optionsWrap}>
               {displayOptions.map((option, optionIndex) => {
                 const isSelected = selectedOptions[currentQuestion.id] === optionIndex;
+                const optionImages = optionImageUrlsByIndex[optionIndex] || [];
                 return (
                   <Pressable
                     key={`${currentQuestion.id}-${optionIndex}`}
                     style={[
                       styles.optionRow,
+                      optionImages.length > 0 && styles.optionRowWithMedia,
                       {
                         borderColor: border,
                         backgroundColor: card,
@@ -948,9 +1652,26 @@ export default function MockPracticeScreen() {
                         {isSelected && <View style={styles.radioInner} />}
                       </View>
                     </View>
-                    <Text style={[styles.optionText, { color: text, fontSize: 14 * zoomLevel, lineHeight: 22 * zoomLevel }]}>
-                      {String(option).replace(/^Option\s[A-D]:\s*/, '')}
-                    </Text>
+                    <View style={styles.optionContentWrap}>
+                      {String(option).replace(/^Option\s[A-D]:\s*/, '').length > 0 && (
+                        <Text style={[styles.optionText, { color: text, fontSize: 14 * zoomLevel, lineHeight: 22 * zoomLevel }]}>
+                          {String(option).replace(/^Option\s[A-D]:\s*/, '')}
+                        </Text>
+                      )}
+                      {optionImages.length > 0 && (
+                        <View style={styles.optionMediaWrap}>
+                          {optionImages.map((url, idx) => (
+                            <SmartRemoteImage
+                              key={`oimg-${currentQuestion.id}-${optionIndex}-${idx}`}
+                              uri={url}
+                              minHeight={optionImageMinHeight}
+                              maxHeight={optionImageMaxHeight}
+                              borderRadius={8}
+                            />
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </Pressable>
                 );
               })}
@@ -1011,7 +1732,7 @@ export default function MockPracticeScreen() {
                         key={`part-${section}`}
                         style={[
                           styles.palettePartBadge,
-                          { backgroundColor: activeSection === section ? '#16a34a' : '#2563eb' },
+                          { backgroundColor: activeSection === section ? '#16a34a' : '#1d4ed8' },
                         ]}
                         onPress={() => {
                           setActiveSection(section);
@@ -1085,7 +1806,7 @@ export default function MockPracticeScreen() {
 
                 <View style={styles.paletteFooterSubmitWrap}>
                   <Pressable style={styles.paletteFooterSubmit} onPress={handleSubmit}>
-                    <Text style={styles.paletteFooterSubmitText}>Submit Test</Text>
+                    <Text style={styles.paletteFooterSubmitText}>Submit</Text>
                   </Pressable>
                 </View>
           </View>
@@ -1141,7 +1862,9 @@ export default function MockPracticeScreen() {
             ]}
             onStartShouldSetResponder={() => true}
           >
-            <Text style={[styles.submitModalTitle, { color: text, fontSize: isCompact ? 20 : 28 }]}>Submit your test</Text>
+            <Text style={[styles.submitModalTitle, { color: text, fontSize: isCompact ? 20 : 28 }]}>
+              {isTier2Mode && currentPhaseConfig ? `Submit ${currentPhaseConfig.label}` : 'Submit your test'}
+            </Text>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.submitTableScroll}>
               <View style={[styles.submitTable, { borderColor: border, minWidth: isCompact ? 700 : 980 }]}> 
@@ -1197,7 +1920,7 @@ export default function MockPracticeScreen() {
                   The different symbols used in the next pages are shown below. Please go through them and understand their meaning before you start the test.
                 </Text>
 
-                <View style={[styles.infoTableHeaderRow, { backgroundColor: '#2563eb' }]}>
+                <View style={[styles.infoTableHeaderRow, { backgroundColor: '#1d4ed8' }]}>
                   <Text style={styles.infoSymbolHeader}>Symbol</Text>
                   <Text style={styles.infoDescHeader}>Description</Text>
                 </View>
@@ -1262,10 +1985,10 @@ export default function MockPracticeScreen() {
 
                 <ScrollView style={styles.instructionsScroll} contentContainerStyle={styles.instructionsContent}>
                   <Text style={styles.instructionsSectionTitle}>1. Exam Overview / परीक्षा का संक्षिप्त विवरण</Text>
-                  <Text style={styles.instructionsBullet}>- Duration: 60 minutes / समयावधि: 60 मिनट</Text>
-                  <Text style={styles.instructionsBullet}>- Total Questions: 100 / कुल प्रश्न: 100</Text>
-                  <Text style={styles.instructionsBullet}>- Negative Marking: 0.50 marks deducted for each wrong answer. / ऋणात्मक अंकन: प्रत्येक गलत उत्तर पर 0.50 अंक काटे जाएंगे।</Text>
-                  <Text style={styles.instructionsBullet}>- Number of Sections displayed at any time: 4 / किसी भी समय पर प्रदर्शित अनुभागों की संख्या: 4</Text>
+                  <Text style={styles.instructionsBullet}>- Duration: 135 minutes / समयावधि: 135 मिनट</Text>
+                  <Text style={styles.instructionsBullet}>- Total Questions: 150 / कुल प्रश्न: 150</Text>
+                  <Text style={styles.instructionsBullet}>- Marking Scheme: +3 marks for each correct answer and -1 mark for each wrong answer. / अंकन योजना: प्रत्येक सही उत्तर पर +3 अंक और प्रत्येक गलत उत्तर पर -1 अंक।</Text>
+                  <Text style={styles.instructionsBullet}>- Number of Sections displayed at any time: 5 / किसी भी समय पर प्रदर्शित अनुभागों की संख्या: 5</Text>
 
                   <ScrollView
                     horizontal
@@ -1282,26 +2005,32 @@ export default function MockPracticeScreen() {
                       <View style={styles.instructionsTableRow}>
                         <Text style={[styles.instructionsTableCell, styles.instructionsCellSection]}>PART-A</Text>
                         <Text style={[styles.instructionsTableCell, styles.instructionsCellSubject]}>General Awareness</Text>
-                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>25</Text>
-                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>50</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>30</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>90</Text>
                       </View>
                       <View style={styles.instructionsTableRow}>
                         <Text style={[styles.instructionsTableCell, styles.instructionsCellSection]}>PART-B</Text>
                         <Text style={[styles.instructionsTableCell, styles.instructionsCellSubject]}>Quantitative Aptitude</Text>
-                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>25</Text>
-                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>50</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>30</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>90</Text>
                       </View>
                       <View style={styles.instructionsTableRow}>
                         <Text style={[styles.instructionsTableCell, styles.instructionsCellSection]}>PART-C</Text>
                         <Text style={[styles.instructionsTableCell, styles.instructionsCellSubject]}>General Intelligence & Reasoning</Text>
-                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>25</Text>
-                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>50</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>30</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>90</Text>
                       </View>
                       <View style={styles.instructionsTableRow}>
                         <Text style={[styles.instructionsTableCell, styles.instructionsCellSection]}>PART-D</Text>
                         <Text style={[styles.instructionsTableCell, styles.instructionsCellSubject]}>English Comprehension</Text>
-                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>25</Text>
-                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>50</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>30</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>90</Text>
+                      </View>
+                      <View style={styles.instructionsTableRow}>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellSection]}>PART-E</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellSubject]}>Computer Knowledge</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellCount]}>30</Text>
+                        <Text style={[styles.instructionsTableCell, styles.instructionsCellMarks]}>90</Text>
                       </View>
                     </View>
                   </ScrollView>
@@ -1561,20 +2290,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   tbReviewBtn: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1d4ed8',
     minWidth: 112,
   },
   tbBottomSmallBtn: {
     height: 36,
     borderRadius: 3,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1d4ed8',
     paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 8,
   },
   tbSaveBtn: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1d4ed8',
     minWidth: 102,
   },
   tbBottomBtnText: {
@@ -1589,7 +2318,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 4,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1d4ed8',
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 3,
@@ -1721,7 +2450,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#d1d5db',
   },
   paletteFooterSubmit: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1d4ed8',
     borderRadius: 3,
     minHeight: 34,
     alignItems: 'center',
@@ -2017,6 +2746,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  phaseStrip: {
+    borderBottomWidth: 1,
+  },
+  phaseStripContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  phaseTab: {
+    borderWidth: 1,
+    borderRadius: 6,
+    minWidth: 110,
+    height: 34,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  phaseTabText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
   sectionStrip: {
     borderBottomWidth: 1,
   },
@@ -2082,12 +2835,18 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     marginBottom: 14,
   },
-  questionTextScroll: {
-    maxHeight: 160,
+  questionBodyWrap: {
     marginBottom: 8,
   },
-  questionTextScrollContent: {
-    paddingRight: 2,
+  questionMediaWrap: {
+    marginTop: 8,
+    gap: 12,
+  },
+  questionMediaImage: {
+    width: '100%',
+    minHeight: 120,
+    maxHeight: 320,
+    borderRadius: 8,
   },
   languageNotice: {
     fontSize: 11,
@@ -2106,6 +2865,9 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     minHeight: 48,
     paddingVertical: 8,
+  },
+  optionRowWithMedia: {
+    alignItems: 'flex-start',
   },
   radioOuter: {
     width: 20,
@@ -2126,6 +2888,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     fontWeight: '400',
+  },
+  optionContentWrap: {
+    flex: 1,
+    paddingLeft: 10,
+    paddingRight: 2,
+  },
+  optionMediaWrap: {
+    marginTop: 6,
+    gap: 8,
+  },
+  optionMediaImage: {
+    width: '100%',
+    minHeight: 80,
+    maxHeight: 170,
+    borderRadius: 8,
   },
   bottomBar: {
     borderTopWidth: 1,
