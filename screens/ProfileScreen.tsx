@@ -166,7 +166,6 @@ export default function ProfileScreen() {
   const [resultHistory, setResultHistory] = useState<StoredResult[]>([]);
   const [dailyExamHistory, setDailyExamHistory] = useState<DailyExamResultEntry[]>([]);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
   const [editForm, setEditForm] = useState({
     fullName: '',
     email: '',
@@ -553,15 +552,6 @@ export default function ProfileScreen() {
     navigation.navigate('Notifications');
   };
 
-  const handleOpenSettings = () => {
-    setIsSettingsModalVisible(true);
-  };
-
-  const handleToggleTheme = () => {
-    toggleTheme();
-    showFeedback(isDark ? 'Switched to light mode' : 'Switched to dark mode');
-  };
-
   const handleOpenTests = () => {
     navigation.navigate('Tests');
   };
@@ -663,7 +653,6 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    setIsSettingsModalVisible(false);
 
     if (Platform.OS === 'web') {
       const confirmFn = (globalThis as any)?.confirm;
@@ -714,9 +703,6 @@ export default function ProfileScreen() {
           <View style={styles.headerIcons}>
             <Pressable style={styles.iconBtn} hitSlop={8} onPress={handleOpenNotifications}>
               <Ionicons name="notifications-outline" size={20} color="#059669" />
-            </Pressable>
-            <Pressable style={styles.iconBtn} hitSlop={8} onPress={handleOpenSettings}>
-              <Ionicons name="settings-outline" size={20} color="#059669" />
             </Pressable>
           </View>
         </View>
@@ -872,83 +858,10 @@ export default function ProfileScreen() {
             ))}
           </View>
         )}
-      </ScrollView>
-
-      <Modal
-        visible={isSettingsModalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setIsSettingsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setIsSettingsModalVisible(false)} />
-          <View
-            style={[
-              styles.modalCard,
-              {
-                backgroundColor: card,
-                borderColor: border,
-                width: isWide ? 520 : width - 24,
-              },
-            ]}
-          >
-            <View style={[styles.modalHeaderRow, { borderBottomColor: border }]}>
-              <Text style={[styles.modalTitle, { color: text }]}>Settings</Text>
-              <Pressable onPress={() => setIsSettingsModalVisible(false)} hitSlop={8}>
-                <Ionicons name="close" size={20} color={muted} />
-              </Pressable>
-            </View>
-
-            <View style={styles.settingsBody}>
-              <Pressable
-                style={[styles.settingRow, { borderBottomColor: border }]}
-                onPress={() => {
-                  setIsSettingsModalVisible(false);
-                  openEditModal();
-                }}
-              >
-                <View style={styles.settingLeft}>
-                  <Ionicons name="person-circle-outline" size={18} color="#059669" />
-                  <Text style={[styles.settingText, { color: text }]}>Edit Profile Details</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={muted} />
-              </Pressable>
-
-              <Pressable
-                style={[styles.settingRow, { borderBottomColor: border }]}
-                onPress={() => {
-                  setIsSettingsModalVisible(false);
-                  handleOpenNotifications();
-                }}
-              >
-                <View style={styles.settingLeft}>
-                  <Ionicons name="notifications-outline" size={18} color="#059669" />
-                  <Text style={[styles.settingText, { color: text }]}>Notifications</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={muted} />
-              </Pressable>
-
-              <Pressable style={[styles.settingRow, { borderBottomColor: border }]} onPress={handleToggleTheme}>
-                <View style={styles.settingLeft}>
-                  <Ionicons name="contrast-outline" size={18} color="#059669" />
-                  <Text style={[styles.settingText, { color: text }]}>Theme Mode</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={muted} />
-              </Pressable>
-
-              <Pressable
-                style={[styles.settingRow, { borderBottomColor: border }]}
-                onPress={() => {
-                  setIsSettingsModalVisible(false);
-                  handleOpenTests();
-                }}
-              >
-                <View style={styles.settingLeft}>
-                  <Ionicons name="school-outline" size={18} color="#059669" />
-                  <Text style={[styles.settingText, { color: text }]}>Practice Tests</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={muted} />
-              </Pressable>
+        {/* Native Settings List */}
+        <View style={[styles.profileCard, { backgroundColor: card, borderColor: border, marginTop: 16 }]}>
+           <Text style={[styles.sectionHeader, { color: text, marginBottom: 8 }]}>Settings</Text>
+           <View style={{ paddingVertical: 4 }}>
 
               <Pressable style={[styles.settingRow, { borderBottomColor: border }]} onPress={handleHelp}>
                 <View style={styles.settingLeft}>
@@ -964,10 +877,9 @@ export default function ProfileScreen() {
                   <Text style={styles.logoutText}>Logout</Text>
                 </View>
               </Pressable>
-            </View>
-          </View>
+           </View>
         </View>
-      </Modal>
+      </ScrollView>
 
       <Modal
         visible={isEditModalVisible}

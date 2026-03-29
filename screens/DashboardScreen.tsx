@@ -81,7 +81,7 @@ const resolveSubjectKey = (sectionName?: string): 'quant' | 'gi' | 'english' | '
 
 
 export default function DashboardScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { userName } = useLoginModal();
@@ -252,7 +252,7 @@ export default function DashboardScreen() {
           <Pressable
             style={styles.iconBtn}
             hitSlop={8}
-            onPress={() => navigation.navigate('Notifications')}
+            onPress={() => navigation.navigate('Notifications' as never)}
           >
             <Ionicons name="notifications-outline" size={20} color="#059669" />
           </Pressable>
@@ -458,60 +458,122 @@ export default function DashboardScreen() {
         </View>
 
         {/* Daily Challenge */}
+        {(() => {
+          const isCompletedToday = !!challengeResult && new Date(challengeResult.completedAt).toDateString() === new Date().toDateString();
+          const maxScore = challengeResult ? challengeResult.totalQuestions * 2 : 40;
+          const pct = challengeResult ? Math.round((challengeResult.score / maxScore) * 100) : 0;
+          return (
         <View style={[styles.blockCard, { backgroundColor: cardBg, borderColor: border }]}>
           <View style={[styles.blockIconWrap, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
             <Ionicons name="stopwatch" size={22} color="#3b82f6" />
           </View>
           <Text style={[styles.blockTitle, { color: text }]}>DAILY CHALLENGE</Text>
-          {challengeResult ? (
+          {isCompletedToday && challengeResult ? (
             <View style={[styles.dailyResultCard, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-              <Text style={[styles.dailyResultTitle, { color: isDark ? '#bbf7d0' : '#065f46' }]}>Challenge Complete</Text>
-              <Text style={[styles.dailyResultScore, { color: isDark ? '#ffffff' : '#065f46' }]}>
-                {challengeResult.score.toFixed(1)}
-                <Text style={[styles.dailyResultOutOf, { color: isDark ? '#a7f3d0' : '#047857' }]}> / {challengeResult.totalQuestions * 2}</Text>
-              </Text>
-              <Text style={[styles.dailyResultMeta, { color: isDark ? '#d1fae5' : '#047857' }]}>
-                Correct {challengeResult.correct} | Wrong {challengeResult.wrong} | Time {formatDuration(challengeResult.timeTaken)}
-              </Text>
-              <Text style={[styles.dailyResultStamp, { color: isDark ? '#a7f3d0' : '#065f46' }]}>Updated {formatCompletedAt(challengeResult.completedAt)}</Text>
+              <View style={styles.dailyResultTopRow}>
+                <View style={styles.dailyResultScoreCircle}>
+                  <Text style={[styles.dailyResultPct, { color: isDark ? '#ffffff' : '#065f46' }]}>{pct}%</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.dailyResultTitle, { color: isDark ? '#bbf7d0' : '#065f46' }]}>Challenge Complete</Text>
+                  <Text style={[styles.dailyResultScore, { color: isDark ? '#ffffff' : '#065f46' }]}>
+                    {challengeResult.score.toFixed(1)}
+                    <Text style={[styles.dailyResultOutOf, { color: isDark ? '#a7f3d0' : '#047857' }]}> / {maxScore}</Text>
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.dailyStatsRow}>
+                <View style={styles.dailyStatItem}>
+                  <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
+                  <Text style={[styles.dailyStatText, { color: isDark ? '#d1fae5' : '#047857' }]}>{challengeResult.correct} Correct</Text>
+                </View>
+                <View style={styles.dailyStatItem}>
+                  <Ionicons name="close-circle" size={14} color="#ef4444" />
+                  <Text style={[styles.dailyStatText, { color: isDark ? '#d1fae5' : '#047857' }]}>{challengeResult.wrong} Wrong</Text>
+                </View>
+                <View style={styles.dailyStatItem}>
+                  <Ionicons name="time" size={14} color="#3b82f6" />
+                  <Text style={[styles.dailyStatText, { color: isDark ? '#d1fae5' : '#047857' }]}>{formatDuration(challengeResult.timeTaken)}</Text>
+                </View>
+              </View>
+              <Text style={[styles.dailyResultStamp, { color: isDark ? '#a7f3d0' : '#065f46' }]}>Completed {formatCompletedAt(challengeResult.completedAt)}</Text>
             </View>
           ) : (
             <Text style={[styles.blockSub, { color: muted }]} numberOfLines={2}>
               Complete 20 mixed questions in 30 mins to boost your speed.
             </Text>
           )}
-          <Pressable style={styles.blockBtn} onPress={() => navigation.navigate('DailyChallenge', { mode: 'challenge' })}>
-            <Text style={styles.blockBtnText}>{challengeResult ? 'REATTEMPT →' : 'START NOW →'}</Text>
+          <Pressable
+            style={[styles.blockBtn, isCompletedToday && styles.blockBtnDisabled]}
+            disabled={isCompletedToday}
+            onPress={() => navigation.navigate('DailyChallenge' as never, { mode: 'challenge' } as never)}
+          >
+            <Text style={[styles.blockBtnText, isCompletedToday && { color: muted }]}>
+              {isCompletedToday ? 'COMPLETED TODAY ✓' : 'START NOW →'}
+            </Text>
           </Pressable>
         </View>
+          );
+        })()}
 
         {/* Daily Quiz */}
+        {(() => {
+          const isCompletedToday = !!quizResult && new Date(quizResult.completedAt).toDateString() === new Date().toDateString();
+          const maxScore = quizResult ? quizResult.totalQuestions * 2 : 20;
+          const pct = quizResult ? Math.round((quizResult.score / maxScore) * 100) : 0;
+          return (
         <View style={[styles.blockCard, { backgroundColor: cardBg, borderColor: border }]}>
           <View style={[styles.blockIconWrap, { backgroundColor: 'rgba(236, 72, 153, 0.2)' }]}>
             <Ionicons name="help-circle" size={22} color="#ec4899" />
           </View>
           <Text style={[styles.blockTitle, { color: text }]}>DAILY QUIZ</Text>
-          {quizResult ? (
+          {isCompletedToday && quizResult ? (
             <View style={[styles.dailyResultCard, { backgroundColor: isDark ? '#4c1d95' : '#fce7f3' }]}>
-              <Text style={[styles.dailyResultTitle, { color: isDark ? '#e9d5ff' : '#9d174d' }]}>Quiz Complete</Text>
-              <Text style={[styles.dailyResultScore, { color: isDark ? '#ffffff' : '#9d174d' }]}>
-                {quizResult.score.toFixed(1)}
-                <Text style={[styles.dailyResultOutOf, { color: isDark ? '#f5d0fe' : '#be185d' }]}> / {quizResult.totalQuestions * 2}</Text>
-              </Text>
-              <Text style={[styles.dailyResultMeta, { color: isDark ? '#f5d0fe' : '#be185d' }]}>
-                Correct {quizResult.correct} | Wrong {quizResult.wrong} | Time {formatDuration(quizResult.timeTaken)}
-              </Text>
-              <Text style={[styles.dailyResultStamp, { color: isDark ? '#f0abfc' : '#9d174d' }]}>Updated {formatCompletedAt(quizResult.completedAt)}</Text>
+              <View style={styles.dailyResultTopRow}>
+                <View style={[styles.dailyResultScoreCircle, { borderColor: isDark ? '#a78bfa' : '#ec4899' }]}>
+                  <Text style={[styles.dailyResultPct, { color: isDark ? '#ffffff' : '#9d174d' }]}>{pct}%</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.dailyResultTitle, { color: isDark ? '#e9d5ff' : '#9d174d' }]}>Quiz Complete</Text>
+                  <Text style={[styles.dailyResultScore, { color: isDark ? '#ffffff' : '#9d174d' }]}>
+                    {quizResult.score.toFixed(1)}
+                    <Text style={[styles.dailyResultOutOf, { color: isDark ? '#f5d0fe' : '#be185d' }]}> / {maxScore}</Text>
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.dailyStatsRow}>
+                <View style={styles.dailyStatItem}>
+                  <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
+                  <Text style={[styles.dailyStatText, { color: isDark ? '#f5d0fe' : '#be185d' }]}>{quizResult.correct} Correct</Text>
+                </View>
+                <View style={styles.dailyStatItem}>
+                  <Ionicons name="close-circle" size={14} color="#ef4444" />
+                  <Text style={[styles.dailyStatText, { color: isDark ? '#f5d0fe' : '#be185d' }]}>{quizResult.wrong} Wrong</Text>
+                </View>
+                <View style={styles.dailyStatItem}>
+                  <Ionicons name="time" size={14} color="#3b82f6" />
+                  <Text style={[styles.dailyStatText, { color: isDark ? '#f5d0fe' : '#be185d' }]}>{formatDuration(quizResult.timeTaken)}</Text>
+                </View>
+              </View>
+              <Text style={[styles.dailyResultStamp, { color: isDark ? '#f0abfc' : '#9d174d' }]}>Completed {formatCompletedAt(quizResult.completedAt)}</Text>
             </View>
           ) : (
             <Text style={[styles.blockSub, { color: muted }]} numberOfLines={2}>
               10 mixed questions from Quant, Reasoning, English, and GA.
             </Text>
           )}
-          <Pressable style={styles.blockBtn} onPress={() => navigation.navigate('DailyChallenge', { mode: 'quiz' })}>
-            <Text style={styles.blockBtnText}>{quizResult ? 'PLAY AGAIN →' : 'PLAY QUIZ →'}</Text>
+          <Pressable
+            style={[styles.blockBtn, isCompletedToday && styles.blockBtnDisabled]}
+            disabled={isCompletedToday}
+            onPress={() => navigation.navigate('DailyChallenge' as never, { mode: 'quiz' } as never)}
+          >
+            <Text style={[styles.blockBtnText, isCompletedToday && { color: muted }]}>
+              {isCompletedToday ? 'COMPLETED TODAY ✓' : 'PLAY QUIZ →'}
+            </Text>
           </Pressable>
         </View>
+          );
+        })()}
 
 
         <View style={{ height: 32 }} />
@@ -611,18 +673,45 @@ const styles = StyleSheet.create({
   },
   blockTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
   blockSub: { fontSize: 14, marginBottom: 12, textAlign: 'center' },
-  blockBtn: { alignSelf: 'center' },
+  blockBtn: { alignSelf: 'center', paddingVertical: 6 },
   blockBtnText: { color: '#059669', fontWeight: '700', fontSize: 14 },
+  blockBtnDisabled: { opacity: 0.6 },
   dailyResultCard: {
     width: '100%',
     borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     marginBottom: 10,
   },
-  dailyResultTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.2, marginBottom: 4 },
-  dailyResultScore: { fontSize: 28, fontWeight: '900' },
-  dailyResultOutOf: { fontSize: 16, fontWeight: '700' },
+  dailyResultTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dailyResultScoreCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 3,
+    borderColor: '#059669',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dailyResultPct: { fontSize: 14, fontWeight: '900' },
+  dailyResultTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.2, marginBottom: 2 },
+  dailyResultScore: { fontSize: 24, fontWeight: '900' },
+  dailyResultOutOf: { fontSize: 14, fontWeight: '700' },
+  dailyStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  dailyStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dailyStatText: { fontSize: 11, fontWeight: '700' },
   dailyResultMeta: { fontSize: 12, fontWeight: '700', marginTop: 4 },
   dailyResultStamp: { fontSize: 11, fontWeight: '600', marginTop: 4 },
   shortcutsGrid: {

@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { forumApi } from '../services/api';
 
 export type Comment = {
@@ -260,6 +261,14 @@ export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setError(null);
 
     try {
+      // Check for auth token before making API calls
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        setError('LOGIN_REQUIRED');
+        setLoading(false);
+        return;
+      }
+
       const [postsRes, tagsRes, contributorsRes] = await Promise.allSettled([
         forumApi.listPosts({ limit: 50 }),
         forumApi.getTrendingTags(8),
@@ -272,7 +281,12 @@ export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setPosts(postList);
         }
       } else {
-        setError(postsRes.reason?.message || 'Could not load forum posts.');
+        const reason = postsRes.reason;
+        if (reason?.status === 401 || reason?.isAuthError) {
+          setError('LOGIN_REQUIRED');
+        } else {
+          setError(reason?.message || 'Could not load forum posts.');
+        }
       }
 
       if (tagsRes.status === 'fulfilled') {
@@ -298,7 +312,11 @@ export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setTopContributors(contributors);
       }
     } catch (e: any) {
-      setError(e?.message || 'Could not load forum data.');
+      if (e?.status === 401 || e?.isAuthError) {
+        setError('LOGIN_REQUIRED');
+      } else {
+        setError(e?.message || 'Could not load forum data.');
+      }
     } finally {
       setLoading(false);
     }

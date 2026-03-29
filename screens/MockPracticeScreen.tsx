@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Alert,
   Image,
@@ -104,6 +104,14 @@ const SECTION_SUBJECTS: Record<SectionTitle, string> = {
   'PART-E': 'Computer Knowledge',
 };
 
+const MTS_SECTION_SUBJECTS: Record<SectionTitle, string> = {
+  'PART-A': 'Numerical and Mathematical Ability',
+  'PART-B': 'Reasoning Ability and Problem Solving',
+  'PART-C': 'General Awareness',
+  'PART-D': 'English Language and Comprehension',
+  'PART-E': 'Computer Knowledge',
+};
+
 const CGL_TIER2_PHASES = [
   {
     key: 'section-1',
@@ -127,6 +135,62 @@ const CGL_TIER2_PHASES = [
     nextLabel: 'Final Submit',
   },
 ] as const;
+
+const MTS_PHASES = [
+  {
+    key: 'section-1',
+    label: 'Section 1',
+    sections: ['PART-A', 'PART-B'] as SectionTitle[],
+    duration: 45 * 60,
+    nextLabel: 'Section 2',
+  },
+  {
+    key: 'section-2',
+    label: 'Section 2',
+    sections: ['PART-C', 'PART-D'] as SectionTitle[],
+    duration: 45 * 60,
+    nextLabel: 'Final Submit',
+  },
+] as const;
+
+const CPO_PHASES = [
+  {
+    key: 'section-1',
+    label: 'PART-A',
+    sections: ['PART-A'] as SectionTitle[],
+    duration: 30 * 60,
+    nextLabel: 'PART-B',
+  },
+  {
+    key: 'section-2',
+    label: 'PART-B',
+    sections: ['PART-B'] as SectionTitle[],
+    duration: 30 * 60,
+    nextLabel: 'PART-C',
+  },
+  {
+    key: 'section-3',
+    label: 'PART-C',
+    sections: ['PART-C'] as SectionTitle[],
+    duration: 30 * 60,
+    nextLabel: 'PART-D',
+  },
+  {
+    key: 'section-4',
+    label: 'PART-D',
+    sections: ['PART-D'] as SectionTitle[],
+    duration: 30 * 60,
+    nextLabel: 'Final Submit',
+  },
+] as const;
+
+const CPO_TIER2_SECTION_SUBJECTS: Record<SectionTitle, string> = {
+  'PART-A': '',
+  'PART-B': '',
+  'PART-C': '',
+  'PART-D': '',
+  'PART-E': '',
+};
 
 const LANGUAGE_OPTIONS = ['English', 'Hindi'] as const;
 
@@ -196,6 +260,79 @@ const buildCglTier2Questions = (examLabel: 'SSC CGL' | 'SSC CHSL' = 'SSC CGL'): 
   return questions;
 };
 
+const buildMtsQuestions = (): Question[] => {
+  const plan: Array<{ section: SectionTitle; count: number }> = [
+    { section: 'PART-A', count: 20 },
+    { section: 'PART-B', count: 20 },
+    { section: 'PART-C', count: 25 },
+    { section: 'PART-D', count: 25 },
+  ];
+
+  let runningId = 1;
+  const questions: Question[] = [];
+
+  plan.forEach(({ section, count }) => {
+    for (let idx = 0; idx < count; idx += 1) {
+      const sample = SAMPLE_OPTIONS[(runningId - 1) % SAMPLE_OPTIONS.length];
+      const subjectLabel = MTS_SECTION_SUBJECTS[section];
+      questions.push({
+        id: runningId,
+        section,
+        questionText: `Question ${runningId}: ${subjectLabel} practice question for SSC MTS. Choose the most suitable answer.`,
+        options: [
+          `Option A: ${sample[0]}`,
+          `Option B: ${sample[1]}`,
+          `Option C: ${sample[2]}`,
+          `Option D: ${sample[3]}`,
+        ],
+        correctOption: (runningId - 1) % 4,
+      });
+      runningId += 1;
+    }
+  });
+
+  return questions;
+};
+
+const buildCpoQuestions = (isTier2: boolean): Question[] => {
+  const plan: Array<{ section: SectionTitle; count: number }> = [
+    { section: 'PART-A', count: 50 },
+    { section: 'PART-B', count: 50 },
+    { section: 'PART-C', count: 50 },
+    { section: 'PART-D', count: 50 },
+  ];
+
+  let runningId = 1;
+  const questions: Question[] = [];
+
+  plan.forEach(({ section, count }) => {
+    for (let idx = 0; idx < count; idx += 1) {
+      const sample = SAMPLE_OPTIONS[(runningId - 1) % SAMPLE_OPTIONS.length];
+      const subjectLabel = isTier2 ? '' : SECTION_SUBJECTS[section];
+      const examName = isTier2 ? 'SSC CPO Tier 2' : 'SSC CPO Tier 1';
+      const questionText = isTier2 
+         ? `Question ${runningId}: English Language and Comprehension practice question for ${examName}. Choose the most suitable answer.`
+         : `Question ${runningId}: ${subjectLabel} practice question for ${examName}. Choose the most suitable answer.`;
+
+      questions.push({
+        id: runningId,
+        section,
+        questionText,
+        options: [
+          `Option A: ${sample[0]}`,
+          `Option B: ${sample[1]}`,
+          `Option C: ${sample[2]}`,
+          `Option D: ${sample[3]}`,
+        ],
+        correctOption: (runningId - 1) % 4,
+      });
+      runningId += 1;
+    }
+  });
+
+  return questions;
+};
+
 type QuestionStatus = 'unvisited' | 'notAnswered' | 'answered' | 'review' | 'answeredReview';
 
 export default function MockPracticeScreen() {
@@ -211,8 +348,13 @@ export default function MockPracticeScreen() {
   };
   const sourceTab: SourceTab = route.params?.sourceTab || (mockData.title.includes('Rank Maker') ? 'RankMaker' : 'PYQ');
   const normalizedTitle = String(mockData.title || '');
-  const isTier2Mode = /(cgl|chsl)/i.test(normalizedTitle) && /tier\s*2/i.test(normalizedTitle);
+  const isCglChslTier2 = /(cgl|chsl)/i.test(normalizedTitle) && /tier\s*2/i.test(normalizedTitle);
+  const isMtsMode = /mts/i.test(normalizedTitle);
+  const isCpoMode = /cpo/i.test(normalizedTitle);
+  const isCpoTier2Mode = isCpoMode && /tier\s*2/i.test(normalizedTitle);
+  const isMultiPhaseMode = isCglChslTier2 || isMtsMode;
   const tier2ExamLabel: 'SSC CGL' | 'SSC CHSL' = /chsl/i.test(normalizedTitle) ? 'SSC CHSL' : 'SSC CGL';
+  const activePhases = isCpoMode ? CPO_PHASES : (isMtsMode ? MTS_PHASES : CGL_TIER2_PHASES);
   const testKey: string =
     route.params?.testKey ||
     `${sourceTab}:${String(mockData.title || 'Mock Test')}:${String(mockData.questions || 25)}`;
@@ -223,7 +365,7 @@ export default function MockPracticeScreen() {
     : 25;
 
   const [examQuestions, setExamQuestions] = useState<Question[]>([]);
-  const [cglTier2Questions, setCglTier2Questions] = useState<Question[]>([]);
+  const [multiPhaseQuestions, setMultiPhaseQuestions] = useState<Question[]>([]);
   const [activePhase, setActivePhase] = useState<number>(resumeState?.activePhase || 0);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [apiMetadata, setApiMetadata] = useState<{ attemptId?: string; originalQuestions?: any[], timeLimit?: number }>({});
@@ -258,6 +400,19 @@ export default function MockPracticeScreen() {
   const [isSubmitModalVisible, setIsSubmitModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  const allowEviction = useRef(false);
+
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', (e: any) => {
+      if (allowEviction.current || isSubmitting) {
+        return;
+      }
+      e.preventDefault();
+      handlePauseRequest();
+    });
+    return unsub;
+  }, [navigation, isSubmitting]);
+
   const extractNestedString = (val: any): string | null => {
     if (typeof val === 'string' && val.trim() !== '') return val;
     if (typeof val === 'number') return String(val);
@@ -645,18 +800,18 @@ export default function MockPracticeScreen() {
   useEffect(() => {
     let isMounted = true;
     const fetchPaper = async () => {
-      if (isTier2Mode) {
-        const allPhaseQuestions = buildCglTier2Questions(tier2ExamLabel);
+      if (isMultiPhaseMode) {
+        const allPhaseQuestions = isCpoMode ? buildCpoQuestions(isCpoTier2Mode) : (isMtsMode ? buildMtsQuestions() : buildCglTier2Questions(tier2ExamLabel));
         const restoredPhase = Number.isInteger(resumeState?.activePhase)
-          ? Math.min(Math.max(Number(resumeState?.activePhase), 0), CGL_TIER2_PHASES.length - 1)
+          ? Math.min(Math.max(Number(resumeState?.activePhase), 0), activePhases.length - 1)
           : 0;
-        const currentPhaseConfig = CGL_TIER2_PHASES[restoredPhase];
+        const currentPhaseConfig = activePhases[restoredPhase];
         const currentPhaseQuestions = allPhaseQuestions.filter((q) =>
           currentPhaseConfig.sections.includes(q.section)
         );
 
         if (isMounted) {
-          setCglTier2Questions(allPhaseQuestions);
+          setMultiPhaseQuestions(allPhaseQuestions);
           setActivePhase(restoredPhase);
           setExamQuestions(currentPhaseQuestions);
 
@@ -756,7 +911,7 @@ export default function MockPracticeScreen() {
     };
     fetchPaper();
     return () => { isMounted = false; };
-  }, [sourceTab, route.params?.testPaperId, totalQuestions, isTier2Mode, tier2ExamLabel]);
+  }, [sourceTab, route.params?.testPaperId, totalQuestions, isMultiPhaseMode, tier2ExamLabel]);
 
   const bg = isDark ? '#111827' : '#edf0f4';
   const card = isDark ? '#1f2937' : '#ffffff';
@@ -792,12 +947,18 @@ export default function MockPracticeScreen() {
     navigation.navigate('PYQs');
   };
 
-  const inferMarkingSchemeForTest = () => {
+  const inferMarkingSchemeForTest = (section?: string) => {
     const title = String(mockData?.title || '').toLowerCase();
     const isTier2 = /tier\s*2/.test(title);
 
     if (/mts/.test(title)) {
-      return { correctMark: 1, wrongMark: 0.25 };
+      if (section === 'PART-A' || section === 'PART-B') {
+        return { correctMark: 3, wrongMark: 0 };
+      }
+      if (section === 'PART-C' || section === 'PART-D') {
+        return { correctMark: 3, wrongMark: 1 };
+      }
+      return { correctMark: 3, wrongMark: 0 };
     }
 
     if (/cgl/.test(title) && isTier2) {
@@ -868,7 +1029,7 @@ export default function MockPracticeScreen() {
     let correct = 0;
     let wrong = 0;
 
-    const resultQuestions = isTier2Mode ? cglTier2Questions : examQuestions;
+    const resultQuestions = isMultiPhaseMode ? multiPhaseQuestions : examQuestions;
     const resultSections = Array.from(new Set(resultQuestions.map((q) => q.section))) as SectionTitle[];
 
     resultQuestions.forEach((q) => {
@@ -886,8 +1047,10 @@ export default function MockPracticeScreen() {
     const attempted = correct + wrong;
     const unattempted = resultQuestions.length - attempted;
     const markingScheme = inferMarkingSchemeForTest();
-    const score = correct * markingScheme.correctMark - wrong * markingScheme.wrongMark;
+    let totalScore = 0;
+
     const sectionBreakup: SectionBreakup[] = resultSections.map((section) => {
+      const sectionMarking = inferMarkingSchemeForTest(section);
       const sectionQuestions = resultQuestions.filter((q) => q.section === section);
       let sectionCorrect = 0;
       let sectionWrong = 0;
@@ -904,14 +1067,19 @@ export default function MockPracticeScreen() {
         }
       });
 
+      const secScore = sectionCorrect * sectionMarking.correctMark - sectionWrong * sectionMarking.wrongMark;
+      totalScore += secScore;
+
       return {
         section,
         correct: sectionCorrect,
         wrong: sectionWrong,
         attempted: sectionCorrect + sectionWrong,
-        score: sectionCorrect * markingScheme.correctMark - sectionWrong * markingScheme.wrongMark,
+        score: secScore,
       };
     });
+
+    const score = totalScore;
 
     return {
       sourceTab,
@@ -935,15 +1103,16 @@ export default function MockPracticeScreen() {
   };
 
   const submitAndReturnToSeries = async (mode: 'manual' | 'auto') => {
+    allowEviction.current = true;
     let result = buildSubmissionResult();
     setIsSubmitting(true);
 
     await persistSubmissionResult(result);
     await removePausedPayload(testKey);
 
-    const submitQuestions = isTier2Mode ? cglTier2Questions : examQuestions;
+    const submitQuestions = isMultiPhaseMode ? multiPhaseQuestions : examQuestions;
 
-    if (sourceTab === 'PYQ' && route.params?.testPaperId && !isTier2Mode) {
+    if (sourceTab === 'PYQ' && route.params?.testPaperId && !isMultiPhaseMode) {
       try {
         const parsedLimit = apiMetadata.timeLimit || mockData?.duration || EXAM_DURATION_SECONDS;
         const totalDurationSeconds = parsedLimit < 300 ? parsedLimit * 60 : parsedLimit;
@@ -1023,6 +1192,7 @@ export default function MockPracticeScreen() {
   };
 
   const pauseAndReturnToSeries = async () => {
+    allowEviction.current = true;
     const pausedPayload = {
       testKey,
       sourceTab,
@@ -1041,11 +1211,11 @@ export default function MockPracticeScreen() {
       pausedAt: new Date().toISOString(),
     };
 
-    const pauseQuestions = isTier2Mode ? cglTier2Questions : examQuestions;
+    const pauseQuestions = isMultiPhaseMode ? multiPhaseQuestions : examQuestions;
 
     await persistPausedPayload(pausedPayload);
 
-    if (sourceTab === 'PYQ' && route.params?.testPaperId && !isTier2Mode) {
+    if (sourceTab === 'PYQ' && route.params?.testPaperId && !isMultiPhaseMode) {
       try {
         const parsedLimit = apiMetadata.timeLimit || mockData?.duration || EXAM_DURATION_SECONDS;
         const totalDurationSeconds = parsedLimit < 300 ? parsedLimit * 60 : parsedLimit;
@@ -1127,10 +1297,10 @@ export default function MockPracticeScreen() {
         return;
       }
       setIsSubmitModalVisible(false);
-      if (isTier2Mode && activePhase < CGL_TIER2_PHASES.length - 1) {
+      if (isMultiPhaseMode && activePhase < activePhases.length - 1) {
         const nextPhase = activePhase + 1;
-        const nextPhaseConfig = CGL_TIER2_PHASES[nextPhase];
-        const nextPhaseQuestions = cglTier2Questions.filter((q) => nextPhaseConfig.sections.includes(q.section));
+        const nextPhaseConfig = activePhases[nextPhase];
+        const nextPhaseQuestions = multiPhaseQuestions.filter((q) => nextPhaseConfig.sections.includes(q.section));
         setActivePhase(nextPhase);
         setExamQuestions(nextPhaseQuestions);
         setCurrentQuestionIndex(0);
@@ -1140,7 +1310,7 @@ export default function MockPracticeScreen() {
 
         Alert.alert(
           'Time up',
-          `${CGL_TIER2_PHASES[activePhase].label} auto-submitted. ${nextPhaseConfig.label} has started.`
+          `${activePhases[activePhase].label} auto-submitted. ${nextPhaseConfig.label} has started.`
         );
       } else {
         setIsSubmitting(true);
@@ -1161,7 +1331,7 @@ export default function MockPracticeScreen() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLeft, isSubmitting, isTier2Mode, activePhase, cglTier2Questions]);
+  }, [timeLeft, isSubmitting, isMultiPhaseMode, activePhase, multiPhaseQuestions]);
 
   const getStatus = (questionId: number): QuestionStatus => {
     const isAnswered = selectedOptions[questionId] !== undefined;
@@ -1207,7 +1377,7 @@ export default function MockPracticeScreen() {
   };
 
   const handleBack = () => {
-    goBackSafe();
+    handlePauseRequest();
   };
 
   const handleSubmit = () => {
@@ -1216,8 +1386,8 @@ export default function MockPracticeScreen() {
 
   const moveToNextCglPhase = () => {
     const nextPhase = activePhase + 1;
-    const nextPhaseConfig = CGL_TIER2_PHASES[nextPhase];
-    const nextPhaseQuestions = cglTier2Questions.filter((q) => nextPhaseConfig.sections.includes(q.section));
+    const nextPhaseConfig = activePhases[nextPhase];
+    const nextPhaseQuestions = multiPhaseQuestions.filter((q) => nextPhaseConfig.sections.includes(q.section));
 
     setActivePhase(nextPhase);
     setExamQuestions(nextPhaseQuestions);
@@ -1228,7 +1398,7 @@ export default function MockPracticeScreen() {
   };
 
   const handlePhaseTabPress = (targetPhase: number) => {
-    if (!isTier2Mode) {
+    if (!isMultiPhaseMode) {
       return;
     }
     if (targetPhase === activePhase) {
@@ -1245,7 +1415,7 @@ export default function MockPracticeScreen() {
       return;
     }
 
-    if (isTier2Mode && activePhase < CGL_TIER2_PHASES.length - 1) {
+    if (isMultiPhaseMode && activePhase < activePhases.length - 1) {
       setIsSubmitModalVisible(false);
       moveToNextCglPhase();
       return;
@@ -1353,7 +1523,7 @@ export default function MockPracticeScreen() {
     : 170;
   const questionImageMinHeight = optionImageCount >= 3 ? 90 : 120;
   const questionImageMaxHeight = optionImageCount >= 3 ? 170 : 320;
-  const currentPhaseConfig = isTier2Mode ? CGL_TIER2_PHASES[activePhase] : null;
+  const currentPhaseConfig = isMultiPhaseMode ? activePhases[activePhase] : null;
 
   const submitTableRows = sectionNames.map((section) => {
     const questions = examQuestions.filter((q) => q.section === section);
@@ -1366,7 +1536,7 @@ export default function MockPracticeScreen() {
 
     return {
       section,
-      subject: SECTION_SUBJECTS[section],
+      subject: isCpoTier2Mode ? CPO_TIER2_SECTION_SUBJECTS[section] : isMtsMode ? MTS_SECTION_SUBJECTS[section] : SECTION_SUBJECTS[section],
       total: questions.length,
       answered,
       notAnswered,
@@ -1403,7 +1573,7 @@ export default function MockPracticeScreen() {
     );
   }
 
-  const showPartsStrip = !(isTier2Mode && CGL_TIER2_PHASES[activePhase]?.label === 'Computer Knowledge');
+  const showPartsStrip = !(isMultiPhaseMode && activePhases[activePhase]?.label === 'Computer Knowledge');
 
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: Platform.OS === 'ios' ? insets.top : 10 }]}> 
@@ -1414,7 +1584,7 @@ export default function MockPracticeScreen() {
 
         <View style={styles.titleWrap}>
           <Text style={[styles.headerTitle, { color: text }]} numberOfLines={1}>
-            {isTier2Mode && currentPhaseConfig
+            {isMultiPhaseMode && currentPhaseConfig
               ? `${mockData.title} - ${currentPhaseConfig.label}`
               : mockData.title}
           </Text>
@@ -1485,10 +1655,10 @@ export default function MockPracticeScreen() {
         </View>
       </View>
 
-      {isTier2Mode && (
+      {isMultiPhaseMode && (
         <View style={[styles.phaseStrip, { borderBottomColor: border, backgroundColor: card }]}>
           <View style={styles.phaseStripContent}>
-            {CGL_TIER2_PHASES.map((phase, index) => {
+            {activePhases.map((phase, index) => {
               const isActivePhase = index === activePhase;
               const isLocked = index > activePhase;
               return (
@@ -1863,7 +2033,7 @@ export default function MockPracticeScreen() {
             onStartShouldSetResponder={() => true}
           >
             <Text style={[styles.submitModalTitle, { color: text, fontSize: isCompact ? 20 : 28 }]}>
-              {isTier2Mode && currentPhaseConfig ? `Submit ${currentPhaseConfig.label}` : 'Submit your test'}
+              {isMultiPhaseMode && currentPhaseConfig ? `Submit ${currentPhaseConfig.label}` : 'Submit your test'}
             </Text>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.submitTableScroll}>

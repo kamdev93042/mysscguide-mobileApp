@@ -17,7 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 
 type MarkingScheme = {
   correctMark: number;
-  wrongMark: number;
+  wrongMark: number | string;
 };
 
 type SectionItem = {
@@ -102,10 +102,11 @@ const fallbackMarking = (result: SubmissionResult): MarkingScheme => {
   const t = String(result.testTitle || '').toLowerCase();
   const isTier2 = /tier\s*2/.test(t);
 
-  if (/mts/.test(t)) return { correctMark: 1, wrongMark: 0.25 };
+  if (/mts/.test(t)) return { correctMark: 3, wrongMark: '0 (S1), 1 (S2)' };
+  if (/cpo/.test(t)) return { correctMark: 1, wrongMark: 0.25 };
   if (/cgl/.test(t) && isTier2) return { correctMark: 3, wrongMark: 1 };
   if (/chsl/.test(t) && isTier2) return { correctMark: 2, wrongMark: 0.5 };
-  if (/cgl|chsl|cpo/.test(t)) return { correctMark: 2, wrongMark: 0.5 };
+  if (/cgl|chsl/.test(t)) return { correctMark: 2, wrongMark: 0.5 };
 
   return { correctMark: 2, wrongMark: 0.5 };
 };
@@ -273,7 +274,7 @@ export default function TestAnalysisScreen() {
     const wrong = Number(fromResult?.incorrect ?? fromResult?.wrong ?? result?.wrong ?? 0);
     const totalQuestions = Number(fromResult?.totalQuestions ?? result?.totalQuestions ?? attempted + Number(result?.unattempted || 0));
     const unattempted = Math.max(0, Number(fromResult?.unattempted ?? result?.unattempted ?? totalQuestions - attempted));
-    const score = Number(fromResult?.score ?? result?.score ?? correct * resolvedMarking.correctMark - wrong * resolvedMarking.wrongMark);
+    const score = Number(fromResult?.score ?? result?.score ?? correct * resolvedMarking.correctMark - wrong * (typeof resolvedMarking.wrongMark === 'number' ? resolvedMarking.wrongMark : 0));
     const rank = Number(fromResult?.rank ?? resultPayload?.rank ?? analysisPayload?.rank ?? 1);
     const percentile = Number(fromResult?.percentile ?? resultPayload?.percentile ?? analysisPayload?.percentile ?? 100);
     const timeTaken = Number(fromResult?.totalTimeTaken ?? resultPayload?.totalTimeTaken ?? analysisPayload?.totalTimeTaken ?? 0);

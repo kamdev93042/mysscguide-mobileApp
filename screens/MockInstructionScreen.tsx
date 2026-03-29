@@ -34,10 +34,17 @@ export default function MockInstructionScreen() {
   const normalizedTitle = String(mockData?.title || '');
   const isCglTier2 = /cgl/i.test(normalizedTitle) && /tier\s*2/i.test(normalizedTitle);
   const isChslTier2 = /chsl/i.test(normalizedTitle) && /tier\s*2/i.test(normalizedTitle);
-  const isTier2Instruction = isCglTier2 || isChslTier2;
-  const examTierLabel = isChslTier2 ? 'SSC CHSL Tier 2' : isCglTier2 ? 'SSC CGL Tier 2' : 'SSC Test';
+  const isMtsMode = /mts/i.test(normalizedTitle);
+  const isCpoMode = /cpo/i.test(normalizedTitle);
+  const isCpoTier2Mode = isCpoMode && /tier\s*2/i.test(normalizedTitle);
+  const isTier2Instruction = isCglTier2 || isChslTier2 || isMtsMode || isCpoMode;
+  const examTierLabel = isChslTier2 ? 'SSC CHSL Tier 2' : isCglTier2 ? 'SSC CGL Tier 2' : isMtsMode ? 'SSC MTS' : isCpoTier2Mode ? 'SSC CPO Tier 2' : isCpoMode ? 'SSC CPO Tier 1' : 'SSC Test';
   const markingScheme = isCglTier2
     ? { correct: 3, wrong: 1 }
+    : isMtsMode
+    ? { correct: 3, wrong: '0 for Session-I, 1 for Session-II' }
+    : isCpoMode
+    ? { correct: 1, wrong: 0.25 }
     : { correct: 2, wrong: 0.5 };
 
   const bg = isDark ? '#000000' : '#ffffff';
@@ -282,7 +289,7 @@ export default function MockInstructionScreen() {
           </View>
           <View style={styles.bulletRow}>
             <View style={[styles.dot, { backgroundColor: text }]} />
-            <Text style={[styles.bulletBody, { color: text }]}>For each wrong answer, <Text style={{fontWeight: 'bold'}}>{markingScheme.wrong.toFixed(2)} marks</Text> will be deducted (negative marking).</Text>
+            <Text style={[styles.bulletBody, { color: text }]}>For each wrong answer, <Text style={{fontWeight: 'bold'}}>{typeof markingScheme.wrong === 'number' ? `${markingScheme.wrong.toFixed(2)} marks` : `${markingScheme.wrong} marks`}</Text> will be deducted.</Text>
           </View>
           <View style={styles.bulletRow}>
             <View style={[styles.dot, { backgroundColor: text }]} />
