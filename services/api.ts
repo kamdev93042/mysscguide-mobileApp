@@ -345,3 +345,40 @@ export const pyqApi = {
   },
 };
 
+export const mnemonicApi = {
+  async createMnemonic(data: { word: string; meaning: string; mnemonic: string }) {
+    return fetchApi('/user/mnemonics', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getMnemonics(limit: number = 100) {
+    return fetchApi(`/user/mnemonics?limit=${limit}`, { method: 'GET' });
+  },
+
+  async likeMnemonic(id: string) {
+    return fetchApi(`/user/mnemonics/${id}/like`, { method: 'POST' });
+  },
+
+  async dislikeMnemonic(id: string) {
+    return fetchApi(`/user/mnemonics/${id}/dislike`, { method: 'POST' });
+  },
+
+  async deleteMnemonic(id: string) {
+    return fetchApi(`/user/mnemonics/${id}`, { method: 'DELETE' });
+  },
+
+  async reportMnemonic(id: string, reason: string) {
+    // Calling the generic reports endpoint as provided by the user.
+    return fetchApi('/user/reports', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: id,
+        type: 'Mnemonic', // Fixed from targetType based on backend error "type is required"
+        reason,
+      }),
+    });
+  },
+};
+

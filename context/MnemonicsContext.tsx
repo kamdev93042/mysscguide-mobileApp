@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { mnemonicApi } from '../services/api';
 
 export type MnemonicItem = {
   id: string;
@@ -13,157 +14,105 @@ export type MnemonicItem = {
   reportedReasons: string[];
 };
 
-const INITIAL_MNEMONICS: MnemonicItem[] = [
-  {
-    id: '1',
-    word: 'Assiduous',
-    meaning: 'Showing great care and perseverance',
-    trick: `"Ass + iduous" -> like an ass doing nonstop hard work.`,
-    author: 'Praveen Maurya',
-    likes: 18,
-    dislikes: 0,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-  {
-    id: '2',
-    word: 'Assiduous',
-    meaning: 'Diligent and persistent',
-    trick: `"A city does work daily" -> Assiduous reminds me of consistent effort.`,
-    author: 'Ritika Sharma',
-    likes: 11,
-    dislikes: 1,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-  {
-    id: '3',
-    word: 'Belligerent',
-    meaning: 'Hostile and aggressive',
-    trick: `"Belly + grrr" -> always ready to fight.`,
-    author: 'Yash Maurya',
-    likes: 21,
-    dislikes: 0,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-  {
-    id: '4',
-    word: 'Belligerent',
-    meaning: 'Warlike in attitude',
-    trick: `"Bell rings, argument begins" -> Belligerent means quarrelsome.`,
-    author: 'Aman Singh',
-    likes: 7,
-    dislikes: 0,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-  {
-    id: '5',
-    word: 'Deference',
-    meaning: 'Respect',
-    trick: `"Difference in age -> deference in behavior".`,
-    author: 'Nikhil Maurya',
-    likes: 12,
-    dislikes: 0,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-  {
-    id: '6',
-    word: 'Deference',
-    meaning: 'Humble submission and respect',
-    trick: `"Dear-fence" -> keep a respectful boundary with seniors.`,
-    author: 'Gauri S.',
-    likes: 6,
-    dislikes: 0,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-  {
-    id: '7',
-    word: 'Alacrity',
-    meaning: 'Brisk and cheerful readiness',
-    trick: `"All + crity (city) -> All city people are ready with alacrity."`,
-    author: 'Admin',
-    likes: 10,
-    dislikes: 1,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-  {
-    id: '8',
-    word: 'Capricious',
-    meaning: 'Given to sudden and unaccountable changes of mood or behavior',
-    trick: `"Capri pants -> weather changes suddenly, so you wear capris."`,
-    author: 'Student123',
-    likes: 5,
-    dislikes: 0,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-  {
-    id: '9',
-    word: 'Diligent',
-    meaning: 'Careful and using a lot of effort',
-    trick: `"Dilli + Gents -> Delhi gents are very hard working."`,
-    author: 'SSC_Scorer',
-    likes: 8,
-    dislikes: 0,
-    isSaved: false,
-    userVote: null,
-    reportedReasons: [],
-  },
-];
-
 type MnemonicsContextType = {
   mnemonics: MnemonicItem[];
-  addMnemonic: (word: string, meaning: string, trick: string, author: string) => void;
+  addMnemonic: (word: string, meaning: string, trick: string, author: string) => Promise<void>;
   toggleSave: (id: string) => void;
   deleteMnemonic: (id: string) => void;
-  reportMnemonic: (id: string, reason: string) => void;
+  reportMnemonic: (id: string, reason: string) => Promise<void>;
   incrementLike: (id: string) => void;
   incrementDislike: (id: string) => void;
+  refreshMnemonics: () => Promise<void>;
+  isLoading: boolean;
 };
 
 const MnemonicsContext = createContext<MnemonicsContextType>({
   mnemonics: [],
-  addMnemonic: () => {},
+  addMnemonic: async () => {},
   toggleSave: () => {},
-  deleteMnemonic: () => {},
-  reportMnemonic: () => {},
-  incrementLike: () => {},
-  incrementDislike: () => {},
+  deleteMnemonic: async () => {},
+  reportMnemonic: async () => {},
+  incrementLike: async () => {},
+  incrementDislike: async () => {},
+  refreshMnemonics: async () => {},
+  isLoading: true,
 });
 
 export const useMnemonics = () => useContext(MnemonicsContext);
 
 export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [mnemonics, setMnemonics] = useState<MnemonicItem[]>(INITIAL_MNEMONICS);
+  const [mnemonics, setMnemonics] = useState<MnemonicItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const addMnemonic = (word: string, meaning: string, trick: string, author: string) => {
-    const newItem: MnemonicItem = {
-      id: Date.now().toString(),
-      word,
-      meaning,
-      trick,
-      author,
-      likes: 0,
-      dislikes: 0,
-      isSaved: false,
-      userVote: null,
-      reportedReasons: [],
-    };
-    // Add new mnonics to the top of the list
-    setMnemonics((prev) => [newItem, ...prev]);
+  const fetchMnemonics = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const limit = 500; // default large limit to grab them all for local search
+      const response = await mnemonicApi.getMnemonics(limit);
+      if (response && response.data) {
+        // Map backend to frontend schema
+        const mapped: MnemonicItem[] = response.data.map((apiItem: any) => ({
+          id: apiItem.id,
+          word: apiItem.word,
+          meaning: apiItem.meaning,
+          trick: apiItem.mnemonic, // trick maps to mnemonic
+          author: apiItem.user?.name || apiItem.user?.username || 'Anonymous',
+          likes: apiItem.upvotes || 0,
+          dislikes: apiItem.downvotes || 0,
+          isSaved: false,
+          userVote: apiItem.likedByMe ? 'like' : (apiItem.dislikedByMe ? 'dislike' : null),
+          reportedReasons: [],
+        }));
+        setMnemonics(mapped);
+      }
+    } catch (error) {
+      console.error('Failed to load mnemonics', error);
+      setMnemonics([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initial fetch
+    fetchMnemonics();
+  }, [fetchMnemonics]);
+
+  const refreshMnemonics = async () => {
+    await fetchMnemonics();
+  };
+
+  const addMnemonic = async (word: string, meaning: string, trick: string, author: string) => {
+    try {
+      const response = await mnemonicApi.createMnemonic({
+        word,
+        meaning,
+        mnemonic: trick,
+      });
+
+      if (response && response.data) {
+        const apiItem = response.data;
+        const newItem: MnemonicItem = {
+          id: apiItem.id,
+          word: apiItem.word,
+          meaning: apiItem.meaning,
+          trick: apiItem.mnemonic,
+          author: apiItem.user?.name || apiItem.user?.username || author,
+          likes: apiItem.upvotes || 0,
+          dislikes: apiItem.downvotes || 0,
+          isSaved: false,
+          userVote: null,
+          reportedReasons: [],
+        };
+        // Add new mnonics to the top of the list
+        setMnemonics((prev) => [newItem, ...prev]);
+      } else {
+        throw new Error('Invalid response structure');
+      }
+    } catch (error) {
+      console.error('Failed to create mnemonic:', error);
+      throw error;
+    }
   };
 
   const toggleSave = (id: string) => {
@@ -174,20 +123,33 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     );
   };
 
-  const deleteMnemonic = (id: string) => {
-    setMnemonics((prev) => prev.filter((item) => item.id !== id));
+  const deleteMnemonic = async (id: string) => {
+    try {
+      await mnemonicApi.deleteMnemonic(id);
+      setMnemonics((prev) => prev.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error('Failed to delete mnemonic:', error);
+    }
   };
 
-  const reportMnemonic = (id: string, reason: string) => {
-    setMnemonics((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        return { ...item, reportedReasons: [...item.reportedReasons, reason] };
-      })
-    );
+  const reportMnemonic = async (id: string, reason: string) => {
+    try {
+      await mnemonicApi.reportMnemonic(id, reason);
+      // Update local state to show it was reported (if desired)
+      setMnemonics((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          return { ...item, reportedReasons: [...item.reportedReasons, reason] };
+        })
+      );
+    } catch (error) {
+      console.error('Failed to report mnemonic:', error);
+      throw error;
+    }
   };
 
-  const incrementLike = (id: string) => {
+  const incrementLike = async (id: string) => {
+    // Optimistic update
     setMnemonics((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
@@ -197,16 +159,13 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         let newVote = item.userVote;
 
         if (item.userVote === 'like') {
-          // Undo like
           newLikes -= 1;
           newVote = null;
         } else if (item.userVote === 'dislike') {
-          // Switch vote from dislike to like
           newDislikes -= 1;
           newLikes += 1;
           newVote = 'like';
         } else {
-          // First time voting
           newLikes += 1;
           newVote = 'like';
         }
@@ -214,9 +173,23 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return { ...item, likes: newLikes, dislikes: newDislikes, userVote: newVote };
       })
     );
+
+    try {
+      const res = await mnemonicApi.likeMnemonic(id);
+      if (res && res.status === 'success') {
+        setMnemonics((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, likes: res.upvotes, dislikes: res.downvotes } : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Failed to like mnemonic:', error);
+    }
   };
 
-  const incrementDislike = (id: string) => {
+  const incrementDislike = async (id: string) => {
+    // Optimistic update
     setMnemonics((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
@@ -226,16 +199,13 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         let newVote = item.userVote;
 
         if (item.userVote === 'dislike') {
-          // Undo dislike
           newDislikes -= 1;
           newVote = null;
         } else if (item.userVote === 'like') {
-          // Switch vote from like to dislike
           newLikes -= 1;
           newDislikes += 1;
           newVote = 'dislike';
         } else {
-          // First time voting
           newDislikes += 1;
           newVote = 'dislike';
         }
@@ -243,6 +213,19 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return { ...item, likes: newLikes, dislikes: newDislikes, userVote: newVote };
       })
     );
+
+    try {
+      const res = await mnemonicApi.dislikeMnemonic(id);
+      if (res && res.status === 'success') {
+        setMnemonics((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, likes: res.upvotes, dislikes: res.downvotes } : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Failed to dislike mnemonic:', error);
+    }
   };
 
   return (
@@ -255,6 +238,8 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         reportMnemonic,
         incrementLike,
         incrementDislike,
+        refreshMnemonics,
+        isLoading,
       }}
     >
       {children}

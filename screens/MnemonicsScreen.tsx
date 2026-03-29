@@ -11,6 +11,7 @@ import {
   Image,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +30,7 @@ export default function MnemonicsScreen() {
   const { isDark, toggleTheme } = useTheme();
   const { userName } = useLoginModal();
 
-  const { mnemonics, addMnemonic, deleteMnemonic, reportMnemonic, incrementLike, incrementDislike } = useMnemonics();
+  const { mnemonics, addMnemonic, deleteMnemonic, reportMnemonic, incrementLike, incrementDislike, isLoading } = useMnemonics();
 
   const [filterQuery, setFilterQuery] = useState('By word');
   const [filterOpen, setFilterOpen] = useState(false);
@@ -53,10 +54,12 @@ export default function MnemonicsScreen() {
   const [newWord, setNewWord] = useState('');
   const [newMeaning, setNewMeaning] = useState('');
   const [newTrick, setNewTrick] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Report Modal states
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [reportTargetId, setReportTargetId] = useState<string | null>(null);
+  const [reportTargetWord, setReportTargetWord] = useState<string>('');
   const [reportReason, setReportReason] = useState<string>('');
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
@@ -135,27 +138,36 @@ export default function MnemonicsScreen() {
 
   const canSubmitTrick = newWord.trim().length > 0 && newMeaning.trim().length > 0 && newTrick.trim().length > 0;
 
-  const handlePostMnemonic = () => {
-    if (!canSubmitTrick) return;
-    const authorName = userName || 'Anonymous';
-    addMnemonic(newWord.trim(), newMeaning.trim(), newTrick.trim(), authorName);
-    setModalVisible(false);
-    setNewWord('');
-    setNewMeaning('');
-    setNewTrick('');
+  const handlePostMnemonic = async () => {
+    if (!canSubmitTrick || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const authorName = userName || 'Anonymous';
+      await addMnemonic(newWord.trim(), newMeaning.trim(), newTrick.trim(), authorName);
+      setModalVisible(false);
+      setNewWord('');
+      setNewMeaning('');
+      setNewTrick('');
+    } catch (error) {
+      Alert.alert("Error", "Failed to post trick. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const openReportModal = (id: string) => {
-    setReportTargetId(id);
+  const openReportModal = (item: MnemonicItem) => {
+    setReportTargetId(item.id);
+    setReportTargetWord(item.word);
     setReportReason('');
     setReportModalVisible(true);
   };
 
   const submitReport = () => {
-    if (reportTargetId && reportReason) {
-      reportMnemonic(reportTargetId, reportReason);
+    if (reportTargetId) {
+      reportMnemonic(reportTargetId, reportReason.trim() || 'No details provided');
       setReportModalVisible(false);
       setReportTargetId(null);
+      setReportTargetWord('');
       setReportReason('');
       Alert.alert("Report Submitted", "Thank you for helping keep the community clean.");
     }
@@ -191,7 +203,7 @@ export default function MnemonicsScreen() {
         <View style={styles.cardHeader}>
           <Text style={[styles.cardWord, { color: text }, isVariant && { fontSize: 16 }]}>{item.word}</Text>
           <View style={{ flexDirection: 'row', gap: 16 }}>
-            <Pressable onPress={() => openReportModal(item.id)} hitSlop={8}>
+            <Pressable onPress={() => openReportModal(item)} hitSlop={8}>
               <Ionicons name="flag-outline" size={20} color={muted} />
             </Pressable>
             {userName && item.author === userName && (
@@ -411,9 +423,15 @@ export default function MnemonicsScreen() {
         </View>
 
         <View style={[styles.grid, { flexDirection: width > 600 ? 'row' : 'column' }]}>
-          {visibleGroups.map((group) => {
-            const topTrick = group[0];
-            const key = topTrick.word.toLowerCase();
+          {isLoading && groupedMnemonics.length === 0 ? (
+            <View style={{ width: '100%', alignItems: 'center', marginTop: 40, marginBottom: 40 }}>
+              <ActivityIndicator size="large" color="#059669" />
+              <Text style={{ color: muted, marginTop: 12 }}>Loading mnemonics...</Text>
+            </View>
+          ) : (
+            visibleGroups.map((group) => {
+              const topTrick = group[0];
+              const key = topTrick.word.toLowerCase();
             const variantsVisible = expandedGroups[key] || 1;
             const hasMoreVariants = group.length > variantsVisible;
             const shownVariants = group.slice(1, variantsVisible);
@@ -454,9 +472,9 @@ export default function MnemonicsScreen() {
                 ) : null}
               </View>
             );
-          })}
+          }))}
 
-          {groupedMnemonics.length > visibleCount && (
+          {groupedMnemonics.length > visibleCount && !isLoading && (
             <View style={{ width: '100%', alignItems: 'center', marginTop: 12, marginBottom: 24 }}>
               <Pressable style={styles.loadMoreBtn} onPress={handleLoadMoreGroups}>
                 <Text style={styles.loadMoreText}>Load More</Text>
@@ -464,7 +482,7 @@ export default function MnemonicsScreen() {
             </View>
           )}
 
-          {groupedMnemonics.length === 0 && (
+          {groupedMnemonics.length === 0 && !isLoading && (
             <Text style={{ color: muted, width: '100%', textAlign: 'center', marginTop: 20 }}>
               No mnemonics found matching "{searchQuery}"
             </Text>
@@ -553,11 +571,15 @@ export default function MnemonicsScreen() {
                 <Text style={[styles.cancelBtnText, { color: muted }]}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.postBtn, !canSubmitTrick && { opacity: 0.5 }]}
+                style={[styles.postBtn, (!canSubmitTrick || isSubmitting) && { opacity: 0.5 }]}
                 onPress={handlePostMnemonic}
-                disabled={!canSubmitTrick}
+                disabled={!canSubmitTrick || isSubmitting}
               >
-                <Text style={styles.postBtnText}>Post Mnemonic</Text>
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.postBtnText}>Post Mnemonic</Text>
+                )}
               </Pressable>
             </View>
           </View>
@@ -572,54 +594,42 @@ export default function MnemonicsScreen() {
         onRequestClose={() => setReportModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: bg, borderColor: border }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: border }]}>
-              <View style={styles.modalTitleRow}>
-                <View style={[styles.modalIconWrap, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-                  <Ionicons name="flag" size={16} color="#ef4444" />
-                </View>
-                <Text style={[styles.modalTitle, { color: text }]}>Report Trick</Text>
-              </View>
-              <Pressable onPress={() => setReportModalVisible(false)} hitSlop={10}>
-                <Ionicons name="close" size={24} color={muted} />
-              </Pressable>
-            </View>
-
-            <Text style={[styles.modalSubtitle, { color: muted }]}>
-              Why are you reporting this mnemonic?
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#0b1320' : '#fff', borderColor: border, borderWidth: 1, padding: 24, borderRadius: 16 }]}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: text, marginBottom: 8 }}>Report mnemonic</Text>
+            <Text style={{ fontSize: 13, color: muted, marginBottom: 20 }}>
+              Tell us what's wrong with "{reportTargetWord}".
             </Text>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 16 }}>
-              {REPORT_REASONS.map((reason) => (
-                <Pressable
-                  key={reason}
-                  onPress={() => setReportReason(reason)}
-                  style={[
-                    styles.reportOption,
-                    { borderColor: border },
-                    reportReason === reason && { borderColor: '#059669', backgroundColor: 'rgba(5, 150, 105, 0.05)' }
-                  ]}
-                >
-                  <Ionicons
-                    name={reportReason === reason ? "radio-button-on" : "radio-button-off"}
-                    size={20}
-                    color={reportReason === reason ? "#059669" : muted}
-                  />
-                  <Text style={[styles.reportOptionText, { color: text }]}>{reason}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+            <TextInput
+              style={[
+                styles.textInput,
+                styles.textArea,
+                { 
+                  backgroundColor: isDark ? '#142033' : '#f8fafc',
+                  borderColor: isDark ? '#1e293b' : '#e2e8f0',
+                  color: text,
+                  marginBottom: 24,
+                  height: 100,
+                  fontSize: 14
+                }
+              ]}
+              placeholder="Add details (optional)"
+              placeholderTextColor={muted}
+              value={reportReason}
+              onChangeText={setReportReason}
+              multiline
+              textAlignVertical="top"
+            />
 
-            <View style={styles.modalFooter}>
-              <Pressable style={styles.cancelBtn} onPress={() => setReportModalVisible(false)}>
-                <Text style={[styles.cancelBtnText, { color: muted }]}>Cancel</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 20 }}>
+              <Pressable onPress={() => setReportModalVisible(false)} hitSlop={10}>
+                <Text style={{ color: text, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.postBtn, { backgroundColor: '#ef4444' }, !reportReason && { opacity: 0.5 }]}
+                style={{ backgroundColor: '#f59e0b', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
                 onPress={submitReport}
-                disabled={!reportReason}
               >
-                <Text style={styles.postBtnText}>Submit Report</Text>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Submit report</Text>
               </Pressable>
             </View>
           </View>
