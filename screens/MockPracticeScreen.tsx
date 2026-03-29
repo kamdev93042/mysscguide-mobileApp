@@ -30,6 +30,17 @@ type Question = {
 
 type SourceTab = 'PYQ' | 'RankMaker';
 
+type ResumeState = {
+  currentQuestionIndex: number;
+  selectedOptions: Record<number, number>;
+  visitedQuestions: Record<number, boolean>;
+  reviewedQuestions: Record<number, boolean>;
+  timeLeft: number;
+  activeSection: SectionTitle;
+  selectedLanguage: 'English' | 'Hindi';
+  zoomLevel: number;
+};
+
 type SectionBreakup = {
   section: SectionTitle;
   correct: number;
@@ -92,6 +103,10 @@ export default function MockPracticeScreen() {
     questions: 25,
   };
   const sourceTab: SourceTab = route.params?.sourceTab || (mockData.title.includes('Rank Maker') ? 'RankMaker' : 'PYQ');
+  const testKey: string =
+    route.params?.testKey ||
+    `${sourceTab}:${String(mockData.title || 'Mock Test')}:${String(mockData.questions || 25)}`;
+  const resumeState = route.params?.resumeState as ResumeState | undefined;
 
   const totalQuestions = Number.isFinite(Number(mockData.questions))
     ? Number(mockData.questions)
@@ -103,23 +118,33 @@ export default function MockPracticeScreen() {
     [examQuestions]
   );
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedOptions, setSelectedOptions] = useState<Record<number, number>>({});
-  const [visitedQuestions, setVisitedQuestions] = useState<Record<number, boolean>>({
-    [examQuestions[0].id]: true,
-  });
-  const [reviewedQuestions, setReviewedQuestions] = useState<Record<number, boolean>>({});
-  const [timeLeft, setTimeLeft] = useState(EXAM_DURATION_SECONDS);
+  const initialQuestionIndex =
+    resumeState && Number.isInteger(resumeState.currentQuestionIndex)
+      ? Math.min(Math.max(resumeState.currentQuestionIndex, 0), Math.max(examQuestions.length - 1, 0))
+      : 0;
+
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(initialQuestionIndex);
+  const [selectedOptions, setSelectedOptions] = useState<Record<number, number>>(resumeState?.selectedOptions || {});
+  const [visitedQuestions, setVisitedQuestions] = useState<Record<number, boolean>>(
+    resumeState?.visitedQuestions || { [examQuestions[initialQuestionIndex]?.id || examQuestions[0].id]: true }
+  );
+  const [reviewedQuestions, setReviewedQuestions] = useState<Record<number, boolean>>(resumeState?.reviewedQuestions || {});
+  const [timeLeft, setTimeLeft] = useState(
+    typeof resumeState?.timeLeft === 'number' && resumeState.timeLeft > 0
+      ? resumeState.timeLeft
+      : EXAM_DURATION_SECONDS
+  );
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionTitle>(sectionNames[0]);
-  const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Hindi'>('English');
+  const [activeSection, setActiveSection] = useState<SectionTitle>(resumeState?.activeSection || sectionNames[0]);
+  const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Hindi'>(resumeState?.selectedLanguage || 'English');
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const [isReportDropdownOpen, setIsReportDropdownOpen] = useState(false);
   const [activePaletteTab, setActivePaletteTab] = useState<'symbols' | 'instructions'>('symbols');
   const [isSubmitModalVisible, setIsSubmitModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(
+    typeof resumeState?.zoomLevel === 'number' ? resumeState.zoomLevel : 1
+  );
   const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
   const [infoModalType, setInfoModalType] = useState<'symbols' | 'instructions'>('instructions');
   const [isPauseConfirmVisible, setIsPauseConfirmVisible] = useState(false);
@@ -207,6 +232,7 @@ export default function MockPracticeScreen() {
     return {
       sourceTab,
       testTitle: String(mockData.title || 'Mock Test'),
+      testKey,
       attempted,
       correct,
       wrong,
@@ -239,6 +265,7 @@ export default function MockPracticeScreen() {
         ...CommonActions.setParams({
           submissionResult: result,
           submitMode: mode,
+          clearPausedTestKey: testKey,
         }),
         source: pyqsKey,
       });
@@ -253,6 +280,60 @@ export default function MockPracticeScreen() {
     navigation.navigate('PYQs', {
       submissionResult: result,
       submitMode: mode,
+      clearPausedTestKey: testKey,
+    });
+  };
+
+  const pauseAndReturnToSeries = () => {
+    const pausedPayload = {
+      testKey,
+      sourceTab,
+      mockData,
+      resumeState: {
+        currentQuestionIndex,
+        selectedOptions,
+        visitedQuestions,
+        reviewedQuestions,
+        timeLeft,
+        activeSection,
+        selectedLanguage,
+        zoomLevel,
+      },
+      pausedAt: new Date().toISOString(),
+    };
+
+    const state = navigation.getState?.();
+    const routes = state?.routes || [];
+    const currentIndex = typeof state?.index === 'number' ? state.index : routes.length - 1;
+
+    let pyqsRouteIndex = -1;
+    for (let i = currentIndex - 1; i >= 0; i -= 1) {
+      if (routes[i]?.name === 'PYQs') {
+        pyqsRouteIndex = i;
+        break;
+      }
+    }
+
+    if (pyqsRouteIndex >= 0) {
+      const pyqsKey = routes[pyqsRouteIndex].key;
+      navigation.dispatch({
+        ...CommonActions.setParams({
+          pausedTest: pausedPayload,
+          activeTab: sourceTab,
+        }),
+        source: pyqsKey,
+      });
+
+      const popCount = currentIndex - pyqsRouteIndex;
+      if (popCount > 0) {
+        navigation.dispatch(StackActions.pop(popCount));
+      }
+      return;
+    }
+
+    navigation.navigate('PYQs', {
+      pausedTest: pausedPayload,
+      activeTab: sourceTab,
     });
   };
 
@@ -412,12 +493,12 @@ export default function MockPracticeScreen() {
 
   const handlePauseConfirm = () => {
     setIsPauseConfirmVisible(false);
-    setIsTestPaused(true);
     setIsLanguageDropdownOpen(false);
     setIsReportDropdownOpen(false);
     setIsPaletteVisible(false);
     setIsInfoModalVisible(false);
     setIsSubmitModalVisible(false);
+    pauseAndReturnToSeries();
   };
 
   const handleResumeTest = () => {
@@ -546,19 +627,10 @@ export default function MockPracticeScreen() {
             <Text style={styles.infoTabLink}>INSTRUCTIONS</Text>
           </Pressable>
         </View>
-
-        <Pressable
-          style={[styles.fullscreenBtn, { borderColor: border }]}
-          onPress={() => setIsFullscreen((prev) => !prev)}
-        >
-          <Ionicons name={isFullscreen ? 'contract-outline' : 'expand-outline'} size={16} color={text} />
-          <Text style={[styles.fullscreenBtnText, { color: text }]}>{isFullscreen ? 'Exit' : 'Full'}</Text>
-        </Pressable>
       </View>
 
-      {!isFullscreen && (
-        <View style={[styles.sectionStrip, { borderBottomColor: border, backgroundColor: card }]}> 
-          <View style={styles.sectionStripContent}>
+      <View style={[styles.sectionStrip, { borderBottomColor: border, backgroundColor: card }]}> 
+        <View style={styles.sectionStripContent}>
           {sectionNames.map((section) => {
             const isActive = currentQuestion.section === section;
             return (
@@ -581,9 +653,8 @@ export default function MockPracticeScreen() {
             );
           })}
 
-          </View>
         </View>
-      )}
+      </View>
 
       <ScrollView contentContainerStyle={styles.mainContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.questionCard, { backgroundColor: card, borderColor: border }]}> 
@@ -670,8 +741,8 @@ export default function MockPracticeScreen() {
                     style={[
                       styles.optionRow,
                       {
-                        borderColor: isSelected ? '#3b82f6' : border,
-                        backgroundColor: isSelected ? (isDark ? '#111827' : '#f8fbff') : card,
+                        borderColor: border,
+                        backgroundColor: card,
                       },
                     ]}
                     onPress={() => handleSelectOption(optionIndex)}
@@ -1762,20 +1833,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  fullscreenBtn: {
-    height: 34,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fullscreenBtnText: {
-    marginLeft: 5,
-    fontSize: 12,
-    fontWeight: '700',
-  },
   submitBtn: {
     borderRadius: 10,
     paddingHorizontal: 14,
@@ -1818,9 +1875,6 @@ const styles = StyleSheet.create({
   mainContent: {
     padding: 12,
     paddingBottom: 90,
-  },
-  mainContentFullscreen: {
-    paddingTop: 8,
   },
   questionCard: {
     borderWidth: 1,
