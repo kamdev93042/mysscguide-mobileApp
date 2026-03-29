@@ -10,6 +10,8 @@ import {
   Modal,
   Share,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +26,7 @@ export default function ForumsScreen() {
   const { width } = useWindowDimensions();
   const { isDark, toggleTheme } = useTheme();
   const { userName } = useLoginModal();
-  const { posts, addPost, incrementLike } = useForums();
+  const { posts, loading, error, refreshPosts, addPost, deletePost, incrementLike } = useForums();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(3);
@@ -45,7 +47,8 @@ export default function ForumsScreen() {
   useFocusEffect(
     useCallback(() => {
       setVisibleCount(3);
-    }, [])
+      void refreshPosts();
+    }, [refreshPosts])
   );
 
   const filteredPosts = useMemo(() => {
@@ -77,6 +80,30 @@ export default function ForumsScreen() {
     } catch (error) {
       console.log('Error sharing', error);
     }
+  };
+
+  const normalizeName = (value: string) => value.trim().toLowerCase();
+  const isMyPost = (author: string) => normalizeName(userName || 'Anonymous') === normalizeName(author || 'Anonymous');
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const handleDeletePost = (postId: string) => {
+    Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingId(postId);
+          try {
+            await deletePost(postId, userName || 'Anonymous');
+          } catch (e) {
+            Alert.alert('Error', 'Failed to delete post.');
+          } finally {
+            setDeletingId(null);
+          }
+        },
+      },
+    ]);
   };
 
   const canSubmit = newTitle.trim().length > 0;
@@ -186,6 +213,22 @@ export default function ForumsScreen() {
 
         {/* Posts List */}
         <View style={styles.postsList}>
+          {loading && (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="small" color={primary} />
+              <Text style={[styles.loadingText, { color: muted }]}>Loading posts...</Text>
+            </View>
+          )}
+
+          {!!error && (
+            <View style={styles.errorWrap}>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable onPress={() => void refreshPosts()}>
+                <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
+            </View>
+          )}
+
           {visiblePosts.map((post) => (
              <Pressable 
                 key={post.id} 
@@ -229,16 +272,42 @@ export default function ForumsScreen() {
                      </Pressable>
                      <Pressable style={styles.actionIcon}>
                        <Ionicons name="chatbubble-outline" size={18} color={muted} />
-                       <Text style={[styles.actionNum, { color: muted }]}>{getTotalComments(post.comments)}</Text>
+                       <Text style={[styles.actionNum, { color: muted }]}>
+                         {typeof post.commentCount === 'number' ? post.commentCount : getTotalComments(post.comments)}
+                       </Text>
                      </Pressable>
                      <View style={styles.actionIcon}>
                        <Ionicons name="eye-outline" size={18} color={muted} />
                        <Text style={[styles.actionNum, { color: muted }]}>{post.views}</Text>
                      </View>
                    </View>
-                   <Pressable onPress={() => handleShare(post.title)} hitSlop={12}>
-                     <Ionicons name="share-social-outline" size={18} color={muted} />
-                   </Pressable>
+                   <View style={styles.postActionsRight}>
+                     {isMyPost(post.author) && (
+                       <Pressable
+                         onPress={(e) => {
+                           e.stopPropagation();
+                           handleDeletePost(post.id);
+                         }}
+                         hitSlop={12}
+                         disabled={deletingId === post.id}
+                       >
+                         {deletingId === post.id ? (
+                           <ActivityIndicator size={18} color="#ef4444" />
+                         ) : (
+                           <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                         )}
+                       </Pressable>
+                     )}
+                     <Pressable
+                       onPress={(e) => {
+                         e.stopPropagation();
+                         void handleShare(post.title);
+                       }}
+                       hitSlop={12}
+                     >
+                       <Ionicons name="share-social-outline" size={18} color={muted} />
+                     </Pressable>
+                   </View>
                 </View>
              </Pressable>
           ))}
@@ -384,6 +453,38 @@ const styles = StyleSheet.create({
   createBtn: { backgroundColor: '#10b981', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12 },
   createBtnText: { color: '#fff', fontWeight: '700', fontSize: 14, marginLeft: 6 },
   postsList: { paddingHorizontal: 16 },
+  loadingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
+  loadingText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  errorWrap: {
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  retryText: {
+    color: '#059669',
+    fontWeight: '800',
+    marginTop: 8,
+  },
   postItem: { 
     borderWidth: 1, 
     borderRadius: 12, 
@@ -407,6 +508,7 @@ const styles = StyleSheet.create({
   tagText: { fontSize: 12, fontWeight: '600' },
   postActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   actionGroup: { flexDirection: 'row', gap: 16 },
+  postActionsRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   actionIcon: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionNum: { fontSize: 13, fontWeight: '500' },
   loadMoreBtn: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 24, borderWidth: 1, borderColor: '#10b981', borderRadius: 20, marginTop: 10, marginBottom: 20 },
