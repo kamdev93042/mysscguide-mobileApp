@@ -10,6 +10,8 @@ import {
   Modal,
   Share,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +26,7 @@ export default function ForumsScreen() {
   const { width } = useWindowDimensions();
   const { isDark, toggleTheme } = useTheme();
   const { userName } = useLoginModal();
-  const { posts, addPost, incrementLike } = useForums();
+  const { posts, loading, error, refreshPosts, addPost, deletePost, incrementLike, trendingTags, topContributors } = useForums();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(3);
@@ -45,7 +47,8 @@ export default function ForumsScreen() {
   useFocusEffect(
     useCallback(() => {
       setVisibleCount(3);
-    }, [])
+      void refreshPosts();
+    }, [refreshPosts])
   );
 
   const filteredPosts = useMemo(() => {
@@ -77,6 +80,30 @@ export default function ForumsScreen() {
     } catch (error) {
       console.log('Error sharing', error);
     }
+  };
+
+  const normalizeName = (value: string) => value.trim().toLowerCase();
+  const isMyPost = (author: string) => normalizeName(userName || 'Anonymous') === normalizeName(author || 'Anonymous');
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const handleDeletePost = (postId: string) => {
+    Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingId(postId);
+          try {
+            await deletePost(postId, userName || 'Anonymous');
+          } catch (e) {
+            Alert.alert('Error', 'Failed to delete post.');
+          } finally {
+            setDeletingId(null);
+          }
+        },
+      },
+    ]);
   };
 
   const canSubmit = newTitle.trim().length > 0;
@@ -166,8 +193,11 @@ export default function ForumsScreen() {
           </View>
         </View>
 
-        {/* Search & Create */}
-        <View style={[styles.searchRow, width > 600 && { flexDirection: 'row', alignItems: 'center' }]}>
+         {/* Forums Content Layout */}
+        <View style={[styles.mainLayout, width >= 1024 && { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16 }]}>
+          <View style={[styles.mainContent, width >= 1024 && { flex: 1, marginRight: 24 }]}>
+            {/* Search & Create */}
+            <View style={[styles.searchRow, width > 600 && { flexDirection: 'row', alignItems: 'center' }, width >= 1024 && { paddingHorizontal: 0 }]}>
            <View style={[styles.searchBox, { backgroundColor: cardBg, borderColor: border }, width > 600 && { flex: 1, marginRight: 16, marginBottom: 0 }]}>
               <Ionicons name="search" size={20} color="#10b981" style={{marginLeft: 12}} />
               <TextInput 
@@ -184,8 +214,81 @@ export default function ForumsScreen() {
            </Pressable>
         </View>
 
-        {/* Posts List */}
-        <View style={styles.postsList}>
+            {/* Mobile Widgets Layout */}
+            {width < 1024 && (
+              <View style={styles.mobileWidgetsWrap}>
+                 <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingHorizontal: 16}}>
+                    <Ionicons name="trending-up" size={14} color="#ea580c" style={{marginRight: 4}}/>
+                    <Text style={[styles.mobileWidgetTitle, { color: text }]}>Trending Tags</Text>
+                 </View>
+                 {trendingTags.length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.mobileTagsScroll, { paddingHorizontal: 16 }]}>
+                       {trendingTags.map((tag, idx) => (
+                         <View key={idx} style={[styles.mobileTagPill, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
+                           <Text style={[styles.mobileTagText, { color: text }]}>#{tag}</Text>
+                         </View>
+                       ))}
+                    </ScrollView>
+                 ) : (
+                    <Text style={[styles.widgetEmpty, { color: muted, marginBottom: 16, paddingHorizontal: 16 }]}>No tags yet.</Text>
+                 )}
+
+                 <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingHorizontal: 16}}>
+                    <Ionicons name="people" size={14} color="#059669" style={{marginRight: 4}}/>
+                    <Text style={[styles.mobileWidgetTitle, { color: text }]}>Top Contributors</Text>
+                 </View>
+                 {topContributors.length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.mobileContributorsScroll, { paddingHorizontal: 16 }]}>
+                       {topContributors.map((user, idx) => (
+                         <View key={idx} style={[styles.mobileContributorPill, { backgroundColor: cardBg, borderColor: border, borderWidth: 1 }]}>
+                            <View style={[styles.contributorAvatarSmall, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
+                               <Text style={[styles.contributorInitialSmall, { color: '#059669' }]}>{user.name.charAt(0).toUpperCase()}</Text>
+                            </View>
+                            <Text style={[styles.mobileContributorName, { color: text }]} numberOfLines={1}>{user.name}</Text>
+                         </View>
+                       ))}
+                    </ScrollView>
+                 ) : (
+                    <Text style={[styles.widgetEmpty, { color: muted, marginBottom: 8, paddingHorizontal: 16 }]}>No contributors yet.</Text>
+                 )}
+              </View>
+            )}
+
+            {/* Posts List */}
+            <View style={[styles.postsList, width >= 1024 && { paddingHorizontal: 0 }, width < 1024 && { marginTop: 8 }]}>
+              {loading && (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="small" color={primary} />
+              <Text style={[styles.loadingText, { color: muted }]}>Loading posts...</Text>
+            </View>
+          )}
+
+          {error === 'LOGIN_REQUIRED' ? (
+            <View style={[styles.loginRequiredWrap, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: border }]}>
+              <View style={[styles.loginIconCircle, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
+                <Ionicons name="lock-closed" size={28} color={primary} />
+              </View>
+              <Text style={[styles.loginTitle, { color: text }]}>Login Required</Text>
+              <Text style={[styles.loginSub, { color: muted }]}>
+                Please log in to access Community Forums, create posts, and join discussions.
+              </Text>
+              <Pressable
+                style={[styles.loginBtn, { backgroundColor: primary }]}
+                onPress={() => navigation.navigate('Profile' as never)}
+              >
+                <Ionicons name="log-in-outline" size={16} color="#fff" />
+                <Text style={styles.loginBtnText}>Log In</Text>
+              </Pressable>
+            </View>
+          ) : !!error && (
+            <View style={styles.errorWrap}>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable onPress={() => void refreshPosts()}>
+                <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
+            </View>
+          )}
+
           {visiblePosts.map((post) => (
              <Pressable 
                 key={post.id} 
@@ -229,16 +332,42 @@ export default function ForumsScreen() {
                      </Pressable>
                      <Pressable style={styles.actionIcon}>
                        <Ionicons name="chatbubble-outline" size={18} color={muted} />
-                       <Text style={[styles.actionNum, { color: muted }]}>{getTotalComments(post.comments)}</Text>
+                       <Text style={[styles.actionNum, { color: muted }]}>
+                         {typeof post.commentCount === 'number' ? post.commentCount : getTotalComments(post.comments)}
+                       </Text>
                      </Pressable>
                      <View style={styles.actionIcon}>
                        <Ionicons name="eye-outline" size={18} color={muted} />
                        <Text style={[styles.actionNum, { color: muted }]}>{post.views}</Text>
                      </View>
                    </View>
-                   <Pressable onPress={() => handleShare(post.title)} hitSlop={12}>
-                     <Ionicons name="share-social-outline" size={18} color={muted} />
-                   </Pressable>
+                   <View style={styles.postActionsRight}>
+                     {isMyPost(post.author) && (
+                       <Pressable
+                         onPress={(e) => {
+                           e.stopPropagation();
+                           handleDeletePost(post.id);
+                         }}
+                         hitSlop={12}
+                         disabled={deletingId === post.id}
+                       >
+                         {deletingId === post.id ? (
+                           <ActivityIndicator size={18} color="#ef4444" />
+                         ) : (
+                           <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                         )}
+                       </Pressable>
+                     )}
+                     <Pressable
+                       onPress={(e) => {
+                         e.stopPropagation();
+                         void handleShare(post.title);
+                       }}
+                       hitSlop={12}
+                     >
+                       <Ionicons name="share-social-outline" size={18} color={muted} />
+                     </Pressable>
+                   </View>
                 </View>
              </Pressable>
           ))}
@@ -253,10 +382,79 @@ export default function ForumsScreen() {
             <Text style={{textAlign: 'center', color: muted, marginTop: 20}}>No more posts to load.</Text>
           )}
 
-          {filteredPosts.length === 0 && (
-            <Text style={{textAlign: 'center', color: muted, marginTop: 40}}>No posts found matching your search.</Text>
-          )}
+              {filteredPosts.length === 0 && (
+                <Text style={{textAlign: 'center', color: muted, marginTop: 40}}>No posts found matching your search.</Text>
+              )}
+            </View>
+          </View>
 
+          {/* Sidebar / Desktop Widgets */}
+          {width >= 1024 && (
+            <View style={styles.sidebar}>
+               
+               {/* Trending Tags Widget */}
+               <View style={[styles.widgetCard, { backgroundColor: cardBg, borderColor: border }]}>
+                  <View style={styles.widgetHeader}>
+                     <View style={[styles.widgetIconBox, { backgroundColor: '#ffedd5' }]}>
+                        <Ionicons name="trending-up" size={16} color="#ea580c" />
+                     </View>
+                     <Text style={[styles.widgetTitle, { color: text }]}>Trending Tags</Text>
+                  </View>
+                  {trendingTags.length === 0 ? (
+                    <Text style={[styles.widgetEmpty, { color: muted }]}>No tags yet.</Text>
+                  ) : (
+                    <View style={styles.widgetTags}>
+                       {trendingTags.map((tag, idx) => (
+                         <View key={idx} style={[styles.widgetTagPill, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
+                            <Text style={[styles.widgetTagText, { color: text }]}>#{tag}</Text>
+                         </View>
+                       ))}
+                    </View>
+                  )}
+               </View>
+
+               {/* Top Contributors Widget */}
+               <View style={[styles.widgetCard, { backgroundColor: cardBg, borderColor: border }]}>
+                  <View style={styles.widgetHeader}>
+                     <View style={[styles.widgetIconBox, { backgroundColor: '#d1fae5' }]}>
+                        <Ionicons name="people" size={16} color="#059669" />
+                     </View>
+                     <Text style={[styles.widgetTitle, { color: text }]}>Top Contributors</Text>
+                  </View>
+                  {topContributors.length === 0 ? (
+                    <Text style={[styles.widgetEmpty, { color: muted }]}>No contributors yet.</Text>
+                  ) : (
+                    <View style={styles.widgetList}>
+                       {topContributors.map((user, idx) => (
+                         <View key={idx} style={styles.contributorRow}>
+                            <View style={[styles.contributorAvatar, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
+                               <Text style={[styles.contributorInitial, { color: '#059669' }]}>{user.name.charAt(0).toUpperCase()}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                               <Text style={[styles.contributorName, { color: text }]} numberOfLines={1}>{user.name}</Text>
+                               <Text style={[styles.contributorCount, { color: muted }]}>{user.count} posts</Text>
+                            </View>
+                         </View>
+                       ))}
+                    </View>
+                  )}
+               </View>
+
+               {/* Forum Guidelines Widget */}
+               <View style={[styles.widgetCard, { backgroundColor: cardBg, borderColor: border }]}>
+                  <View style={styles.widgetHeader}>
+                     <View style={[styles.widgetIconBox, { backgroundColor: '#dcfce7' }]}>
+                        <Ionicons name="book" size={16} color="#059669" />
+                     </View>
+                     <Text style={[styles.widgetTitle, { color: text }]}>Forum Guidelines</Text>
+                  </View>
+                  <Text style={[styles.widgetText, { color: muted }]}>
+                    Keep discussions respectful and relevant. Avoid spam and follow the community code of conduct.
+                  </Text>
+               </View>
+               
+            </View>
+          )}
         </View>
 
       </ScrollView>
@@ -384,6 +582,38 @@ const styles = StyleSheet.create({
   createBtn: { backgroundColor: '#10b981', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12 },
   createBtnText: { color: '#fff', fontWeight: '700', fontSize: 14, marginLeft: 6 },
   postsList: { paddingHorizontal: 16 },
+  loadingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
+  loadingText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  errorWrap: {
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  retryText: {
+    color: '#059669',
+    fontWeight: '800',
+    marginTop: 8,
+  },
   postItem: { 
     borderWidth: 1, 
     borderRadius: 12, 
@@ -407,6 +637,7 @@ const styles = StyleSheet.create({
   tagText: { fontSize: 12, fontWeight: '600' },
   postActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   actionGroup: { flexDirection: 'row', gap: 16 },
+  postActionsRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   actionIcon: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionNum: { fontSize: 13, fontWeight: '500' },
   loadMoreBtn: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 24, borderWidth: 1, borderColor: '#10b981', borderRadius: 20, marginTop: 10, marginBottom: 20 },
@@ -420,5 +651,82 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 14, backgroundColor: 'transparent' },
   textArea: { minHeight: 90, textAlignVertical: 'top' },
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 16, marginTop: 8, borderTopWidth: 1, alignItems: 'center', paddingHorizontal: 20 },
-  postBtn: { backgroundColor: '#0f766e', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8 }
+  postBtn: { backgroundColor: '#0f766e', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8 },
+  loginRequiredWrap: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  loginIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  loginTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  loginSub: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  loginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  loginBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  // Layout
+  mainLayout: { width: '100%', maxWidth: 1200, alignSelf: 'center' },
+  mainContent: { flex: 1 },
+  sidebar: { width: '100%', maxWidth: 320, alignSelf: 'center' },
+  
+  // Widget Cards
+  widgetCard: { borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  widgetHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  widgetIconBox: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  widgetTitle: { fontSize: 16, fontWeight: '800' },
+  widgetEmpty: { fontSize: 13 },
+  widgetText: { fontSize: 13, lineHeight: 20 },
+  widgetTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  widgetTagPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  widgetTagText: { fontSize: 13, fontWeight: '600' },
+  widgetList: { flexDirection: 'column', gap: 12 },
+  contributorRow: { flexDirection: 'row', alignItems: 'center' },
+  contributorAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  contributorInitial: { fontWeight: '800', fontSize: 16 },
+  contributorName: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  contributorCount: { fontSize: 12 },
+
+  // Mobile Widgets Layout
+  mobileWidgetsWrap: { marginBottom: 12 },
+  mobileTagsScroll: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  mobileContributorsScroll: { flexDirection: 'row', alignItems: 'center', paddingTop: 4 },
+  mobileWidgetTitle: { fontSize: 13, fontWeight: '800' },
+  mobileTagPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 8 },
+  mobileTagText: { fontSize: 12, fontWeight: '600' },
+  mobileContributorPill: { flexDirection: 'row', alignItems: 'center', paddingRight: 10, borderRadius: 16, marginRight: 10, height: 32 },
+  contributorAvatarSmall: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 6 },
+  contributorInitialSmall: { fontSize: 13, fontWeight: '800' },
+  mobileContributorName: { fontSize: 13, fontWeight: '600', maxWidth: 80 },
 });

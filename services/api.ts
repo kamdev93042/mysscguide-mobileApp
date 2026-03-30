@@ -10,6 +10,15 @@ const getBaseUrl = () => {
 
 export const API_BASE_URL = getBaseUrl();
 
+const isLikelyAuthErrorMessage = (message: string) =>
+  /unauthori[sz]ed|token\s+is\s+expired|invalid\s+claims|jwt|forbidden|invalid\s+token/i.test(message || '');
+
+export const isAuthSessionError = (error: any) => {
+  if (!error) return false;
+  const msg = String(error?.message || '');
+  return Boolean(error?.isAuthError) || Number(error?.status) === 401 || isLikelyAuthErrorMessage(msg);
+};
+
 /**
  * Helper function for making API requests.
  */
@@ -33,7 +42,12 @@ async function fetchApi(endpoint: string, options: RequestInit = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(data.message || data.error || `API request failed with status ${response.status}`);
+      const message = data.message || data.error || `API request failed with status ${response.status}`;
+      const err: any = new Error(message);
+      err.status = response.status;
+      err.code = data.code || data.errorCode;
+      err.isAuthError = response.status === 401 || isLikelyAuthErrorMessage(String(message));
+      throw err;
     }
 
     return data;
@@ -165,6 +179,91 @@ export const userApi = {
     return fetchApi('/user/profile', {
       method: 'GET',
     });
+  },
+};
+
+export const forumApi = {
+  async listPosts(query: { limit?: number; cursor?: string; tag?: string; category?: string; search?: string } = {}) {
+    const params = new URLSearchParams();
+    if (query.limit != null) params.append('limit', String(query.limit));
+    if (query.cursor) params.append('cursor', query.cursor);
+    if (query.tag) params.append('tag', query.tag);
+    if (query.category) params.append('category', query.category);
+    if (query.search) params.append('search', query.search);
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return fetchApi(`/user/community/posts${queryString}`, { method: 'GET' });
+  },
+
+  async getPost(postId: string) {
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}`, { method: 'GET' });
+  },
+
+  async createPost(payload: { title: string; subtitle?: string; tags?: string[]; category?: string }) {
+    return fetchApi('/user/community/posts', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: payload.title.trim(),
+        subtitle: payload.subtitle?.trim() || undefined,
+        tags: payload.tags ?? [],
+        category: payload.category,
+      }),
+    });
+  },
+
+  async deletePost(postId: string) {
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}`, { method: 'DELETE' });
+  },
+
+  async likePost(postId: string) {
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}/like`, { method: 'POST' });
+  },
+
+  async unlikePost(postId: string) {
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}/like`, { method: 'DELETE' });
+  },
+
+  async listReplies(postId: string, query: { parentId?: string; cursor?: string; limit?: number; sort?: string } = {}) {
+    const params = new URLSearchParams();
+    if (query.parentId) params.append('parentId', query.parentId);
+    if (query.cursor) params.append('cursor', query.cursor);
+    if (query.limit != null) params.append('limit', String(query.limit));
+    if (query.sort) params.append('sort', query.sort);
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}/replies${queryString}`, { method: 'GET' });
+  },
+
+  async addReply(postId: string, content: string, parentId?: string) {
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}/replies`, {
+      method: 'POST',
+      body: JSON.stringify({ content: content.trim(), parentId }),
+    });
+  },
+
+  async updateReply(postId: string, replyId: string, content: string) {
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}/replies/${encodeURIComponent(replyId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content: content.trim() }),
+    });
+  },
+
+  async deleteReply(postId: string, replyId: string) {
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}/replies/${encodeURIComponent(replyId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async addView(postId: string) {
+    return fetchApi(`/user/community/posts/${encodeURIComponent(postId)}/view`, { method: 'POST' });
+  },
+
+  async getTrendingTags(limit = 8) {
+    return fetchApi(`/user/community/posts/trending-tags?limit=${encodeURIComponent(String(limit))}`, { method: 'GET' });
+  },
+
+  async getTopContributors(limit = 5) {
+    return fetchApi(`/user/community/posts/top-contributors?limit=${encodeURIComponent(String(limit))}`, { method: 'GET' });
   },
 };
 

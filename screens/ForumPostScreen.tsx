@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,13 +18,19 @@ export default function ForumPostScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { userName } = useLoginModal();
-  const { posts, addComment, addReply, incrementLike } = useForums();
+  const { posts, loadReplies, addComment, addReply, editComment, deleteComment, deletePost, incrementLike } = useForums();
 
   const passedPost = route.params?.post as ForumPostData;
   const post = posts.find(p => p.id === passedPost.id) || passedPost;
 
+  useEffect(() => {
+    void loadReplies(post.id);
+  }, [loadReplies, post.id]);
+
   const [commentText, setCommentText] = useState('');
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
 
   const bg = isDark ? '#0f172a' : '#f8fafc'; 
   const cardBg = isDark ? '#1e293b' : '#fff'; 
@@ -38,6 +44,9 @@ export default function ForumPostScreen() {
   };
 
   const totalCommentCount = useMemo(() => getTotalComments(post.comments), [post.comments]);
+
+  const normalizeName = (value: string) => value.trim().toLowerCase();
+  const isMyContent = (owner: string) => normalizeName(userName || 'Anonymous') === normalizeName(owner || 'Anonymous');
 
   const handleSendComment = () => {
     if (!commentText.trim()) return;
@@ -57,6 +66,53 @@ export default function ForumPostScreen() {
     setReplyTarget({ commentId: comment.id, author: comment.author });
   };
 
+  const beginEditComment = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.text);
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+  };
+
+  const saveEditComment = (comment: Comment) => {
+    const next = editingCommentText.trim();
+    if (!next) return;
+    editComment(post.id, comment.id, next, userName || 'Anonymous');
+    cancelEditComment();
+  };
+
+  const askDeleteComment = (comment: Comment) => {
+    Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deleteComment(post.id, comment.id, userName || 'Anonymous');
+          if (editingCommentId === comment.id) {
+            cancelEditComment();
+          }
+        },
+      },
+    ]);
+  };
+
+  const askDeletePost = () => {
+    Alert.alert('Delete Post', 'Are you sure you want to delete this forum post?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deletePost(post.id, userName || 'Anonymous');
+          navigation.goBack();
+        },
+      },
+    ]);
+  };
+
   const renderComment = (comment: Comment, depth = 0): React.ReactNode => {
     const indent = Math.min(depth, 4) * 16;
 
@@ -69,15 +125,54 @@ export default function ForumPostScreen() {
           <View style={[styles.commentBubble, { backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderColor: isDark ? '#334155' : '#e2e8f0', borderWidth: 1 }]}> 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
               <Text style={[styles.commentAuthor, { color: text }]}>{comment.author}</Text>
-              <Text style={[styles.commentTime, { color: muted }]}>{comment.timestamp}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.commentTime, { color: muted }]}>{comment.timestamp}</Text>
+                {comment.edited && (
+                  <Text style={{ color: '#059669', fontSize: 11, marginLeft: 6, fontWeight: '600' }}>
+                    (edited)
+                  </Text>
+                )}
+              </View>
             </View>
             <Text style={[styles.commentText, { color: text }]}>
               {comment.replyTo ? <Text style={styles.replyToHandle}>@{comment.replyTo} </Text> : null}
               {comment.text}
             </Text>
-            <Pressable onPress={() => handleReplyPress(comment)} style={styles.replyBtn} hitSlop={8}>
-              <Text style={styles.replyBtnText}>Reply</Text>
-            </Pressable>
+
+            {editingCommentId === comment.id ? (
+              <View style={styles.editComposerWrap}>
+                <TextInput
+                  style={[styles.editInput, { borderColor: border, color: text }]}
+                  value={editingCommentText}
+                  onChangeText={setEditingCommentText}
+                  multiline
+                />
+                <View style={styles.commentActionRow}>
+                  <Pressable onPress={() => saveEditComment(comment)} hitSlop={8}>
+                    <Text style={styles.replyBtnText}>Save</Text>
+                  </Pressable>
+                  <Pressable onPress={cancelEditComment} hitSlop={8}>
+                    <Text style={[styles.replyBtnText, { color: '#64748b' }]}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.commentActionRow}>
+                <Pressable onPress={() => handleReplyPress(comment)} style={styles.replyBtn} hitSlop={8}>
+                  <Text style={styles.replyBtnText}>Reply</Text>
+                </Pressable>
+                {isMyContent(comment.author) && (
+                  <>
+                    <Pressable onPress={() => beginEditComment(comment)} style={styles.replyBtn} hitSlop={8}>
+                      <Text style={styles.replyBtnText}>Edit</Text>
+                    </Pressable>
+                    <Pressable onPress={() => askDeleteComment(comment)} style={styles.replyBtn} hitSlop={8}>
+                      <Text style={styles.deleteBtnText}>Delete</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            )}
           </View>
         </View>
 
@@ -100,12 +195,18 @@ export default function ForumPostScreen() {
           <Ionicons name="arrow-back" size={24} color={text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: text }]} numberOfLines={1}>Discussion</Text>
-        <View style={{width: 40}} />
+        {isMyContent(post.author) ? (
+          <Pressable onPress={askDeletePost} style={{ padding: 8 }} hitSlop={8}>
+            <Ionicons name="trash-outline" size={20} color="#ef4444" />
+          </Pressable>
+        ) : (
+          <View style={{width: 40}} />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Post Details */}
-        <View style={styles.postArea}>
+        <View style={[styles.postArea, styles.postCard, { backgroundColor: cardBg, borderColor: border }]}> 
             <View style={styles.postAuthorRow}>
                 <View style={[styles.authorAvatar, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
                   <Text style={[styles.authorInitial, { color: primary }]}>{post.authorInitial}</Text>
@@ -117,7 +218,7 @@ export default function ForumPostScreen() {
             </View>
             
             <Text style={[styles.postTitle, { color: text }]}>{post.title}</Text>
-            <Text style={[styles.postSub, { color: text }]}>{post.subtitle}</Text>
+            <Text style={[styles.postSub, { color: muted }]}>{post.subtitle}</Text>
             
             {post.tags.length > 0 && (
                 <View style={styles.tagsRow}>
@@ -129,7 +230,7 @@ export default function ForumPostScreen() {
                 </View>
             )}
 
-            <View style={[styles.actionsRow, { borderBottomColor: border }]}>
+            <View style={[styles.actionsRow, { borderTopColor: border }]}> 
                 <Pressable style={styles.actionIcon} onPress={() => incrementLike(post.id)}>
                     <Ionicons name={post.userVote === 'like' ? 'heart' : 'heart-outline'} size={20} color={post.userVote === 'like' ? '#ec4899' : muted} />
                     <Text style={[styles.actionNum, { color: muted }]}>{post.likes} Likes</Text>
@@ -190,32 +291,60 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 12, borderBottomWidth: 1 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
   scroll: { paddingBottom: 24 },
-  postArea: { padding: 16 },
-  postAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  authorAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  authorInitial: { color: '#059669', fontWeight: '800', fontSize: 16 },
-  postAuthorName: { fontSize: 15, fontWeight: '700' },
+  postArea: { marginHorizontal: 14, marginTop: 12, marginBottom: 8, padding: 14 },
+  postCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  postAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  authorAvatar: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  authorInitial: { color: '#059669', fontWeight: '800', fontSize: 14 },
+  postAuthorName: { fontSize: 16, fontWeight: '700' },
   postTime: { fontSize: 12 },
-  postTitle: { fontSize: 24, fontWeight: '800', marginBottom: 12, lineHeight: 32 },
-  postSub: { fontSize: 16, lineHeight: 26, marginBottom: 20, opacity: 0.9 },
-  tagsRow: { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
-  tagPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  tagText: { fontSize: 13, fontWeight: '700' },
-  actionsRow: { flexDirection: 'row', paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, gap: 24 },
-  actionIcon: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionNum: { fontSize: 15, fontWeight: '700' },
-  commentsArea: { padding: 16 },
-  commentsTitle: { fontSize: 18, fontWeight: '800', marginBottom: 20 },
-  commentBlock: { marginBottom: 16 },
+  postTitle: { fontSize: 24, fontWeight: '800', marginBottom: 10, lineHeight: 32, letterSpacing: 0.1 },
+  postSub: { fontSize: 16, lineHeight: 26, marginBottom: 16 },
+  tagsRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  tagPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  tagText: { fontSize: 12, fontWeight: '700' },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 12,
+    marginTop: 2,
+    borderTopWidth: 1,
+    gap: 20,
+  },
+  actionIcon: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  actionNum: { fontSize: 13, fontWeight: '700' },
+  commentsArea: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
+  commentsTitle: { fontSize: 20, fontWeight: '800', marginBottom: 14 },
+  commentBlock: { marginBottom: 12 },
   commentItem: { flexDirection: 'row', marginBottom: 4 },
-  commentAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 4 },
-  commentBubble: { flex: 1, padding: 16, borderRadius: 16, borderTopLeftRadius: 4 },
-  commentAuthor: { fontSize: 14, fontWeight: '800' },
+  commentAvatar: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 },
+  commentBubble: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderTopLeftRadius: 4 },
+  commentAuthor: { fontSize: 13, fontWeight: '800' },
   commentTime: { fontSize: 12 },
-  commentText: { fontSize: 15, lineHeight: 22, marginTop: 4 },
+  commentText: { fontSize: 14, lineHeight: 20, marginTop: 3 },
   replyToHandle: { color: '#059669', fontWeight: '800' },
-  replyBtn: { marginTop: 10, alignSelf: 'flex-start' },
+  commentActionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 8 },
+  replyBtn: { marginTop: 8, alignSelf: 'flex-start' },
   replyBtnText: { color: '#059669', fontWeight: '700', fontSize: 13 },
+  deleteBtnText: { color: '#ef4444', fontWeight: '700', fontSize: 13 },
+  editComposerWrap: { marginTop: 10 },
+  editInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    minHeight: 44,
+    textAlignVertical: 'top',
+  },
   repliesWrap: { marginTop: 8 },
   inputRow: { padding: 16, borderTopWidth: 1, alignItems: 'stretch', paddingBottom: Platform.OS === 'ios' ? 24 : 16 },
   replyingBanner: {

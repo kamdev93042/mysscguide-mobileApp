@@ -1,5 +1,5 @@
-import { ScrollView, View, Text, StyleSheet, Pressable, Modal, Image, Platform } from 'react-native';
-import { useState, createElement, useEffect } from 'react';
+import { BackHandler, ScrollView, View, Text, StyleSheet, Pressable, Modal, Image, Platform } from 'react-native';
+import { useState, createElement, useEffect, useMemo, useCallback } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 let DateTimePicker: any = null;
@@ -15,14 +15,6 @@ import { pyqApi } from '../services/api';
 const PAUSED_TESTS_STORAGE_KEY = 'pyqs_paused_tests_v1';
 const RESULT_HISTORY_STORAGE_KEY = 'pyqs_result_history_v1';
 
-const RANK_MAKER_LIST = [
-  { id: 'rm1', title: 'Rank Maker Series — Test 1', questions: '100 Questions', duration: '60 min' },
-  { id: 'rm2', title: 'Rank Maker Series — Test 2', questions: '100 Questions', duration: '60 min' },
-  { id: 'rm3', title: 'Rank Maker Series — Test 3', questions: '100 Questions', duration: '60 min' },
-  { id: 'rm4', title: 'Rank Maker Series — Test 4', questions: '100 Questions', duration: '60 min' },
-  { id: 'rm5', title: 'Rank Maker Series — Test 5', questions: '100 Questions', duration: '60 min' },
-];
-
 const FILTER_DATA_PYQ = {
   Exam: ['All Exams', 'CGL', 'CHSL', 'MTS', 'CPO'],
   Tier: ['All Tiers', 'Tier 1', 'Tier 2'],
@@ -31,16 +23,128 @@ const FILTER_DATA_PYQ = {
   Date: [], // directly triggers date picker
 };
 
-const FILTER_DATA_RM = {
-  Exam: ['All Exams', 'CGL', 'CHSL', 'MTS', 'CPO'],
-  Tier: ['All Tiers', 'Tier 1', 'Tier 2'],
-  Year: ['All Years', '2025', '2024', '2023', '2022', '2021', '2020', '2019'],
+const DUMMY_PYQ_PAPERS = [
+  { id: 'demo-cgl-t1-2025-s1', examName: 'SSC CGL', examYear: '2025', tier: 'Tier1', shift: 'shift1', date: '2025-02-10', title: 'SSC CGL Tier 1 Demo Paper', questionCount: 100, timeLimit: 60 * 60 },
+  { id: 'demo-cgl-t2-2025-s2', examName: 'SSC CGL', examYear: '2025', tier: 'Tier2', shift: 'shift2', date: '2025-03-11', title: 'SSC CGL Tier 2 Demo Paper', questionCount: 120, timeLimit: 60 * 60 },
+  { id: 'demo-chsl-t1-2024-s1', examName: 'SSC CHSL', examYear: '2024', tier: 'Tier1', shift: 'shift1', date: '2024-07-08', title: 'SSC CHSL Tier 1 Demo Paper', questionCount: 100, timeLimit: 60 * 60 },
+  { id: 'demo-chsl-t2-2024-s3', examName: 'SSC CHSL', examYear: '2024', tier: 'Tier2', shift: 'shift3', date: '2024-08-14', title: 'SSC CHSL Tier 2 Demo Paper', questionCount: 100, timeLimit: 60 * 60 },
+  { id: 'demo-mts-t1-2023-s2', examName: 'SSC MTS', examYear: '2023', tier: 'Tier1', shift: 'shift2', date: '2023-09-18', title: 'SSC MTS Tier 1 Demo Paper', questionCount: 90, timeLimit: 60 * 60 },
+  { id: 'demo-mts-t2-2023-s4', examName: 'SSC MTS', examYear: '2023', tier: 'Tier2', shift: 'shift4', date: '2023-10-03', title: 'SSC MTS Tier 2 Demo Paper', questionCount: 90, timeLimit: 60 * 60 },
+  { id: 'demo-cpo-t1-2022-s1', examName: 'SSC CPO', examYear: '2022', tier: 'Tier1', shift: 'shift1', date: '2022-11-20', title: 'SSC CPO Tier 1 Demo Paper', questionCount: 100, timeLimit: 60 * 60 },
+  { id: 'demo-cpo-t2-2022-s2', examName: 'SSC CPO', examYear: '2022', tier: 'Tier2', shift: 'shift2', date: '2022-12-06', title: 'SSC CPO Tier 2 Demo Paper', questionCount: 100, timeLimit: 60 * 60 },
+].map((item) => ({
+  _id: item.id,
+  date: item.date,
+  shift: item.shift,
+  tier: item.tier,
+  questionCount: item.questionCount,
+  timeLimit: item.timeLimit,
+  __dummy: true,
+  metaData: {
+    title: item.title,
+    examName: item.examName,
+    examYear: item.examYear,
+  },
+}));
+
+const PYQ_EXAM_TIER_CARDS = [
+  { key: 'cgl_t1', title: 'CGL Tier 1', exam: 'CGL', tier: 'Tier 1' },
+  { key: 'cgl_t2', title: 'CGL Tier 2', exam: 'CGL', tier: 'Tier 2' },
+  { key: 'chsl_t1', title: 'CHSL Tier 1', exam: 'CHSL', tier: 'Tier 1' },
+  { key: 'chsl_t2', title: 'CHSL Tier 2', exam: 'CHSL', tier: 'Tier 2' },
+  { key: 'mts_t1', title: 'MTS', exam: 'MTS', tier: 'Tier 1' },
+  { key: 'cpo_t1', title: 'CPO Tier 1', exam: 'CPO', tier: 'Tier 1' },
+  { key: 'cpo_t2', title: 'CPO Tier 2', exam: 'CPO', tier: 'Tier 2' },
+];
+
+const RM_EXAM_TIER_CARDS = [
+  { key: 'rm_cgl_t1', title: 'CGL Tier 1', exam: 'CGL', tier: 'Tier 1' },
+  { key: 'rm_cgl_t2', title: 'CGL Tier 2', exam: 'CGL', tier: 'Tier 2' },
+  { key: 'rm_chsl_t1', title: 'CHSL Tier 1', exam: 'CHSL', tier: 'Tier 1' },
+  { key: 'rm_chsl_t2', title: 'CHSL Tier 2', exam: 'CHSL', tier: 'Tier 2' },
+  { key: 'rm_mts', title: 'MTS', exam: 'MTS', tier: 'Tier 1' },
+  { key: 'rm_cpo_t1', title: 'CPO Tier 1', exam: 'CPO', tier: 'Tier 1' },
+  { key: 'rm_cpo_t2', title: 'CPO Tier 2', exam: 'CPO', tier: 'Tier 2' },
+];
+
+const CARD_YEAR_OPTIONS = ['All', '2025', '2024', '2023', '2022', '2021', '2020', '2019'];
+
+const EXAM_QUERY_MAP: Record<string, string> = {
+  CGL: 'SSC CGL',
+  CHSL: 'SSC CHSL',
+  MTS: 'SSC MTS',
+  CPO: 'SSC CPO',
+};
+
+const TIER_QUERY_MAP: Record<string, string> = {
+  'Tier 1': 'Tier1',
+  'Tier 2': 'Tier2',
+};
+
+const SHIFT_QUERY_MAP: Record<string, string> = {
+  'Shift 1': 'shift1',
+  'Shift 2': 'shift2',
+  'Shift 3': 'shift3',
+  'Shift 4': 'shift4',
+};
+
+const getDummyFilteredPapers = (filters: {
+  Exam: string;
+  Tier: string;
+  Year: string;
+  Shift: string;
+  Date: string;
+}) => {
+  const selectedExam =
+    filters.Exam && filters.Exam !== 'Exam' && !filters.Exam.startsWith('All')
+      ? EXAM_QUERY_MAP[filters.Exam] || filters.Exam
+      : null;
+
+  const selectedTier =
+    filters.Tier && filters.Tier !== 'Tier' && !filters.Tier.startsWith('All')
+      ? TIER_QUERY_MAP[filters.Tier] || filters.Tier.replace(/\s+/g, '')
+      : null;
+
+  const selectedYear =
+    filters.Year && filters.Year !== 'Year' && !filters.Year.startsWith('All')
+      ? filters.Year
+      : null;
+
+  const selectedShift =
+    filters.Shift && filters.Shift !== 'Shift' && !filters.Shift.startsWith('All')
+      ? SHIFT_QUERY_MAP[filters.Shift] || filters.Shift.toLowerCase().replace(/\s+/g, '')
+      : null;
+
+  const selectedDate = filters.Date && filters.Date !== 'Date' ? filters.Date : null;
+
+  return DUMMY_PYQ_PAPERS.filter((paper) => {
+    const examName = paper.metaData?.examName;
+    const examYear = paper.metaData?.examYear;
+    if (selectedExam && examName !== selectedExam) return false;
+    if (selectedTier && paper.tier !== selectedTier) return false;
+    if (selectedYear && String(examYear) !== String(selectedYear)) return false;
+    if (selectedShift && paper.shift !== selectedShift) return false;
+    if (selectedDate && paper.date !== selectedDate) return false;
+    return true;
+  });
 };
 
 type SubmissionResult = {
   sourceTab: 'PYQ' | 'RankMaker';
   testKey?: string;
+  attemptId?: string;
+  testPaperId?: string;
   testTitle: string;
+  durationSeconds?: number;
+  totalQuestions?: number;
+  examName?: string;
+  tier?: string;
+  shift?: string;
+  date?: string;
+  markingScheme?: {
+    correctMark: number;
+    wrongMark: number;
+  };
   attempted: number;
   correct: number;
   wrong: number;
@@ -75,6 +179,88 @@ type PausedTestPayload = {
   pausedAt: string;
 };
 
+const formatDate = (value: Date) => {
+  const yyyy = value.getFullYear();
+  const mm = String(value.getMonth() + 1).padStart(2, '0');
+  const dd = String(value.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatSubmittedAt = (value: string) => {
+  const parsed = new Date(value);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toLocaleString();
+  }
+  return value;
+};
+
+const formatPyqDateForTitle = (rawDate?: string) => {
+  if (!rawDate) return 'N/A';
+  const parsed = new Date(rawDate);
+  if (isNaN(parsed.getTime())) return rawDate;
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const month = parsed.toLocaleString('en-US', { month: 'short' });
+  const year = parsed.getFullYear();
+  return `${day} ${month}, ${year}`;
+};
+
+const normalizeTierLabel = (tier?: string) => {
+  if (!tier) return 'Tier 1';
+  const compact = tier.replace(/\s+/g, '');
+  const match = compact.match(/tier[-_ ]?(\d+)/i);
+  if (match?.[1]) return `Tier ${match[1]}`;
+  return tier;
+};
+
+const normalizeShiftLabel = (shift?: string) => {
+  if (!shift) return 'Shift 1';
+  const match = String(shift).match(/(\d+)/);
+  if (match?.[1]) return `Shift ${match[1]}`;
+  return shift;
+};
+
+const normalizeQuestionCount = (paper: any) => {
+  const raw = Number(
+    paper?.questionCount ??
+      paper?.totalQuestions ??
+      paper?.config?.questionCount ??
+      paper?.metaData?.questionCount
+  );
+  if (Number.isFinite(raw) && raw > 0) {
+    return Math.round(raw);
+  }
+  return 100;
+};
+
+const normalizeDurationMinutes = (paper: any) => {
+  const raw = Number(
+    paper?.timeLimit ??
+      paper?.duration ??
+      paper?.config?.timeLimit ??
+      paper?.metaData?.timeLimit
+  );
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return 60;
+  }
+  // Backends may return minutes (e.g. 60) or seconds (e.g. 3600).
+  return raw < 300 ? Math.round(raw) : Math.round(raw / 60);
+};
+
+const buildPyqDisplayTitle = (paper: any, fallbackExamName?: string) => {
+  const examName = paper?.metaData?.examName || paper?.examName || fallbackExamName || 'SSC CGL';
+  const yearFromDate = (() => {
+    const d = paper?.date ? new Date(paper.date) : null;
+    return d && !isNaN(d.getTime()) ? d.getFullYear() : undefined;
+  })();
+  const examYear =
+    paper?.metaData?.examYear ||
+    paper?.examYear ||
+    yearFromDate ||
+    new Date().getFullYear();
+  const tier = normalizeTierLabel(paper?.tier);
+  return `${examName} ${examYear} ${tier}`;
+};
+
 export default function PyqsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -88,7 +274,9 @@ export default function PyqsScreen() {
   const [loadingPyqs, setLoadingPyqs] = useState(false);
   const [hasMorePyqs, setHasMorePyqs] = useState(true);
 
-  const [showAllRM, setShowAllRM] = useState(false);
+  const [selectedRmCard, setSelectedRmCard] = useState<string | null>(null);
+  const [rmPaperCounts, setRmPaperCounts] = useState<Record<string, number>>({});
+  const [loadingRmCounts, setLoadingRmCounts] = useState(false);
 
   const [filters, setFilters] = useState({
     Exam: 'Exam',
@@ -101,6 +289,11 @@ export default function PyqsScreen() {
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateObj, setDateObj] = useState(new Date());
+  const [selectedExamTierCard, setSelectedExamTierCard] = useState<string | null>(null);
+  const [cardYearFilter, setCardYearFilter] = useState<string>('All');
+  const [isCardYearModalVisible, setIsCardYearModalVisible] = useState(false);
+  const [cardPaperCounts, setCardPaperCounts] = useState<Record<string, number>>({});
+  const [loadingCardPaperCounts, setLoadingCardPaperCounts] = useState(false);
   const [resultHistory, setResultHistory] = useState<SubmissionResult[]>([]);
   const [pausedTests, setPausedTests] = useState<Record<string, PausedTestPayload>>({});
   const [hasLoadedPausedTests, setHasLoadedPausedTests] = useState(false);
@@ -113,7 +306,7 @@ export default function PyqsScreen() {
   const muted = isDark ? '#94a3b8' : '#64748b';
   const primary = '#059669';
 
-  const filterData = activeTab === 'PYQ' ? FILTER_DATA_PYQ : FILTER_DATA_RM;
+  const filterData = FILTER_DATA_PYQ;
 
   const fetchPyqs = async (reset = false) => {
     if (loadingPyqs || (!hasMorePyqs && !reset)) return;
@@ -122,31 +315,247 @@ export default function PyqsScreen() {
     try {
       const query: any = { limit: 10 };
       if (!reset && pyqCursor) query.cursor = pyqCursor;
-      
-      if (filters.Exam && filters.Exam !== 'Exam' && !filters.Exam.startsWith('All')) query.examName = filters.Exam;
-      if (filters.Tier && filters.Tier !== 'Tier' && !filters.Tier.startsWith('All')) query.tier = filters.Tier;
-      if (filters.Year && filters.Year !== 'Year' && !filters.Year.startsWith('All')) query.examYear = filters.Year;
-      if (filters.Shift && filters.Shift !== 'Shift' && !filters.Shift.startsWith('All')) query.shift = filters.Shift;
+      const dummyFiltered = getDummyFilteredPapers(filters);
+
+      if (filters.Exam && filters.Exam !== 'Exam' && !filters.Exam.startsWith('All')) {
+        query.examName = EXAM_QUERY_MAP[filters.Exam] || filters.Exam;
+      }
+
+      if (filters.Tier && filters.Tier !== 'Tier' && !filters.Tier.startsWith('All')) {
+        query.tier = TIER_QUERY_MAP[filters.Tier] || filters.Tier.replace(/\s+/g, '');
+      }
+
+      if (filters.Year && filters.Year !== 'Year' && !filters.Year.startsWith('All')) {
+        query.examYear = filters.Year;
+      }
+
+      if (filters.Shift && filters.Shift !== 'Shift' && !filters.Shift.startsWith('All')) {
+        query.shift = SHIFT_QUERY_MAP[filters.Shift] || filters.Shift.toLowerCase().replace(/\s+/g, '');
+      }
+
       if (filters.Date && filters.Date !== 'Date') query.date = filters.Date;
 
       const res = await pyqApi.listTestPapers(query);
       if (res && res.data) {
-        setPyqList(prev => reset ? res.data : [...prev, ...res.data]);
+        setPyqList(prev => reset ? [...dummyFiltered, ...res.data] : [...prev, ...res.data]);
         setPyqCursor(res.nextCursor || null);
         setHasMorePyqs(!!res.nextCursor);
+      } else if (reset) {
+        setPyqList(dummyFiltered);
+        setPyqCursor(null);
+        setHasMorePyqs(false);
       }
     } catch (error) {
       console.error('Failed to fetch PYQs:', error);
+      if (reset) {
+        const dummyFiltered = getDummyFilteredPapers(filters);
+        setPyqList(dummyFiltered);
+        setPyqCursor(null);
+        setHasMorePyqs(false);
+      }
     } finally {
       setLoadingPyqs(false);
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'PYQ') {
-      fetchPyqs(true);
+  const applyExamTierQuickFilter = (card: { key: string; exam: string; tier: string }) => {
+    setSelectedExamTierCard(card.key);
+    setFilters((prev) => ({
+      ...prev,
+      Exam: card.exam,
+      Tier: card.tier,
+      Year: cardYearFilter === 'All' ? 'Year' : cardYearFilter,
+      Shift: 'Shift',
+      Date: 'Date',
+    }));
+  };
+
+  const selectedFilterTitle = useMemo(() => {
+    const exam = filters.Exam !== 'Exam' ? filters.Exam : 'All Exams';
+    const tier = filters.Tier !== 'Tier' ? filters.Tier : 'All Tiers';
+    return `${exam} ${tier}`;
+  }, [filters.Exam, filters.Tier]);
+
+  const selectedExamTierData = useMemo(
+    () => PYQ_EXAM_TIER_CARDS.find((cardItem) => cardItem.key === selectedExamTierCard) || null,
+    [selectedExamTierCard]
+  );
+
+  const clearExamTierSelection = () => {
+    setSelectedExamTierCard(null);
+    setFilters((prev) => ({ ...prev, Exam: 'Exam', Tier: 'Tier', Year: cardYearFilter === 'All' ? 'Year' : cardYearFilter, Shift: 'Shift', Date: 'Date' }));
+  };
+
+  const cardYearOptions = CARD_YEAR_OPTIONS;
+
+  const getDummyCardPyqCount = (cardItem: { exam: string; tier: string }) => {
+    const mappedExam = EXAM_QUERY_MAP[cardItem.exam] || cardItem.exam;
+    const mappedTier = TIER_QUERY_MAP[cardItem.tier] || cardItem.tier.replace(/\s+/g, '');
+
+    return DUMMY_PYQ_PAPERS.filter((paper) => {
+      const matchesExam = paper?.metaData?.examName === mappedExam;
+      const matchesTier = paper?.tier === mappedTier;
+      const matchesYear =
+        cardYearFilter === 'All' || String(paper?.metaData?.examYear || '') === String(cardYearFilter);
+      return matchesExam && matchesTier && matchesYear;
+    }).length;
+  };
+
+  const fetchSingleCardCount = useCallback(async (cardItem: { key: string; exam: string; tier: string }) => {
+    const mappedExam = EXAM_QUERY_MAP[cardItem.exam] || cardItem.exam;
+    const mappedTier = TIER_QUERY_MAP[cardItem.tier] || cardItem.tier.replace(/\s+/g, '');
+    const baseQuery: any = {
+      examName: mappedExam,
+      tier: mappedTier,
+    };
+
+    if (cardYearFilter !== 'All') {
+      baseQuery.examYear = cardYearFilter;
     }
-  }, [filters, activeTab]);
+
+    const extractTotal = (res: any): number | null => {
+      const candidates = [
+        res?.total,
+        res?.count,
+        res?.totalCount,
+        res?.pagination?.total,
+        res?.meta?.total,
+        res?.meta?.count,
+      ];
+      const matched = candidates.find((v) => typeof v === 'number' && Number.isFinite(v));
+      return typeof matched === 'number' ? matched : null;
+    };
+
+    try {
+      const firstRes = await pyqApi.listTestPapers({ ...baseQuery, limit: 100 });
+      const explicitTotal = extractTotal(firstRes);
+      if (explicitTotal !== null) {
+        return explicitTotal;
+      }
+
+      const firstBatch = Array.isArray(firstRes?.data) ? firstRes.data.length : 0;
+      let total = firstBatch;
+      let cursor = firstRes?.nextCursor;
+      let guard = 0;
+
+      while (cursor && guard < 50) {
+        const nextRes = await pyqApi.listTestPapers({ ...baseQuery, limit: 100, cursor });
+        const list = Array.isArray(nextRes?.data) ? nextRes.data : [];
+        total += list.length;
+        cursor = nextRes?.nextCursor;
+        guard += 1;
+      }
+
+      return total;
+    } catch (error) {
+      console.error(`Failed to fetch count for ${cardItem.key}:`, error);
+      return getDummyCardPyqCount(cardItem);
+    }
+  }, [cardYearFilter]);
+
+  useEffect(() => {
+    if (activeTab !== 'PYQ' || selectedExamTierCard) {
+      return;
+    }
+
+    let isMounted = true;
+    const loadCounts = async () => {
+      setLoadingCardPaperCounts(true);
+      try {
+        const pairs = await Promise.all(
+          PYQ_EXAM_TIER_CARDS.map(async (cardItem) => {
+            const count = await fetchSingleCardCount(cardItem);
+            return [cardItem.key, count] as const;
+          })
+        );
+
+        if (!isMounted) return;
+        const nextCounts: Record<string, number> = {};
+        pairs.forEach(([key, count]) => {
+          nextCounts[key] = count;
+        });
+        setCardPaperCounts(nextCounts);
+      } finally {
+        if (isMounted) {
+          setLoadingCardPaperCounts(false);
+        }
+      }
+    };
+
+    loadCounts();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, selectedExamTierCard, cardYearFilter, fetchSingleCardCount]);
+
+  // Load Rank Maker card counts
+  useEffect(() => {
+    if (activeTab !== 'RankMaker' || selectedRmCard) {
+      return;
+    }
+
+    let isMounted = true;
+    const loadRmCounts = async () => {
+      setLoadingRmCounts(true);
+      try {
+        const pairs = await Promise.all(
+          RM_EXAM_TIER_CARDS.map(async (cardItem) => {
+            const count = await fetchSingleCardCount(cardItem);
+            return [cardItem.key, count] as const;
+          })
+        );
+
+        if (!isMounted) return;
+        const nextCounts: Record<string, number> = {};
+        pairs.forEach(([key, count]) => {
+          nextCounts[key] = count;
+        });
+        setRmPaperCounts(nextCounts);
+      } finally {
+        if (isMounted) {
+          setLoadingRmCounts(false);
+        }
+      }
+    };
+
+    loadRmCounts();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, selectedRmCard, fetchSingleCardCount]);
+
+  const getCardPyqCount = (cardItem: { key: string; exam: string; tier: string }) => {
+    if (typeof cardPaperCounts[cardItem.key] === 'number') {
+      return cardPaperCounts[cardItem.key];
+    }
+    return getDummyCardPyqCount(cardItem);
+  };
+
+  const handleHeaderBack = () => {
+    if (selectedExamTierCard) {
+      clearExamTierSelection();
+      setActiveTab('PYQ');
+      return;
+    }
+    navigation.goBack();
+  };
+
+  useEffect(() => {
+    if (activeTab === 'PYQ' && selectedExamTierCard) {
+      if (filters.Year !== (cardYearFilter === 'All' ? 'Year' : cardYearFilter)) {
+        setFilters((prev) => ({ ...prev, Year: cardYearFilter === 'All' ? 'Year' : cardYearFilter }));
+        return;
+      }
+      fetchPyqs(true);
+      return;
+    }
+
+    if (activeTab === 'PYQ' && !selectedExamTierCard) {
+      setPyqList([]);
+      setPyqCursor(null);
+      setHasMorePyqs(false);
+    }
+  }, [filters, activeTab, selectedExamTierCard, cardYearFilter]);
 
   const loadResultHistory = async () => {
     try {
@@ -155,12 +564,25 @@ export default function PyqsScreen() {
         const historyData = res.data.map((h: any) => ({
           sourceTab: 'PYQ',
           testKey: h.attemptId,
-          testTitle: h.testPaper?.metaData?.title || `PYQ Test`,
+          attemptId: h.attemptId,
+          testPaperId: h.testPaper?._id || h.testPaper?.id,
+          testTitle: h.testPaper?.metaData?.title || buildPyqDisplayTitle(h.testPaper || {}, h.testPaper?.metaData?.examName),
+          examName: h.testPaper?.metaData?.examName,
+          tier: normalizeTierLabel(h.testPaper?.tier),
+          shift: normalizeShiftLabel(h.testPaper?.shift),
+          date: h.testPaper?.date,
+          totalQuestions: h.testPaper?.questionCount,
+          durationSeconds: h.testPaper?.timeLimit,
+          markingScheme: {
+            correctMark: Number(h?.results?.marksPerCorrect) || 2,
+            wrongMark: Number(h?.results?.marksPerIncorrect) || 0.5,
+          },
           attempted: h.results?.attempted || 0,
           correct: h.results?.correct || 0,
           wrong: h.results?.incorrect || 0,
           unattempted: h.results?.unattempted || 0,
           score: h.results?.score || 0,
+          sectionBreakup: h.results?.sectionBreakup || [],
           submittedAt: new Date(h.createdAt || Date.now()).toLocaleDateString(),
         }));
         setResultHistory(historyData);
@@ -300,12 +722,29 @@ export default function PyqsScreen() {
     navigation.setParams({ activeTab: undefined });
   }, [navigation, route.params?.activeTab]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    const onBackPress = () => {
+      if (activeTab === 'PYQ' && selectedExamTierCard) {
+        clearExamTierSelection();
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [activeTab, selectedExamTierCard]);
+
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: border }]}>
         <View style={styles.logoRow}>
-          <Pressable onPress={() => navigation.goBack()} style={{ marginRight: 12 }} hitSlop={12}>
+          <Pressable onPress={handleHeaderBack} style={{ marginRight: 12 }} hitSlop={12}>
             <Ionicons name="arrow-back" size={24} color={text} />
           </Pressable>
           <Image 
@@ -349,218 +788,194 @@ export default function PyqsScreen() {
            </View>
         </View>
 
-        {/* Custom Tab Toggle (Native Mobile Segmented Control Style) */}
-        <View style={styles.tabWrapper}>
-          <View style={[styles.tabContainer, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
-            <Pressable 
-              style={[
-                styles.tabBtn, 
-                activeTab === 'RankMaker' && [styles.activeTabBtn, { backgroundColor: primary }]
-              ]}
-              onPress={() => setActiveTab('RankMaker')}
-            >
-              <Text style={[
-                styles.tabText, 
-                { color: activeTab === 'RankMaker' ? '#fff' : muted }
-              ]}>Rank Maker Series</Text>
-            </Pressable>
-            <Pressable 
-              style={[
-                styles.tabBtn, 
-                activeTab === 'PYQ' && [styles.activeTabBtn, { backgroundColor: primary }]
-              ]}
-              onPress={() => setActiveTab('PYQ')}
-            >
-              <Text style={[
-                styles.tabText, 
-                { color: activeTab === 'PYQ' ? '#fff' : muted }
-              ]}>PYQ</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Mobile Horizontal Filter Bar */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterScrollContent}
-        >
-          {Object.keys(filterData).map((key) => {
-            const isActive = filters[key as keyof typeof filters] !== key;
-            return (
-              <View key={key} style={styles.filterWrap}>
-                <Text style={[styles.filterLabel, { color: muted }]}>{key}</Text>
-                <Pressable
-                  style={[
-                    styles.filterPill,
-                    { backgroundColor: card, borderColor: isActive ? primary : border },
-                    isActive && { backgroundColor: isDark ? primary + '20' : primary + '10' }
-                  ]}
-                  onPress={() => {
-                    if (key === 'Date') {
-                      setShowDatePicker(true);
-                    } else {
-                      setActiveFilter(key);
-                    }
-                  }}
-                >
-                  <Text style={[styles.filterPillText, { color: isActive ? primary : text }]}>
-                    {filters[key as keyof typeof filters] === key ? (key === 'Date' ? 'Date' : 'All') : filters[key as keyof typeof filters]}
-                  </Text>
-                  <Ionicons name="calendar-outline" size={14} color={isActive ? primary : muted} style={{ display: key === 'Date' ? 'flex' : 'none' }} />
-                  <Ionicons name="chevron-down" size={14} color={isActive ? primary : muted} style={{ display: key !== 'Date' ? 'flex' : 'none' }} />
-                </Pressable>
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        {activeTab === 'RankMaker' && (
-          <Text style={[styles.infoText, { color: muted }]}>Will be available from 2nd April.</Text>
-        )}
-
-        {/* Test List Section */}
-        {activeTab === 'PYQ' ? (
+        {/* Exam Cards or Detail View */}
+        {!selectedExamTierCard ? (
           <>
-            {pyqList.map((paper) => (
-              (() => {
-                const item = {
-                  id: paper._id || paper.id,
-                  title: paper.metaData?.title || 'PYQ Test',
-                  date: paper.date || 'N/A',
-                  shift: paper.shift || 'N/A',
-                  tier: paper.tier || 'N/A',
-                  questions: paper.questionCount ? `${paper.questionCount} Questions` : '100 Questions',
-                  duration: paper.timeLimit ? `${Math.floor(paper.timeLimit / 60)} min` : '60 min',
-                  examName: paper.metaData?.examName || 'CGL',
-                };
-                const testKey = `PYQ:${item.id}`;
-                const pausedState = pausedTests[testKey];
-                return (
-              <View
-                key={item.id}
-                style={[styles.testCard, { backgroundColor: card, borderColor: border }]}
-              >
-                <View style={styles.testInfoCol}>
-                  <View style={styles.testMetaTopRow}>
-                    <Ionicons name="document-text-outline" size={14} color={muted} />
-                    <Text style={[styles.testExamName, { color: muted }]}>{item.examName}</Text>
-                  </View>
-                  <Text style={[styles.testTitle, { color: text }]}>{item.title}</Text>
-                  <Text style={[styles.testMetaDetails, { color: muted }]}>
-                    {item.questions} · {item.duration} · Held on {item.date} ({item.shift})
-                  </Text>
-                  {pausedState && (
-                    <Text style={[styles.pausedHint, { color: '#f59e0b' }]}>Status: Resume Test</Text>
-                  )}
-                </View>
-                <Pressable 
-                  style={[styles.startBtn, { backgroundColor: pausedState ? '#f59e0b' : primary }]}
-                  onPress={() => {
-                    if (pausedState) {
-                      navigation.navigate('MockPractice', {
-                        mockData: pausedState.mockData,
-                        sourceTab: 'PYQ',
-                        testKey,
-                        resumeState: pausedState.resumeState,
-                      });
-                      return;
-                    }
+            <Text style={[styles.sectionTitle, { color: text, marginBottom: 10 }]}>Select Exam</Text>
 
-                    navigation.navigate('MockInstruction', {
-                      mockData: { title: item.title, questions: parseInt(item.questions), duration: parseInt(item.duration) },
-                      sourceTab: 'PYQ',
-                      testKey,
-                      testPaperId: item.id
-                    });
-                  }}
+            <View style={styles.examTierGrid}>
+              {PYQ_EXAM_TIER_CARDS.map((cardItem) => (
+                <View
+                  key={cardItem.key}
+                  style={[styles.examTierGridCard, { backgroundColor: card, borderColor: border }]}
                 >
-                  <Text style={[styles.startBtnText, { color: '#fff' }]}>{pausedState ? 'Resume Test' : 'Start'}</Text>
-                </Pressable>
-              </View>
-                );
-              })()
-            ))}
-            {pyqList.length === 0 && !loadingPyqs && (
-              <View style={[styles.historyCard, { backgroundColor: isDark ? '#020617' : '#f1f5f9', borderColor: border }]}>
-                <View style={styles.historyIconCircle}>
-                  <Ionicons name="funnel-outline" size={22} color={muted} />
+                  <View style={styles.examTierGridIcon}>
+                    <Ionicons name="book-outline" size={16} color={primary} />
+                  </View>
+                  <Text style={[styles.examTierCardTitle, { color: text }]}>{cardItem.title}</Text>
+                  <Text style={[styles.examTierCardSub, { color: muted }]}>
+                    {loadingCardPaperCounts && typeof cardPaperCounts[cardItem.key] !== 'number'
+                      ? 'Loading papers...'
+                      : `${getCardPyqCount(cardItem)} Previous Year Papers`}
+                  </Text>
+                  <Pressable style={styles.viewPapersBtn} onPress={() => { setActiveTab('PYQ'); applyExamTierQuickFilter(cardItem); }}>
+                    <Text style={styles.viewPapersBtnText}>View Papers</Text>
+                  </Pressable>
                 </View>
-                <Text style={[styles.historyTitle, { color: text }]}>No PYQs found</Text>
-                <Text style={[styles.historySub, { color: muted }]}>Try changing your filters to see available papers.</Text>
-              </View>
-            )}
-            {hasMorePyqs && (
-              <Pressable
-                style={{ paddingVertical: 12, alignItems: 'center' }}
-                onPress={() => fetchPyqs(false)}
-              >
-                <Text style={{ color: primary, fontWeight: '700', fontSize: 13 }}>
-                  {loadingPyqs ? 'Loading...' : 'Load More'}
-                </Text>
-              </Pressable>
-            )}
+              ))}
+            </View>
           </>
         ) : (
           <>
-            {(showAllRM ? RANK_MAKER_LIST : RANK_MAKER_LIST.slice(0, 3)).map((item) => (
-              (() => {
-                const testKey = `RankMaker:${item.id}`;
-                const pausedState = pausedTests[testKey];
-                return (
-              <View
-                key={item.id}
-                style={[styles.testCard, { backgroundColor: card, borderColor: border }]}
-              >
-                <View style={styles.testInfoCol}>
-                  <View style={styles.testMetaTopRow}>
-                    <Ionicons name="document-text-outline" size={14} color={muted} />
-                    <Text style={[styles.testExamName, { color: muted }]}>CGL</Text>
-                  </View>
-                  <Text style={[styles.testTitle, { color: text }]}>{item.title}</Text>
-                  <Text style={[styles.testMetaDetails, { color: muted }]}>
-                    {item.questions} · {item.duration}
-                  </Text>
-                  {pausedState && (
-                    <Text style={[styles.pausedHint, { color: '#f59e0b' }]}>Status: Resume Test</Text>
-                  )}
-                </View>
-                <Pressable 
-                  style={[styles.startBtn, { backgroundColor: pausedState ? '#f59e0b' : primary }]}
-                  onPress={() => {
-                    if (pausedState) {
-                      navigation.navigate('MockPractice', {
-                        mockData: pausedState.mockData,
-                        sourceTab: 'RankMaker',
-                        testKey,
-                        resumeState: pausedState.resumeState,
-                      });
-                      return;
-                    }
+            {/* Detail View Header */}
+            <View style={styles.pyqSelectedHeader}>
+              <Pressable onPress={() => { clearExamTierSelection(); setActiveTab('PYQ'); }} style={styles.pyqBackChip}>
+                <Ionicons name="chevron-back" size={14} color={primary} />
+                <Text style={styles.pyqBackChipText}>All Exams</Text>
+              </Pressable>
+              <Text style={[styles.selectedFilterText, { color: muted, marginBottom: 0 }]}>
+                Showing: {selectedExamTierData?.title || selectedFilterTitle}
+              </Text>
 
-                    navigation.navigate('MockInstruction', {
-                      mockData: { title: item.title, questions: parseInt(item.questions), duration: parseInt(item.duration) },
-                      sourceTab: 'RankMaker',
-                      testKey,
-                    });
-                  }}
+              {/* PYQ / Rank Maker Toggle (inside detail view) */}
+              <View style={[styles.tabContainer, { backgroundColor: isDark ? '#334155' : '#e2e8f0', marginTop: 8, marginBottom: 8 }]}>
+                <Pressable
+                  style={[
+                    styles.tabBtn,
+                    activeTab === 'PYQ' && [styles.activeTabBtn, { backgroundColor: primary }]
+                  ]}
+                  onPress={() => setActiveTab('PYQ')}
                 >
-                  <Text style={[styles.startBtnText, { color: '#fff' }]}>{pausedState ? 'Resume Test' : 'Start'}</Text>
+                  <Text style={[styles.tabText, { color: activeTab === 'PYQ' ? '#fff' : muted }]}>PYQ</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.tabBtn,
+                    activeTab === 'RankMaker' && [styles.activeTabBtn, { backgroundColor: primary }]
+                  ]}
+                  onPress={() => setActiveTab('RankMaker')}
+                >
+                  <Text style={[styles.tabText, { color: activeTab === 'RankMaker' ? '#fff' : muted }]}>Rank Maker</Text>
                 </Pressable>
               </View>
-                );
-              })()
-            ))}
-            {RANK_MAKER_LIST.length > 3 && (
-              <Pressable
-                style={{ paddingVertical: 12, alignItems: 'center' }}
-                onPress={() => setShowAllRM(!showAllRM)}
-              >
-                <Text style={{ color: primary, fontWeight: '700', fontSize: 13 }}>
-                  {showAllRM ? 'View Less' : 'Load More'}
+
+              {activeTab === 'PYQ' && (
+                <View style={styles.selectedPageFilterRow}>
+                  <Pressable
+                    style={[styles.selectedYearBtn, { borderColor: border, backgroundColor: card }]}
+                    onPress={() => setIsCardYearModalVisible(true)}
+                  >
+                    <Text style={[styles.selectedYearBtnText, { color: text }]}>Year: {cardYearFilter}</Text>
+                    <Ionicons name="chevron-down" size={14} color={muted} />
+                  </Pressable>
+                  <Pressable style={[styles.clearFilterBtn, { borderColor: border }]} onPress={() => setCardYearFilter('All')}>
+                    <Text style={[styles.clearFilterText, { color: muted }]}>Clear filter</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+
+            {/* PYQ Papers List */}
+            {activeTab === 'PYQ' && (
+              <>
+                {pyqList.map((paper) => (
+                  (() => {
+                    const backendTitle = String(paper?.metaData?.title || '').trim();
+                    const shouldUseGeneratedTitle =
+                      !backendTitle || /^pyq\s*test$/i.test(backendTitle);
+                    const fallbackExamName =
+                      selectedExamTierData?.exam
+                        ? (EXAM_QUERY_MAP[selectedExamTierData.exam] || selectedExamTierData.exam)
+                        : undefined;
+                    const resolvedTitle = shouldUseGeneratedTitle
+                      ? buildPyqDisplayTitle(paper, fallbackExamName)
+                      : backendTitle;
+                    const resolvedQuestionCount = normalizeQuestionCount(paper);
+                    const resolvedDurationMinutes = normalizeDurationMinutes(paper);
+                    const item = {
+                      id: paper._id || paper.id,
+                      title: resolvedTitle,
+                      date: paper.date || 'N/A',
+                      shift: paper.shift || 'N/A',
+                      tier: paper.tier || 'N/A',
+                      questionCount: resolvedQuestionCount,
+                      durationMinutes: resolvedDurationMinutes,
+                      examName: paper.metaData?.examName || 'CGL',
+                    };
+                    const isDummyPaper = Boolean(paper.__dummy);
+                    const testKey = `PYQ:${item.id}`;
+                    const pausedState = pausedTests[testKey];
+                    return (
+                  <View
+                    key={item.id}
+                    style={[styles.testCard, { backgroundColor: card, borderColor: border }]}
+                  >
+                    <View style={styles.testInfoCol}>
+                      <View style={styles.testMetaTopRow}>
+                        <Ionicons name="document-text-outline" size={14} color={muted} />
+                        <Text style={[styles.testExamName, { color: muted }]}>{item.examName}</Text>
+                      </View>
+                      <Text style={[styles.testTitle, { color: text }]}>{item.title}</Text>
+                      <Text style={[styles.testMetaDetails, { color: muted }]}>
+                        {item.questionCount} Questions · {item.durationMinutes} min · Held on {item.date} ({item.shift})
+                      </Text>
+                      {isDummyPaper && (
+                        <Text style={[styles.pausedHint, { color: '#2563eb' }]}>Demo Paper (Local)</Text>
+                      )}
+                      {pausedState && (
+                        <Text style={[styles.pausedHint, { color: '#f59e0b' }]}>Status: Resume Test</Text>
+                      )}
+                    </View>
+                    <Pressable
+                      style={[styles.startBtn, { backgroundColor: pausedState ? '#f59e0b' : primary }]}
+                      onPress={() => {
+                        if (pausedState) {
+                          navigation.navigate('MockPractice', {
+                            mockData: pausedState.mockData,
+                            sourceTab: 'PYQ',
+                            testKey,
+                            resumeState: pausedState.resumeState,
+                          });
+                          return;
+                        }
+
+                        navigation.navigate('MockInstruction', {
+                          mockData: { title: item.title, questions: item.questionCount, duration: item.durationMinutes },
+                          sourceTab: 'PYQ',
+                          testKey,
+                          testPaperId: isDummyPaper ? undefined : item.id,
+                        });
+                      }}
+                    >
+                      <Text style={[styles.startBtnText, { color: '#fff' }]}>{pausedState ? 'Resume Test' : 'Start'}</Text>
+                    </Pressable>
+                  </View>
+                    );
+                  })()
+                ))}
+                {pyqList.length === 0 && !loadingPyqs && (
+                  <View style={[styles.historyCard, { backgroundColor: isDark ? '#020617' : '#f1f5f9', borderColor: border }]}>
+                    <View style={styles.historyIconCircle}>
+                      <Ionicons name="funnel-outline" size={22} color={muted} />
+                    </View>
+                    <Text style={[styles.historyTitle, { color: text }]}>No PYQs found</Text>
+                    <Text style={[styles.historySub, { color: muted }]}>No papers found for selected exam/tier.</Text>
+                  </View>
+                )}
+                {hasMorePyqs && (
+                  <Pressable
+                    style={{ paddingVertical: 12, alignItems: 'center' }}
+                    onPress={() => fetchPyqs(false)}
+                  >
+                    <Text style={{ color: primary, fontWeight: '700', fontSize: 13 }}>
+                      {loadingPyqs ? 'Loading...' : 'Load More'}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+
+            {/* Rank Maker — Empty State (API not connected yet) */}
+            {activeTab === 'RankMaker' && (
+              <View style={[styles.historyCard, { backgroundColor: isDark ? '#020617' : '#f1f5f9', borderColor: border }]}>
+                <View style={styles.historyIconCircle}>
+                  <Ionicons name="trophy-outline" size={22} color={muted} />
+                </View>
+                <Text style={[styles.historyTitle, { color: text }]}>Rank Maker — Coming Soon</Text>
+                <Text style={[styles.historySub, { color: muted }]}>
+                  Rank Maker papers for {selectedExamTierData?.title || 'this exam'} will be available soon.
                 </Text>
-              </Pressable>
+              </View>
             )}
           </>
         )}
@@ -576,20 +991,15 @@ export default function PyqsScreen() {
                   <Text style={[styles.resultTab, { color: primary }]}>{result.sourceTab}</Text>
                 </View>
                 <Text style={[styles.resultMeta, { color: muted }]}>Submitted: {formatSubmittedAt(result.submittedAt)}</Text>
-                <View style={styles.resultStatsRow}>
-                  <Text style={[styles.resultScore, { color: primary }]}>Score: {result.score.toFixed(2)}</Text>
-                  <Text style={[styles.resultMeta, { color: muted }]}>Correct {result.correct} · Wrong {result.wrong}</Text>
+                <View style={styles.resultActionRow}>
+                  <Pressable
+                    style={[styles.resultActionBtn, { backgroundColor: primary }]}
+                    onPress={() => navigation.navigate('TestAnalysis', { result })}
+                  >
+                    <Text style={styles.resultActionBtnText}>View Detailed Analysis</Text>
+                  </Pressable>
                 </View>
-                <Text style={[styles.resultMeta, { color: muted }]}>Attempted {result.attempted} · Unattempted {result.unattempted}</Text>
-                {result.sectionBreakup && result.sectionBreakup.length > 0 && (
-                  <View style={styles.sectionBreakupWrap}>
-                    {result.sectionBreakup.map((sectionItem) => (
-                      <Text key={`${result.submittedAt}-${sectionItem.section}`} style={[styles.sectionBreakupText, { color: muted }]}>
-                        {sectionItem.section}: {sectionItem.score.toFixed(2)} ({sectionItem.correct}C/{sectionItem.wrong}W)
-                      </Text>
-                    ))}
-                  </View>
-                )}
+                <Text style={[styles.resultMeta, { color: muted }]}>Tap the button to view full section-wise and question-wise analysis.</Text>
               </View>
             ))}
           </View>
@@ -653,6 +1063,47 @@ export default function PyqsScreen() {
                 <View style={{ height: 20 }} />
               </ScrollView>
             )}
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={isCardYearModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCardYearModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setIsCardYearModalVisible(false)}>
+          <View style={[styles.modalContent, { backgroundColor: card }]} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: text }]}>Select Year</Text>
+              <Pressable onPress={() => setIsCardYearModalVisible(false)} hitSlop={8} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={muted} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+              {cardYearOptions.map((year) => {
+                const isSelected = cardYearFilter === year;
+                return (
+                  <Pressable
+                    key={year}
+                    style={[
+                      styles.modalOption,
+                      { borderBottomColor: border },
+                      isSelected && { backgroundColor: isDark ? primary + '20' : primary + '10' },
+                    ]}
+                    onPress={() => {
+                      setCardYearFilter(year);
+                      setIsCardYearModalVisible(false);
+                    }}
+                  >
+                    <Text style={[styles.modalOptionText, { color: isSelected ? primary : text }]}>{year}</Text>
+                    {isSelected && <Ionicons name="checkmark" size={20} color={primary} />}
+                  </Pressable>
+                );
+              })}
+              <View style={{ height: 20 }} />
+            </ScrollView>
           </View>
         </Pressable>
       </Modal>
@@ -898,6 +1349,11 @@ const styles = StyleSheet.create({
   },
   testTitle: { fontSize: 16, fontWeight: '800', marginBottom: 6 },
   testMetaDetails: { fontSize: 12 },
+  pausedHint: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   startBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -946,6 +1402,122 @@ const styles = StyleSheet.create({
   modalOptionText: { fontSize: 15, fontWeight: '500' },
 
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  clearFilterBtn: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  clearFilterText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  examTierGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+    marginBottom: 8,
+  },
+  examTierGridCard: {
+    width: '48%',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  viewPapersBtn: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    backgroundColor: '#059669',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  viewPapersBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  examTierGridIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(5,150,105,0.12)',
+    marginBottom: 8,
+  },
+  pyqSelectedHeader: {
+    marginBottom: 10,
+    gap: 8,
+  },
+  selectedPageFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  selectedYearBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minWidth: 120,
+  },
+  selectedYearBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  pyqBackChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(5,150,105,0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  pyqBackChipText: {
+    color: '#059669',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  examTierCardsScroll: {
+    marginHorizontal: -16,
+    marginBottom: 8,
+  },
+  examTierCardsRow: {
+    paddingHorizontal: 16,
+    gap: 10,
+    paddingBottom: 4,
+  },
+  examTierCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minWidth: 132,
+  },
+  examTierCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  examTierCardSub: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  selectedFilterText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
   resultList: {
     gap: 10,
     marginTop: 4,
@@ -976,15 +1548,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 3,
   },
-  resultStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 3,
+  resultActionRow: {
+    marginVertical: 8,
   },
-  resultScore: {
-    fontSize: 14,
-    fontWeight: '900',
+  resultActionBtn: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  resultActionBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
   },
   sectionBreakupWrap: {
     marginTop: 4,
