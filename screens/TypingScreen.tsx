@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,129 +15,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useLoginModal } from '../context/LoginModalContext';
+import { GOAL_CARDS, EXAM_TOPICS, PRACTICE_TOPICS } from '../constants/TypingConstants';
 
-const GOAL_CARDS = [
-  {
-    title: 'Set Realistic Goals',
-    desc: 'Aim for 2-3 WPM improvement weekly. Track progress via the dashboard.',
-    icon: 'medal',
-    color: '#f59e0b',
-  },
-  {
-    title: 'Practice Different Topics',
-    desc: 'Type on various topics like GK and Science to improve adaptability.',
-    icon: 'flash',
-    color: '#0d9488',
-  },
-  {
-    title: 'Review Your Mistakes',
-    desc: 'Analyze errors after tests to identify and fix recurring patterns.',
-    icon: 'trending-up',
-    color: '#db2777',
-  },
-];
 
-const PASSAGES: Record<string, string[]> = {
-  'History': [
-    "The early phase of the Indian National Congress (INC), from its formation in 1885 to around 1905, was dominated by leaders who came to be known as the Moderates. Leaders like Dadabhai Naoroji, Pherozeshah Mehta, and Gopal Krishna Gokhale led this faction. They had immense faith in British justice and fair play and believed that India's political goals could be achieved through",
-    "The Delhi Sultanate, a series of five successive dynasties that ruled over large parts of the Indian subcontinent from 1206 to 1526, established a new Turko-Persian culture and left a lasting impact on Indian administration and architecture. The first of these was the Mamluk or Slave Dynasty, founded by Qutb-ud-din Aibak.",
-    "The Mughal Empire, at its peak, was one of the largest and most powerful empires in human history. Foundation laid by Babur in 1526, it reached its zenith under Akbar, who introduced the Din-i-Ilahi and refined the Mansabdari system. The empire saw significant architectural achievements, including the Taj Mahal during Shah Jahan's reign."
+const FALLBACK_PASSAGES: Record<string, string[]> = {
+  History: [
+    "The Indus Valley Civilization was a Bronze Age civilization in the northwestern regions of South Asia, lasting from 3300 BCE to 1300 BCE. Along with ancient Egypt and Mesopotamia, it was one of three early civilizations of the Near East and South Asia.",
+    "The Mughal Empire was an early-modern empire in South Asia. For some two centuries, the empire stretched from the outer fringes of the Indus basin in the west, northern Afghanistan in the northwest, and Kashmir in the north, to the highlands of present-day Assam and Bangladesh."
   ],
-  'Science': [
+  General: [
+    "Typing is the process of writing or inputting text by pressing keys on a typewriter, computer keyboard, cell phone, or calculator. It can be distinguished from other means of text input, such as handwriting and speech recognition.",
+    "Good posture and ergonomic keyboard habits can help prevent repetitive strain injuries and improve typing speed and accuracy over time."
+  ],
+  Science: [
     "Photosynthesis is a process used by plants and other organisms to convert light energy into chemical energy that, through cellular respiration, can later be released to fuel the organism's activities.",
-    "Newton's Laws of Motion are three physical laws that, together, laid the foundation for classical mechanics. They describe the relationship between a body and the forces acting upon it, and its motion in response to those forces. The first law defines inertia, the second relates force to acceleration, and the third states every action has an opposite reaction.",
-    "The cell is the basic structural, functional, and biological unit of all known organisms. Cells are the smallest units of life, and hence are often referred to as the 'building blocks of life'. The study of cells is called cell biology, cytology, or microbiology."
-  ],
-  'Vocabulary': [
-    "Expanding your vocabulary is essential for effective communication and academic success. Learning root words, suffixes, and prefixes can help you decipher the meaning of unfamiliar words. Practicing synonyms and antonyms regularly ensures a deeper understanding of word nuances and prevents repetitive writing.",
-    "Idioms and phrases add color and depth to the English language. Phrases like 'a blessing in disguise' or 'beat around the bush' carry meanings that aren't immediately obvious from the individual words. Mastering these expressions is key to achieving native-like fluency and scoring high in competitive language exams.",
-    "Context clues are hints found within a sentence, paragraph, or passage that a reader can use to understand the meanings of new or unfamiliar words. Recognizing these clues—such as definitions, examples, or contrasts—is a vital skill for improving reading comprehension and overall verbal proficiency."
-  ],
-  'Polity': [
-    "The Preamble to the Constitution of India is a brief introductory statement that sets out the guiding purpose, principles, and philosophy of the document. It declares India to be a Sovereign, Socialist, Secular, Democratic Republic and secures justice, liberty, equality, and fraternity for all its citizens.",
-    "The Indian Parliamentary system is based on the Westminster model. It consists of two houses: the Lok Sabha (House of the People) and the Rajya Sabha (Council of States). The President is the titular head, while the Prime Minister and the Council of Ministers exercise real executive power, being collectively responsible to the Lok Sabha.",
-    "Fundamental Rights in India are the basic human rights of all citizens, guaranteed by the Constitution under Part III. These rights—such as the Right to Equality and Right to Freedom—are enforceable by the courts and act as a check on the powers of the state, ensuring the dignity and liberty of every individual."
-  ],
-  'Geography': [
-    "The Solar System consists of an average star we call the Sun, and the planets Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune. It also includes the satellites of the planets; numerous comets, asteroids, and meteoroids; and the interplanetary medium. The planets are divided into terrestrial and gas giants.",
-    "India is a land of great physical diversity. From the towering Himalayas in the north to the vast coastal plains in the south, the country features diverse landscapes like the Indo-Gangetic Plains, the Thar Desert, and the Deccan Plateau. These physical features significantly influence the climate, culture, and economy of different regions.",
-    "Climate change refers to significant changes in global temperature, precipitation, wind patterns, and other measures of climate that occur over several decades or longer. The increasing concentration of greenhouse gases in the atmosphere, primarily due to human activities, is driving global warming and affecting ecosystems worldwide."
-  ],
-  'Economy': [
-    "The Gross Domestic Product (GDP) is the total monetary or market value of all the finished goods and services produced within a country's borders in a specific time period. It serves as a comprehensive scorecard of a given country's economic health and is used by analysts to compare the productivity of different nations.",
-    "The NITI Aayog is a policy think tank of the Government of India, established with the aim to achieve sustainable development goals with cooperative federalism. It replaced the Planning Commission and focuses on providing strategic and technical advice to the central and state governments on key economic and social policy issues.",
-    "Inflation is the rate at which the general level of prices for goods and services is rising and, consequently, the purchasing power of currency is falling. Central banks attempt to limit inflation, and avoid deflation, in order to keep the economy running smoothly while managing interest rates and money supply."
-  ],
-  'PYQ': [
-    "Previous Year Questions (PYQs) are an invaluable resource for candidates preparing for competitive exams. They provide insights into the recurring patterns, difficulty levels, and the specific topics emphasized by the examiners. Practicing with actual past passages helps build confidence and improves time management skills for the primary test.",
-    "The Data Entry Speed Test (DEST) for SSC CGL typically involves typing a passage of about 2000 key depressions. Success requires not only speed but also extreme precision, as penalties are levied for both full and half mistakes. Regular practice with previous year scripts is the best way to familiarize oneself with the expected format.",
-    "SSC Typing Tests emphasize accuracy over mere speed. Candidates must focus on minimizing errors like omissions, substitutions, and spelling mistakes. Using the spare time after completing a passage to review and correct mistakes is a strategy used by top scorers to ensure they meet the qualifying standards fixed by the Commission."
-  ],
-  'General': [
-    "Sustainable development is the organizing principle for meeting human development goals while simultaneously sustaining the ability of natural systems to provide the natural resources and ecosystem services on which the economy and society depend.",
-    "Digital India is a flagship program of the Government of India with a vision to transform India into a digitally empowered society and knowledge economy. It focuses on providing digital infrastructure as a utility to every citizen, governance and services on demand, and digital empowerment of all citizens.",
-    "The Importance of Education cannot be overstated. It is a powerful tool for personal growth, social development, and economic prosperity. Education empowers individuals to think critically, solve problems, and contribute meaningfully to society, while fostering values of equality, tolerance, and global citizenship."
-  ],
-  'Environment': [
-    "Environmental pollution is one of the most pressing problems facing the modern world. Air, water, and soil pollution caused by industrial activities, vehicular emissions, and improper waste disposal have serious consequences for human health and biodiversity. Sustainable practices and stringent regulations are essential to reverse this damage.",
-    "Biodiversity refers to the variety of life on Earth at all its levels, from genes to ecosystems. It encompasses the evolutionary, ecological, and cultural processes that sustain life. The rapid loss of biodiversity due to habitat destruction, pollution, climate change, and overexploitation poses a critical threat to global ecosystems.",
-    "The Paris Agreement is a landmark international accord adopted in 2015 to address climate change by limiting global warming to well below 2 degrees Celsius above pre-industrial levels. It requires all signatory nations to set nationally determined contributions and regularly report on their progress toward reducing emissions."
-  ],
-  'Current Affairs': [
-    "Current affairs encompass the most recent and significant events happening around the world in politics, economics, science, sports, and culture. For competitive exam aspirants, staying updated with current affairs is crucial, as questions on recent events are a staple in papers like SSC CGL, CHSL, and various state-level examinations.",
-    "The Union Budget of India is an annual financial statement presented by the Finance Minister in Parliament. It outlines the government's revenue and expenditure for the coming financial year and sets the economic agenda. Key highlights include allocations for defense, education, infrastructure, and social welfare schemes.",
-    "India's space program, led by the Indian Space Research Organisation (ISRO), has achieved remarkable milestones in recent years. From the Chandrayaan missions to study the Moon to the Mangalyaan Mars orbiter, ISRO has established India as a major spacefaring nation, delivering complex missions at a fraction of the cost of its global counterparts."
-  ],
-  'Mathematics': [
-    "Mathematics is the universal language of science and engineering. Its branches, including algebra, geometry, calculus, and statistics, form the backbone of modern computation, finance, and technology. Proficiency in mathematics is a key differentiator in competitive examinations and professional success in quantitative fields.",
-    "Number theory is a branch of pure mathematics devoted primarily to the study of the integers and integer-valued functions. German mathematician Carl Friedrich Gauss said that mathematics is the queen of the sciences and number theory is the queen of mathematics. It has deep connections to cryptography and computer science.",
-    "Statistics is the discipline that concerns the collection, organization, analysis, interpretation, and presentation of data. It is applicable to a wide variety of academic disciplines, from natural and social sciences to engineering and requires understanding of both descriptive and inferential statistical methods."
-  ],
-  'Computer': [
-    "A computer is an electronic device that manipulates information or data. It has the ability to store, retrieve, and process data. Computers are used in various fields including education, research, business, healthcare, and entertainment. The development from vacuum tubes to microprocessors marked a revolution in computing technology.",
-    "The Internet is a global network of interconnected computers that communicate using standardized protocols. It has transformed modern civilization by enabling instant communication, e-commerce, information sharing, and social networking on an unprecedented scale. Cloud computing further extends this by offering on-demand access to computing resources.",
-    "Artificial Intelligence is the simulation of human intelligence processes by machines, especially computer systems. Specific applications include expert systems, natural language processing, speech recognition, and machine vision. AI is rapidly transforming industries from healthcare and finance to transportation and manufacturing."
-  ],
+    "The solar system is the gravitationally bound system of the Sun and the objects that orbit it, either directly or indirectly. Of the objects that orbit the Sun directly, the largest are the eight planets."
+  ]
 };
-
-const EXAM_TOPICS = [
-  { id: 'History', title: 'History', sub: 'Modern India, Ancient & Medieval', icon: 'business' },
-  { id: 'Science', title: 'Science', sub: 'Biology, Physics & Chemistry', icon: 'beaker' },
-  { id: 'Vocabulary', title: 'Vocabulary', sub: 'High Frequency Words & Phrases', icon: 'book' },
-  { id: 'Polity', title: 'Polity', sub: 'Constitution & Governance', icon: 'balance-scale' },
-  { id: 'Geography', title: 'Geography', sub: 'Solar System, Physical Features', icon: 'globe' },
-  { id: 'Economy', title: 'Economy', sub: 'Indian Economy & Budget', icon: 'stats-chart' },
-  { id: 'Environment', title: 'Environment', sub: 'Ecology, Pollution & Climate Change', icon: 'leaf' },
-  { id: 'Current Affairs', title: 'Current Affairs', sub: 'Latest news & events for SSC', icon: 'newspaper' },
-  { id: 'Mathematics', title: 'Mathematics', sub: 'Quantitative Aptitude & Number Theory', icon: 'calculator' },
-  { id: 'Computer', title: 'Computer', sub: 'IT Fundamentals & Digital Literacy', icon: 'desktop' },
-  { id: 'General', title: 'General', sub: 'Mixed topics & General Awareness', icon: 'globe-outline' },
-  { id: 'PYQ', title: 'Previous Year Typing Question', sub: 'Practice with actual past exam questions', icon: 'time' },
-];
-
-// Practice mode topic selector - matches website topics
-const PRACTICE_TOPICS = [
-  { id: 'History', label: 'History' },
-  { id: 'Geography', label: 'Geography' },
-  { id: 'Polity', label: 'Polity' },
-  { id: 'Science', label: 'Science' },
-  { id: 'Economy', label: 'Economy' },
-  { id: 'Environment', label: 'Environment' },
-  { id: 'General', label: 'General' },
-];
-
-const RECENT_SESSIONS = [
-  {
-    id: 1,
-    title: 'Administration and Architecture of the Delh...',
-    sub: 'Incomplete session on history topics.',
-    score: 0,
-    accuracy: '0.0%',
-    time: '0m 0s',
-    date: '3/15/2026',
-    color: '#10b981', // emerald
-  }
-];
 
 export default function TypingScreen() {
   const insets = useSafeAreaInsets();
@@ -157,11 +51,120 @@ export default function TypingScreen() {
   const [showSubmitToast, setShowSubmitToast] = useState(false);
   
   const [currentTopic, setCurrentTopic] = useState('History');
-  const getRandomPassage = (topic: string) => {
-    const list = PASSAGES[topic] || PASSAGES['General'];
-    return list[Math.floor(Math.random() * list.length)];
-  };
-  const [passage, setPassage] = useState(getRandomPassage('History'));
+  const [passage, setPassage] = useState('Loading...');
+  const [isLoadingPassage, setIsLoadingPassage] = useState(false);
+  const [passagesCache, setPassagesCache] = useState<Record<string, { data: any[], cursor: string | null }>>({});
+
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [realAttempts, setRealAttempts] = useState<any[]>([]);
+  const [isLoadingAttempts, setIsLoadingAttempts] = useState(false);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [passageId, setPassageId] = useState<string | null>(null);
+  const [attemptsStats, setAttemptsStats] = useState({ bestSpeedWPM: 0, avgAccuracy: 0, testsTaken: 0 });
+
+  const getApiHeaders = useCallback(() => {
+    const API_KEY = process.env.EXPO_PUBLIC_API_KEY || '';
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (API_KEY) {
+      headers['x-api-key'] = API_KEY;
+      headers['Authorization'] = `Bearer ${API_KEY}`;
+    }
+    return headers;
+  }, []);
+
+  const fetchAttempts = useCallback(async () => {
+    setIsLoadingAttempts(true);
+    try {
+      const res = await fetch('https://api.mysscguide.com/api/v1/user/typing/attempts?limit=10', {
+        headers: getApiHeaders()
+      });
+      const json = await res.json();
+      if (json.status === 'success') {
+        setAttempts(json.data || []);
+        setAttemptsStats({
+          bestSpeedWPM: json.bestSpeedWPM || 0,
+          avgAccuracy: json.avgAccuracy || 0,
+          testsTaken: json.testsTaken || 0,
+        });
+      }
+      
+      const realRes = await fetch('https://api.mysscguide.com/api/v1/user/typing/attempts/real?limit=10', {
+        headers: getApiHeaders()
+      });
+      const realJson = await realRes.json();
+      if (realJson.status === 'success') {
+        setRealAttempts(realJson.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching attempts:", err);
+    } finally {
+      setIsLoadingAttempts(false);
+    }
+  }, [getApiHeaders]);
+
+  const fetchPassages = useCallback(async (topicId: string, loadNext: boolean = false) => {
+    setIsLoadingPassage(true);
+    if (!loadNext) setPassage('Loading passage...');
+    
+    try {
+      const queryTopic = topicId === 'PYQ' || topicId === 'General' ? '' : topicId.toLowerCase();
+      let cursor = null;
+      if (loadNext && passagesCache[topicId]?.cursor) {
+        cursor = passagesCache[topicId].cursor;
+      } else if (!loadNext && passagesCache[topicId] && passagesCache[topicId].data.length > 0) {
+        const list = passagesCache[topicId].data;
+        const randomP = list[Math.floor(Math.random() * list.length)];
+        setPassage(randomP.passage);
+        setPassageId(randomP._id || randomP.id || null);
+        setIsLoadingPassage(false);
+        return;
+      }
+      
+      const headers = getApiHeaders();
+      
+      let url = `https://api.mysscguide.com/api/v1/user/typing/passages?limit=10`;
+      if (queryTopic) url += `&topic=${queryTopic}`;
+      if (cursor) url += `&cursor=${cursor}`;
+      
+      const res = await fetch(url, { headers });
+      const json = await res.json();
+      
+      if (json.status === 'success' && json.data && json.data.length > 0) {
+        const newPassages = json.data;
+        const nextCursor = json.nextCursor;
+        
+        setPassagesCache(prev => {
+          const combined = loadNext && prev[topicId]?.data ? [...prev[topicId].data, ...newPassages] : newPassages;
+          return {
+            ...prev,
+            [topicId]: {
+               data: combined.slice(-50),
+               cursor: nextCursor
+            }
+          };
+        });
+        const randomPassage = newPassages[Math.floor(Math.random() * newPassages.length)];
+        setPassage(randomPassage.passage);
+        setPassageId(randomPassage._id || randomPassage.id || null);
+      } else {
+        const fallbackList = FALLBACK_PASSAGES[topicId] || FALLBACK_PASSAGES['General'];
+        setPassage(fallbackList[Math.floor(Math.random() * fallbackList.length)]);
+        setPassageId(null);
+      }
+    } catch (err) {
+      console.error("Error fetching passages:", err);
+      const fallbackList = FALLBACK_PASSAGES[topicId] || FALLBACK_PASSAGES['General'];
+      setPassage(fallbackList[Math.floor(Math.random() * fallbackList.length)]);
+      setPassageId(null);
+    } finally {
+      setIsLoadingPassage(false);
+    }
+  }, [getApiHeaders, passagesCache]);
+
+  useEffect(() => {
+    fetchPassages(currentTopic);
+    fetchAttempts();
+  }, [currentTopic, fetchAttempts]);
   const [typedText, setTypedText] = useState('');
   const [timeLeft, setTimeLeft] = useState(60); // 1:00
   const [wpm, setWpm] = useState(0);
@@ -274,20 +277,34 @@ export default function TypingScreen() {
   };
 
   const handleTopicSelect = (topicId: string) => {
-    setCurrentTopic(topicId);
-    setPassage(getRandomPassage(topicId));
+    if (topicId !== currentTopic) setCurrentTopic(topicId);
     setActiveMode('EXAM_INSTRUCTIONS');
     setIsReadyDecl(false);
   };
 
-  const handleStartRealExam = () => {
+  const handleStartRealExam = async () => {
     if (!isReadyDecl) return;
+    try {
+      const res = await fetch('https://api.mysscguide.com/api/v1/user/typing/start', {
+        method: 'POST',
+        headers: getApiHeaders(),
+        body: JSON.stringify({ topic: currentTopic })
+      });
+      const json = await res.json();
+      if (json.status === 'success' && json.passage) {
+        setAttemptId(json.attemptId);
+        setPassage(json.passage.passage);
+        setPassageId(json.passage._id || json.passage.id);
+      }
+    } catch (e) {
+      console.error("Error starting real exam:", e);
+    }
     setActiveMode('EXAM_PRACTICE');
     resetPractice();
     setTimeLeft(900); // 15:00 as per screenshot duration logic
   };
 
-  const handleSubmitTest = () => {
+  const handleSubmitTest = async () => {
     setIsStarted(false);
     
     // Calculate final stats for the summary
@@ -450,6 +467,30 @@ export default function TypingScreen() {
       reviewDiff,
     };
 
+    const payload = {
+      attemptId: attemptId || undefined,
+      passageId: attemptId ? undefined : (passageId || undefined),
+      topic: activeMode === 'EXAM_PRACTICE' ? currentTopic : 'General',
+      netSpeedWPM: netWpm,
+      grossSpeedWPM: grossWpm,
+      accuracy: Math.round((cw / (cw + rw || 1)) * 100),
+      timeTakenSec: timeElapsedSec,
+      totalWords: passageWords.length,
+      result: finalSession
+    };
+
+    try {
+       await fetch('https://api.mysscguide.com/api/v1/user/typing/submit', {
+         method: 'POST',
+         headers: getApiHeaders(),
+         body: JSON.stringify(payload)
+       });
+       fetchAttempts(); // Refresh stats
+    } catch (e) {
+       console.error("Error submitting test:", e);
+    }
+
+    setAttemptId(null);
     setAnalysisSession(finalSession);
     setIsSubmitConfirmVisible(false);
     
@@ -478,16 +519,37 @@ export default function TypingScreen() {
   };
 
   const handleNextPassage = () => {
-    const newPassage = getRandomPassage(currentTopic);
-    setPassage(newPassage);
+    if (passagesCache[currentTopic] && passagesCache[currentTopic].cursor) {
+      fetchPassages(currentTopic, true);
+    } else if (passagesCache[currentTopic] && passagesCache[currentTopic].data.length > 0) {
+      const list = passagesCache[currentTopic].data;
+      let nextP = list[Math.floor(Math.random() * list.length)];
+      if (typeof nextP === 'string') {
+        if (nextP === passage && list.length > 1) {
+            nextP = list.find(p => p !== passage) || nextP; 
+        }
+        setPassage(nextP as any);
+        setPassageId(null);
+      } else {
+        if (nextP.passage === passage && list.length > 1) {
+            nextP = list.find(p => p.passage !== passage) || nextP; 
+        }
+        setPassage(nextP.passage);
+        setPassageId(nextP._id || nextP.id || null);
+      }
+    } else {
+      fetchPassages(currentTopic, false);
+    }
     resetPractice();
   };
 
   // Change topic and load its passage atomically
   const handleTopicChange = (topicId: string) => {
-    const newPassage = getRandomPassage(topicId);
-    setCurrentTopic(topicId);
-    setPassage(newPassage);
+    if (topicId === currentTopic) {
+      handleNextPassage();
+    } else {
+      setCurrentTopic(topicId);
+    }
     setTypedText('');
     setTimeLeft(60);
     setWpm(0);
@@ -1477,15 +1539,15 @@ export default function TypingScreen() {
               <View style={styles.heroStatsBadgesRow}>
                 <View style={styles.miniStatBadge}>
                   <Text style={styles.miniStatLabel}>BEST WPM</Text>
-                  <Text style={styles.miniStatValue}>0</Text>
+                  <Text style={styles.miniStatValue}>{attemptsStats.bestSpeedWPM}</Text>
                 </View>
                 <View style={styles.miniStatBadge}>
                   <Text style={styles.miniStatLabel}>ACCURACY</Text>
-                  <Text style={styles.miniStatValue}>0%</Text>
+                  <Text style={styles.miniStatValue}>{attemptsStats.avgAccuracy}%</Text>
                 </View>
                 <View style={styles.miniStatBadge}>
                   <Text style={styles.miniStatLabel}>TESTS</Text>
-                  <Text style={styles.miniStatValue}>0</Text>
+                  <Text style={styles.miniStatValue}>{attemptsStats.testsTaken}</Text>
                 </View>
               </View>
 
@@ -1521,7 +1583,7 @@ export default function TypingScreen() {
                 </View>
                 <View>
                   <Text style={styles.analysisLabel}>BEST SPEED</Text>
-                  <Text style={[styles.analysisValue, { color: text }]}>0 <Text style={styles.analysisUnit}>WPM</Text></Text>
+                  <Text style={[styles.analysisValue, { color: text }]}>{attemptsStats.bestSpeedWPM} <Text style={styles.analysisUnit}>WPM</Text></Text>
                 </View>
               </View>
 
@@ -1531,7 +1593,7 @@ export default function TypingScreen() {
                 </View>
                 <View>
                   <Text style={styles.analysisLabel}>AVG ACCURACY</Text>
-                  <Text style={[styles.analysisValue, { color: text }]}>0%</Text>
+                  <Text style={[styles.analysisValue, { color: text }]}>{attemptsStats.avgAccuracy}%</Text>
                 </View>
               </View>
 
@@ -1541,7 +1603,7 @@ export default function TypingScreen() {
                 </View>
                 <View>
                   <Text style={styles.analysisLabel}>TESTS TAKEN</Text>
-                  <Text style={[styles.analysisValue, { color: text }]}>2</Text>
+                  <Text style={[styles.analysisValue, { color: text }]}>{attemptsStats.testsTaken}</Text>
                 </View>
               </View>
             </View>
@@ -1728,53 +1790,72 @@ export default function TypingScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 6, gap: 8 }}
         >
-          {RECENT_SESSIONS.map((session) => {
-            const progress = Math.min(1, (session.score || 0) / 100);
-            return (
-              <View key={session.id} style={[styles.sessionCard, { backgroundColor: cardBg, borderColor: border }]}>
-                <View style={styles.sessionHeaderRow}>
-                  <View style={[styles.sessionIconBox, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}> 
-                    <Ionicons name={session.id % 2 === 0 ? 'document-text' : 'keypad'} size={18} color="#10b981" />
+          {isLoadingAttempts ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: muted }}>Loading attempts...</Text>
+            </View>
+          ) : attempts.length === 0 ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: muted }}>No recent practice sessions found.</Text>
+            </View>
+          ) : (
+            attempts.map((session: any) => {
+              const progress = Math.min(1, (session.accuracy || 0) / 100);
+              const sessionColor = '#10b981'; // emerald
+              return (
+                <View key={session._id || session.id} style={[styles.sessionCard, { backgroundColor: cardBg, borderColor: border }]}>
+                  <View style={styles.sessionHeaderRow}>
+                    <View style={[styles.sessionIconBox, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}> 
+                      <Ionicons name="keypad" size={18} color="#10b981" />
+                    </View>
+                    <View style={styles.sessionBadge}>
+                      <Text style={styles.sessionBadgeText}>{session.netSpeedWPM || 0} WPM</Text>
+                    </View>
                   </View>
-                  <View style={styles.sessionBadge}>
-                    <Text style={styles.sessionBadgeText}>0+</Text>
+
+                  <Text style={[styles.sessionTitle, { color: text }]} numberOfLines={1}>
+                    {session.passageTitle || session.passageId || 'Practice Session'}
+                  </Text>
+                  <Text style={[styles.sessionSub, { color: muted }]}>
+                    {session.topic || 'General'}
+                  </Text>
+
+                  <View style={styles.sessionStatsRow}>
+                    <View style={styles.sessionStatItem}>
+                      <Text style={styles.sessionStatLabel}>NET WPM</Text>
+                      <Text style={[styles.sessionStatValue, { color: '#10b981' }]}>{session.netSpeedWPM || 0}</Text>
+                    </View>
+                    <View style={styles.sessionStatItem}>
+                      <Text style={styles.sessionStatLabel}>ACCURACY</Text>
+                      <Text style={[styles.sessionStatValue, { color: '#3b82f6' }]}>{session.accuracy || 0}%</Text>
+                    </View>
+                    <View style={styles.sessionStatItem}>
+                      <Text style={styles.sessionStatLabel}>TIME</Text>
+                      <Text style={[styles.sessionStatValue, { color: '#f59e0b' }]}>
+                        {Math.floor(session.timeTakenSec / 60)}m {session.timeTakenSec % 60}s
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.progressBarBackground}>
+                    <View style={[styles.progressBarFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: '#10b981' }]} />
+                  </View>
+
+                  <View style={styles.sessionCardFooter}>
+                    <Text style={[styles.sessionDate, { color: muted }]}>
+                      {new Date(session.createdAt || session.date).toLocaleDateString()}
+                    </Text>
+                    <Pressable 
+                      style={[styles.viewAnalysisBtn, { backgroundColor: sessionColor }]}
+                      onPress={() => setAnalysisSession(session)}
+                    >
+                      <Text style={styles.viewAnalysisText}>View Analysis</Text>
+                    </Pressable>
                   </View>
                 </View>
-
-                <Text style={[styles.sessionTitle, { color: text }]} numberOfLines={1}>{session.title}</Text>
-                <Text style={[styles.sessionSub, { color: muted }]}>{session.sub}</Text>
-
-                <View style={styles.sessionStatsRow}>
-                  <View style={styles.sessionStatItem}>
-                    <Text style={styles.sessionStatLabel}>SCORE</Text>
-                    <Text style={[styles.sessionStatValue, { color: '#10b981' }]}>{session.score}</Text>
-                  </View>
-                  <View style={styles.sessionStatItem}>
-                    <Text style={styles.sessionStatLabel}>ACCURACY</Text>
-                    <Text style={[styles.sessionStatValue, { color: '#3b82f6' }]}>{session.accuracy}</Text>
-                  </View>
-                  <View style={styles.sessionStatItem}>
-                    <Text style={styles.sessionStatLabel}>TIME</Text>
-                    <Text style={[styles.sessionStatValue, { color: '#f59e0b' }]}>{session.time}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.progressBarBackground}>
-                  <View style={[styles.progressBarFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: '#10b981' }]} />
-                </View>
-
-                <View style={styles.sessionCardFooter}>
-                  <Text style={[styles.sessionDate, { color: muted }]}>{session.date}</Text>
-                  <Pressable 
-                    style={[styles.viewAnalysisBtn, { backgroundColor: session.color }]}
-                    onPress={() => setAnalysisSession(session)}
-                  >
-                    <Text style={styles.viewAnalysisText}>View Analysis</Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          })}
+              );
+            })
+          )}
         </ScrollView>
 
         <View style={styles.sectionHeader}>
@@ -1792,68 +1873,61 @@ export default function TypingScreen() {
         </View>
 
         <View style={{ paddingHorizontal: 6, gap: 8 }}>
-          {[
-            { id: 1, title: 'Rise of Buddhism and Jainism', sub: 'SSC session • 0+ on history', score: 32, accuracy: '78.5%', time: '0m 16s', date: '3/18/2026', color: '#10b981' },
-          ].map((session) => {
-            const progress = Math.min(1, (session.score || 0) / 100);
-            return (
-              <View key={session.id} style={[styles.sessionCard, { backgroundColor: cardBg, borderColor: border }]}>
-                <View style={styles.sessionHeaderRow}>
-                  <View style={[styles.sessionIconBox, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}> 
-                    <Ionicons name="document-text" size={18} color="#10b981" />
+          {realAttempts.length === 0 ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: muted }}>No real attempts found.</Text>
+            </View>
+          ) : (
+            realAttempts.map((session: any) => {
+              const progress = Math.min(1, (session.accuracy || 0) / 100);
+              const sessionScore = session.netSpeedWPM || 0;
+              const sessionColor = '#10b981';
+              return (
+                <View key={session._id || session.id} style={[styles.sessionCard, { backgroundColor: cardBg, borderColor: border }]}>
+                  <View style={styles.sessionHeaderRow}>
+                    <View style={[styles.sessionIconBox, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}> 
+                      <Ionicons name="document-text" size={18} color="#10b981" />
+                    </View>
+                    <View style={styles.sessionBadge}>
+                      <Text style={styles.sessionBadgeText}>0+</Text>
+                    </View>
                   </View>
-                  <View style={styles.sessionBadge}>
-                    <Text style={styles.sessionBadgeText}>0+</Text>
+
+                  <Text style={[styles.sessionTitle, { color: text }]} numberOfLines={1}>{session.passageTitle || session.passageId || 'SSC Real Test'}</Text>
+                  <Text style={[styles.sessionSub, { color: muted }]}>SSC session • {session.topic || 'General'}</Text>
+
+                  <View style={styles.sessionStatsRow}>
+                    <View style={styles.sessionStatItem}>
+                      <Text style={styles.sessionStatLabel}>SCORE</Text>
+                      <Text style={[styles.sessionStatValue, { color: '#10b981' }]}>{sessionScore}</Text>
+                    </View>
+                    <View style={styles.sessionStatItem}>
+                      <Text style={styles.sessionStatLabel}>ACCURACY</Text>
+                      <Text style={[styles.sessionStatValue, { color: '#3b82f6' }]}>{session.accuracy || 0}%</Text>
+                    </View>
+                    <View style={styles.sessionStatItem}>
+                      <Text style={styles.sessionStatLabel}>TIME</Text>
+                      <Text style={[styles.sessionStatValue, { color: '#f59e0b' }]}>{Math.floor(session.timeTakenSec / 60)}m {session.timeTakenSec % 60}s</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.progressBarBackground}>
+                    <View style={[styles.progressBarFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: '#10b981' }]} />
+                  </View>
+
+                  <View style={styles.sessionCardFooter}>
+                    <Text style={[styles.sessionDate, { color: muted }]}>{new Date(session.createdAt || session.date).toLocaleDateString()}</Text>
+                    <Pressable 
+                      style={[styles.viewAnalysisBtn, { backgroundColor: sessionColor }]}
+                      onPress={() => setAnalysisSession(session.result || session)}
+                    >
+                      <Text style={styles.viewAnalysisText}>View Analysis</Text>
+                    </Pressable>
                   </View>
                 </View>
-
-                <Text style={[styles.sessionTitle, { color: text }]} numberOfLines={1}>{session.title}</Text>
-                <Text style={[styles.sessionSub, { color: muted }]}>{session.sub}</Text>
-
-                <View style={styles.sessionStatsRow}>
-                  <View style={styles.sessionStatItem}>
-                    <Text style={styles.sessionStatLabel}>SCORE</Text>
-                    <Text style={[styles.sessionStatValue, { color: '#10b981' }]}>{session.score}</Text>
-                  </View>
-                  <View style={styles.sessionStatItem}>
-                    <Text style={styles.sessionStatLabel}>ACCURACY</Text>
-                    <Text style={[styles.sessionStatValue, { color: '#3b82f6' }]}>{session.accuracy}</Text>
-                  </View>
-                  <View style={styles.sessionStatItem}>
-                    <Text style={styles.sessionStatLabel}>TIME</Text>
-                    <Text style={[styles.sessionStatValue, { color: '#f59e0b' }]}>{session.time}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.progressBarBackground}>
-                  <View style={[styles.progressBarFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: '#10b981' }]} />
-                </View>
-
-                <View style={styles.sessionCardFooter}>
-                  <Text style={[styles.sessionDate, { color: muted }]}>{session.date}</Text>
-                  <Pressable 
-                    style={[styles.viewAnalysisBtn, { backgroundColor: session.color }]}
-                    onPress={() => setAnalysisSession({
-                      title: session.title,
-                      date: session.date,
-                      netWpm: session.score,
-                      accuracy: parseInt(session.accuracy),
-                      grossWpm: session.score + 5,
-                      consistency: 85,
-                      timeTaken: session.time,
-                      totalWords: session.score,
-                      mistakes: Math.floor(session.score * 0.15),
-                      keystrokes: session.score * 5,
-                      trendData: [{ time: 0, wpm: 0 }, { time: 30, wpm: session.score }, { time: 60, wpm: session.score }],
-                      keyStats: {}
-                    })}
-                  >
-                    <Text style={styles.viewAnalysisText}>View Analysis</Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          })}
+              );
+            })
+          )}
         </View>
 
         <View style={{ height: 60 }} />
