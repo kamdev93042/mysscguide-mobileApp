@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useLoginModal } from '../context/LoginModalContext';
 
 export default function LoginModal() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { isVisible, closeLogin, setUserPhone, setUserEmail } = useLoginModal();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [email, setEmail] = useState('');

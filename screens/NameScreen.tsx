@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function NameScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { setUserName, setHasLoggedIn, userEmail } = useLoginModal();
   const { showSplash } = useSplash();
   const [name, setName] = useState('');

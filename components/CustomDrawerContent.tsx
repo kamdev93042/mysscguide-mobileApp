@@ -47,7 +47,7 @@ export default function CustomDrawerContent(props) {
               }}
             >
               <Ionicons
-                name={item.icon}
+                name={item.icon as any}
                 size={20}
                 color={isActive ? '#059669' : '#94a3b8'}
               />

@@ -41,6 +41,16 @@ const AUTH_STORAGE_KEYS = [
   'userPhone',
 ];
 
+const hasUsableAuthToken = (token: string | null) => {
+  if (!token) return false;
+  const trimmed = token.trim();
+  if (!trimmed || trimmed === 'true' || trimmed === 'dev-bypass-token') {
+    return false;
+  }
+
+  return trimmed.split('.').length === 3;
+};
+
 const clearAuthKeysEverywhere = async () => {
   try {
     await Promise.all(AUTH_STORAGE_KEYS.map((key) => AsyncStorage.removeItem(key)));
@@ -49,17 +59,17 @@ const clearAuthKeysEverywhere = async () => {
   }
 
   try {
-    await AsyncStorage.multiRemove(AUTH_STORAGE_KEYS);
+    await Promise.all(AUTH_STORAGE_KEYS.map((key) => AsyncStorage.removeItem(key)));
   } catch (error) {
-    console.error('Failed removing auth keys via multiRemove', error);
+    console.error('Failed removing auth keys in bulk', error);
   }
 
-  await AsyncStorage.multiSet([
-    ['isLoggedIn', 'false'],
-    ['userToken', ''],
-    ['userName', ''],
-    ['userEmail', ''],
-    ['userPhone', ''],
+  await Promise.all([
+    AsyncStorage.setItem('isLoggedIn', 'false'),
+    AsyncStorage.setItem('userToken', ''),
+    AsyncStorage.setItem('userName', ''),
+    AsyncStorage.setItem('userEmail', ''),
+    AsyncStorage.setItem('userPhone', ''),
   ]);
 
   if (Platform.OS === 'web') {
@@ -247,7 +257,7 @@ export default function ProfileScreen() {
           setDailyExamHistory(storedDailyExamHistory);
         }
 
-        if (isLoggedIn === 'true' && token && token !== 'true') {
+        if (isLoggedIn === 'true' && hasUsableAuthToken(token)) {
           try {
             const res = await userApi.getProfile();
             setProfileData(res?.user || res);
@@ -298,7 +308,7 @@ export default function ProfileScreen() {
               setDailyExamHistory(storedDailyExamHistory);
             }
 
-            if (isLoggedIn === 'true' && token && token !== 'true') {
+            if (isLoggedIn === 'true' && hasUsableAuthToken(token)) {
               try {
                 const res = await userApi.getProfile();
                 if (isActive) {
@@ -552,6 +562,15 @@ export default function ProfileScreen() {
     navigation.navigate('Notifications');
   };
 
+  const handleGoBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.navigate('Main', { screen: 'Home' });
+  };
+
   const handleOpenTests = () => {
     navigation.navigate('Tests');
   };
@@ -701,6 +720,9 @@ export default function ProfileScreen() {
             </View>
           </View>
           <View style={styles.headerIcons}>
+            <Pressable style={styles.iconBtn} hitSlop={8} onPress={handleGoBack}>
+              <Ionicons name="arrow-back" size={20} color="#059669" />
+            </Pressable>
             <Pressable style={styles.iconBtn} hitSlop={8} onPress={handleOpenNotifications}>
               <Ionicons name="notifications-outline" size={20} color="#059669" />
             </Pressable>

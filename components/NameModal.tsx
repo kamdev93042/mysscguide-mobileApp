@@ -15,7 +15,7 @@ import { useLoginModal } from '../context/LoginModalContext';
 
 export default function NameModal() {
   const { nameModalVisible, closeNameModal, setHasLoggedIn, setUserName } = useLoginModal();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [name, setNameInput] = useState('');
 

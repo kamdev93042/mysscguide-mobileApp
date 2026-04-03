@@ -44,6 +44,16 @@ export default function ForumsScreen() {
   const border = isDark ? '#1e293b' : '#e2e8f0';
   const primary = '#059669';
 
+  const goBackFromForums = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    // Fallback when Forums is opened as a top-level route.
+    navigation.navigate('Main', { screen: 'Home' });
+  };
+
   useFocusEffect(
     useCallback(() => {
       setVisibleCount(3);
@@ -127,6 +137,9 @@ export default function ForumsScreen() {
     <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
       {/* Shared Dashboard/App Header */}
       <View style={[styles.appHeader, { borderBottomColor: border }]}>
+        <Pressable onPress={goBackFromForums} style={[styles.iconBtn, styles.backBtn]} hitSlop={8}>
+          <Ionicons name="arrow-back" size={20} color="#059669" />
+        </Pressable>
         <View style={styles.logoRow}>
           <Image 
             source={require('../assets/sscguidelogo.png')} 
@@ -544,6 +557,7 @@ const styles = StyleSheet.create({
   logoHighlight: { color: '#059669' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  backBtn: { marginRight: 6 },
   scroll: { paddingBottom: 40 },
   bannerWrap: { padding: 16 },
   bannerBanner: {

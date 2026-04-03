@@ -4,16 +4,20 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { Text, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFonts, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans';
 import { LoginModalProvider } from './context/LoginModalContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SplashProvider } from './context/SplashContext';
 import { MocksProvider } from './context/MocksContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LoginScreen from './screens/LoginScreen';
+import WelcomeScreen from './screens/WelcomeScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import MenuScreen from './screens/MenuScreen';
+import PlaceholderScreen from './screens/PlaceholderScreen';
 import OtpVerificationScreen from './screens/OtpVerificationScreen';
 import NameScreen from './screens/NameScreen';
 import NotificationScreen from './screens/NotificationScreen';
@@ -46,7 +50,6 @@ const TAB_SCREENS = [
   { name: 'Tests', label: 'Tests', icon: 'document-text', component: TestsScreen },
   { name: 'Mnemonics', label: 'Mnemonics', icon: 'bulb', component: MnemonicsScreen },
   { name: 'Typing', label: 'Typing', icon: 'keypad', component: TypingScreen },
-  { name: 'Forums', label: 'Forums', icon: 'people', component: ForumsScreen },
 ];
 
 function HomeStackNavigator() {
@@ -60,10 +63,10 @@ function HomeStackNavigator() {
 function MainTabs() {
   const { isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const tabBg = isDark ? '#0f172a' : '#f8fafc';
+  const tabBg = isDark ? '#0f172a' : '#ffffff';
   const tabActive = '#059669';
-  const tabInactive = isDark ? '#64748b' : '#94a3b8';
-  const borderTop = isDark ? '#1e293b' : '#e2e8f0';
+  const tabInactive = '#94a3b8';
+  const borderTop = isDark ? '#334155' : '#f1f5f9';
 
   return (
     <Tab.Navigator
@@ -74,30 +77,43 @@ function MainTabs() {
         tabBarShowLabel: true,
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
           backgroundColor: tabBg,
           borderTopColor: borderTop,
           borderTopWidth: 1,
-          height: 64 + insets.bottom,
-          paddingBottom: Math.max(insets.bottom, 10),
-          paddingTop: 8,
+          height: 62 + Math.max(insets.bottom, 4),
+          paddingTop: 6,
+          paddingBottom: Math.max(insets.bottom, 4),
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarActiveTintColor: tabActive,
         tabBarInactiveTintColor: tabInactive,
-        tabBarItemStyle: { paddingVertical: 2 },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', paddingBottom: 2 },
-        tabBarIconStyle: { marginTop: 0 },
+        tabBarActiveBackgroundColor: isDark ? '#064e3b' : '#ecfdf5',
+        tabBarItemStyle: {
+          marginHorizontal: 4,
+          marginVertical: 2,
+          borderRadius: 14,
+        },
+        tabBarLabelStyle: {
+          fontSize: 9,
+          fontWeight: '700',
+          marginBottom: 2,
+        },
+        tabBarIconStyle: { marginTop: 2 },
       }}
     >
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}
         options={{
-          tabBarLabel: ({ color }) => (
-            <Text style={{ fontSize: 11, fontWeight: '700', color, marginTop: 2 }}>
-              Home
-            </Text>
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name="home" size={focused ? 20 : 18} color={color} />
           ),
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
       {TAB_SCREENS.map(({ name, label, icon, component }) => (
@@ -107,25 +123,28 @@ function MainTabs() {
           component={component}
           initialParams={{ name }}
           options={{
-            tabBarLabel: ({ color }) => (
-              <Text style={{ fontSize: 11, fontWeight: '700', color, marginTop: 2 }}>
-                {label}
-              </Text>
+            tabBarLabel: label,
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={icon as any} size={focused ? 20 : 18} color={color} />
             ),
-            tabBarIcon: ({ color, size }) => <Ionicons name={icon as any} size={size} color={color} />,
           }}
         />
       ))}
       <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
+        name="Menu"
+        component={PlaceholderScreen}
+        listeners={({ navigation }) => ({
+          tabPress: (event: any) => {
+            event.preventDefault();
+            navigation.getParent()?.navigate('MenuDrawer' as never);
+          },
+        })}
+        initialParams={{ name: 'Menu' }}
         options={{
-          tabBarLabel: ({ color }) => (
-            <Text style={{ fontSize: 11, fontWeight: '700', color, marginTop: 2 }}>
-              Profile
-            </Text>
+          tabBarLabel: 'Menu',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name="grid" size={focused ? 20 : 18} color={color} />
           ),
-          tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>
@@ -136,10 +155,32 @@ import { MnemonicsProvider } from './context/MnemonicsContext';
 import { ForumsProvider } from './context/ForumsContext';
 
 export default function App() {
-  const [initialRouteName, setInitialRouteName] = useState<'Login' | 'Main'>(
-    BYPASS_LOGIN_FOR_TESTING ? 'Main' : 'Login'
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+  const [initialRouteName, setInitialRouteName] = useState<'Welcome' | 'Main'>(
+    BYPASS_LOGIN_FOR_TESTING ? 'Main' : 'Welcome'
   );
-  const [hasResolvedInitialRoute, setHasResolvedInitialRoute] = useState(BYPASS_LOGIN_FOR_TESTING);
+  const [hasResolvedInitialRoute, setHasResolvedInitialRoute] = useState<boolean>(BYPASS_LOGIN_FOR_TESTING);
+
+  useEffect(() => {
+    if (!fontsLoaded) return;
+
+    const textDefaults = (Text as any).defaultProps || {};
+    (Text as any).defaultProps = {
+      ...textDefaults,
+      style: [{ fontFamily: 'PlusJakartaSans_500Medium' }, textDefaults.style],
+    };
+
+    const inputDefaults = (TextInput as any).defaultProps || {};
+    (TextInput as any).defaultProps = {
+      ...inputDefaults,
+      style: [{ fontFamily: 'PlusJakartaSans_500Medium' }, inputDefaults.style],
+    };
+  }, [fontsLoaded]);
 
   useEffect(() => {
     if (BYPASS_LOGIN_FOR_TESTING) {
@@ -164,12 +205,12 @@ export default function App() {
         if (isLoggedIn === 'true' && userToken) {
           setInitialRouteName('Main');
         } else {
-          setInitialRouteName('Login');
+          setInitialRouteName('Welcome');
         }
       } catch (error) {
         console.error('Failed to restore auth state', error);
         if (isMounted) {
-          setInitialRouteName('Login');
+          setInitialRouteName('Welcome');
         }
       } finally {
         if (isMounted) {
@@ -202,6 +243,7 @@ export default function App() {
                 }}
                 initialRouteName={initialRouteName}
               >
+                <Stack.Screen name="Welcome" component={WelcomeScreen} />
                 <Stack.Screen name="Login" component={LoginScreen} />
                 <Stack.Screen name="OTP" component={OtpVerificationScreen} />
                 <Stack.Screen name="Name" component={NameScreen} />
@@ -217,9 +259,19 @@ export default function App() {
                 <Stack.Screen name="TestAnalysis" component={TestAnalysisScreen} />
                 <Stack.Screen name="DailyChallenge" component={DailyChallengeScreen} />
                 <Stack.Screen name="ForumPost" component={ForumPostScreen} />
+                <Stack.Screen name="Forums" component={ForumsScreen} />
                 <Stack.Screen name="Mocks" component={MocksScreen} />
                 <Stack.Screen name="PYQs" component={PyqsScreen} />
                 <Stack.Screen name="Contests" component={ContestScreen} />
+                <Stack.Screen name="Profile" component={ProfileScreen} />
+                <Stack.Screen
+                  name="MenuDrawer"
+                  component={MenuScreen}
+                  options={{
+                    presentation: 'transparentModal',
+                    animation: 'none',
+                  }}
+                />
               </Stack.Navigator>
             )}
             <SplashScreen />

@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MySSCguide</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{font-size:17px;-webkit-tap-highlight-color:transparent}
+    body{
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      background:#f8fafc;color:#1e293b;
+      min-height:100dvh;overflow-x:hidden;
+      padding-bottom:76px;
+      max-width:480px;margin:0 auto;position:relative;
+    }
+
+    /* ── Header ── */
+    .header{
+      position:sticky;top:0;z-index:100;
+      background:#fff;
+      padding:10px 16px;
+      display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid #f1f5f9;
+    }
+    .brand{display:flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer}
+    .brand-logo{
+      width:32px;height:32px;border-radius:9px;
+      background:linear-gradient(135deg,#059669,#0d9488);
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-size:14px;
+    }
+    .brand-text{font-size:1.05rem;font-weight:800;color:#0f172a;letter-spacing:-.4px}
+    .brand-text b{color:#059669;font-weight:800}
+    .hdr-right{display:flex;align-items:center;gap:6px}
+    .streak-chip{
+      display:flex;align-items:center;gap:3px;
+      background:#fff7ed;border:1px solid #fed7aa;
+      border-radius:99px;padding:4px 9px 4px 6px;
+      text-decoration:none;cursor:pointer;transition:background .15s;
+    }
+    .streak-chip:active{background:#ffedd5}
+    .streak-chip i{
+      color:#f97316;font-size:.85rem;
+      filter:drop-shadow(0 0 3px rgba(249,115,22,.5));
+    }
+    .streak-chip span{font-size:.72rem;font-weight:800;color:#ea580c}
+    .hdr-btn{
+      background:none;border:none;color:#94a3b8;
+      font-size:1.1rem;cursor:pointer;
+      width:34px;height:34px;border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      position:relative;transition:background .15s;
+    }
+    .hdr-btn:active{background:#f1f5f9}
+    .hdr-btn.notif-btn i{color:#f59e0b}
+    .notif-dot{
+      position:absolute;top:5px;right:5px;
+      width:7px;height:7px;background:#f43f5e;
+      border-radius:50%;border:1.5px solid #fff;
+    }
+
+    /* ── Celebration toast ── */
+    .hurrah-toast{
+      position:fixed;top:50%;left:50%;
+      transform:translate(-50%,-50%) scale(.6);
+      background:#fff;border-radius:20px;
+      padding:20px 28px;text-align:center;
+      box-shadow:0 20px 60px rgba(0,0,0,.18);
+      z-index:400;pointer-events:none;
+      opacity:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s;
+    }
+    .hurrah-toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    .hurrah-toast.hide{opacity:0;transform:translate(-50%,-50%) scale(.7)}
+    .hurrah-emoji{font-size:2.4rem;display:block;margin-bottom:6px;animation:wiggle .5s ease}
+    @keyframes wiggle{
+      0%,100%{transform:rotate(0)}
+      25%{transform:rotate(-12deg)}
+      75%{transform:rotate(12deg)}
+    }
+    .hurrah-title{font-size:.95rem;font-weight:800;color:#0f172a;margin-bottom:2px}
+    .hurrah-sub{font-size:.72rem;color:#94a3b8;font-weight:500}
+
+    /* ── Confetti particle ── */
+    .confetti{
+      position:fixed;pointer-events:none;z-index:399;
+      width:7px;height:7px;border-radius:2px;
+      animation:confettiFall linear forwards;
+    }
+    @keyframes confettiFall{
+      0%{transform:translateY(0) rotate(0deg);opacity:1}
+      100%{transform:translateY(100vh) rotate(720deg);opacity:0}
+    }
+
+    .avatar{
+      width:30px;height:30px;border-radius:50%;
+      background:linear-gradient(135deg,#059669,#0d9488);
+      color:#fff;font-weight:700;font-size:.7rem;
+      display:flex;align-items:center;justify-content:center;cursor:pointer;
+    }
+
+    /* ── Greeting ── */
+    .greet{
+      padding:14px 16px 0;
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .greet-text{font-size:.88rem;font-weight:700;color:#334155}
+    .greet-text span{color:#059669}
+    .greet-date{font-size:.68rem;color:#94a3b8;font-weight:600}
+
+    /* ── Ad Carousel ── */
+    .ad-carousel{
+      margin:12px 16px 0;border-radius:16px;
+      overflow:hidden;position:relative;
+      height:140px;
+    }
+    .ad-track{
+      display:flex;width:300%;height:100%;
+      transition:transform .5s cubic-bezier(.4,0,.2,1);
+    }
+    .ad-slide{
+      width:calc(100%/3);height:100%;flex-shrink:0;
+      padding:18px 20px;display:flex;flex-direction:column;
+      justify-content:center;position:relative;overflow:hidden;
+      color:#fff;cursor:pointer;
+    }
+    .ad-slide::before{
+      content:'';position:absolute;top:-25px;right:-15px;
+      width:100px;height:100px;border-radius:50%;
+      background:rgba(255,255,255,.1);
+    }
+    .ad-slide::after{
+      content:'';position:absolute;bottom:-30px;left:30px;
+      width:60px;height:60px;border-radius:50%;
+      background:rgba(255,255,255,.06);
+    }
+    .ad-slide .ad-label{
+      font-size:.5rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:1px;opacity:.5;margin-bottom:6px;
+      position:relative;z-index:1;
+    }
+    .ad-slide .ad-title{
+      font-size:.92rem;font-weight:800;line-height:1.3;
+      margin-bottom:3px;position:relative;z-index:1;
+    }
+    .ad-slide .ad-sub{
+      font-size:.68rem;font-weight:500;opacity:.7;
+      position:relative;z-index:1;line-height:1.35;
+    }
+    .ad-slide .ad-cta{
+      display:inline-flex;align-items:center;gap:5px;
+      background:rgba(255,255,255,.2);backdrop-filter:blur(6px);
+      border:1px solid rgba(255,255,255,.25);
+      color:#fff;font-size:.65rem;font-weight:700;
+      padding:6px 14px;border-radius:8px;
+      margin-top:10px;width:fit-content;
+      cursor:pointer;position:relative;z-index:1;
+      transition:background .15s;
+    }
+    .ad-slide .ad-cta:active{background:rgba(255,255,255,.35)}
+    .ad-dots{
+      position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+      display:flex;gap:6px;z-index:2;
+    }
+    .ad-dot{
+      width:6px;height:6px;border-radius:50%;
+      background:rgba(255,255,255,.35);
+      transition:all .3s;cursor:pointer;
+    }
+    .ad-dot.on{width:18px;border-radius:3px;background:#fff}
+
+    /* ── Target card ── */
+    .target{
+      margin:10px 16px 0;background:#fff;
+      border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;
+    }
+    .target-row{
+      display:flex;align-items:center;gap:10px;padding:10px 12px;
+    }
+    .target-row .t-ico{color:#7c3aed;font-size:.8rem;flex-shrink:0}
+    .target-row .t-title{font-size:.8rem;font-weight:700;color:#334155;flex:1}
+    .target-row .t-hint{font-size:.68rem;color:#cbd5e1;font-weight:500}
+    .t-add{
+      width:24px;height:24px;background:#ecfdf5;border:none;
+      border-radius:6px;color:#059669;font-size:.82rem;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;flex-shrink:0;transition:background .15s;
+    }
+    .t-add:active{background:#d1fae5}
+    .t-input-row{
+      display:none;align-items:center;gap:6px;
+      padding:8px 12px;border-top:1px solid #f1f5f9;background:#fafbfc;
+    }
+    .t-input-row.visible{display:flex}
+    .t-input-row input{
+      flex:1;border:1px solid #e2e8f0;border-radius:8px;
+      padding:7px 10px;font-size:.76rem;font-family:inherit;
+      color:#1e293b;outline:none;background:#fff;
+    }
+    .t-input-row input:focus{border-color:#059669}
+    .t-input-row .t-save{
+      background:#059669;color:#fff;border:none;
+      border-radius:8px;padding:7px 12px;
+      font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap;
+    }
+    .t-input-row .t-save:active{opacity:.85}
+    .t-list{}
+    .t-item{
+      display:flex;align-items:center;gap:10px;
+      padding:7px 12px;border-top:1px solid #f8fafc;
+    }
+    .t-chk{
+      width:17px;height:17px;border-radius:50%;
+      border:1.5px solid #d1d5db;flex-shrink:0;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:all .15s;
+    }
+    .t-chk.done{
+      background:#059669;border-color:#059669;
+      box-shadow:0 0 0 4px rgba(5,150,105,.22);
+      animation:checkGlow .4s ease;
+    }
+    @keyframes checkGlow{
+      0%{box-shadow:0 0 0 0 rgba(5,150,105,.6);transform:scale(.8)}
+      60%{box-shadow:0 0 0 8px rgba(5,150,105,.0);transform:scale(1.15)}
+      100%{box-shadow:0 0 0 4px rgba(5,150,105,.22);transform:scale(1)}
+    }
+    .t-chk.done::after{content:'✓';font-size:.55rem;font-weight:900;color:#fff}
+    .t-txt{flex:1;font-size:.76rem;font-weight:600;color:#334155;line-height:1.3}
+    .t-txt.done{text-decoration:line-through;color:#94a3b8}
+    .t-del{
+      background:none;border:none;color:#e2e8f0;
+      font-size:.65rem;cursor:pointer;padding:3px;flex-shrink:0;
+    }
+    .t-del:active{color:#f87171}
+
+    /* ── Quick Actions (Matiks-inspired) ── */
+    .section-lbl{
+      padding:0 16px;font-size:.7rem;font-weight:700;
+      color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;
+      margin-top:20px;margin-bottom:10px;
+    }
+    .qa-grid{
+      display:grid;grid-template-columns:repeat(4,1fr);
+      gap:14px 8px;padding:0 16px;
+    }
+    .qa-item{
+      display:flex;flex-direction:column;align-items:center;
+      gap:6px;text-decoration:none;cursor:pointer;position:relative;
+    }
+    .qa-item:active .qa-ico{transform:scale(.88)}
+    .qa-ico{
+      width:52px;height:52px;border-radius:16px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.2rem;color:#fff;transition:transform .12s;
+      position:relative;
+      box-shadow:0 4px 14px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.25);
+    }
+    .qa-ico::after{
+      content:'';position:absolute;inset:0;border-radius:16px;
+      background:linear-gradient(180deg,rgba(255,255,255,.18) 0%,transparent 50%);
+      pointer-events:none;
+    }
+    .qa-badge{
+      position:absolute;top:-3px;right:6px;
+      background:#f43f5e;color:#fff;
+      font-size:.5rem;font-weight:800;
+      padding:1px 5px;border-radius:6px;
+      line-height:1.4;
+      box-shadow:0 2px 6px rgba(244,63,94,.4);
+    }
+    .qa-badge.live{background:#059669;animation:livePulse 2s infinite}
+    @keyframes livePulse{
+      0%,100%{box-shadow:0 0 0 0 rgba(5,150,105,.4)}
+      50%{box-shadow:0 0 0 5px rgba(5,150,105,0)}
+    }
+    .qa-name{font-size:.64rem;font-weight:600;color:#64748b;text-align:center;line-height:1.2}
+
+    /* ── Challenge cards ── */
+    .challenges{
+      display:flex;flex-direction:column;gap:10px;padding:0 16px;
+    }
+    .ch-card{
+      background:#fff;border-radius:14px;
+      padding:14px;display:flex;align-items:center;gap:12px;
+      border:1px solid #e2e8f0;cursor:pointer;
+      text-decoration:none;color:inherit;transition:transform .12s;
+    }
+    .ch-card:active{transform:scale(.98)}
+    .ch-ico{
+      width:44px;height:44px;border-radius:12px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.15rem;flex-shrink:0;
+    }
+    .ch-body{flex:1;min-width:0}
+    .ch-body h3{font-size:.85rem;font-weight:700;color:#1e293b;margin-bottom:1px}
+    .ch-body p{font-size:.7rem;color:#94a3b8;font-weight:500;line-height:1.35}
+    .ch-go{color:#cbd5e1;font-size:.75rem;flex-shrink:0;transition:color .15s}
+    .ch-card:active .ch-go{color:#059669}
+
+    /* (ad styles in carousel above) */
+
+    /* ── Premium strip ── */
+    .premium{
+      margin:0 16px;border-radius:14px;
+      background:linear-gradient(135deg,#059669 0%,#0d9488 100%);
+      padding:14px 16px;display:flex;align-items:center;gap:12px;
+      color:#fff;cursor:pointer;position:relative;overflow:hidden;
+      text-decoration:none;
+    }
+    .premium::after{
+      content:'';position:absolute;top:-30px;right:-20px;
+      width:90px;height:90px;background:rgba(255,255,255,.08);border-radius:50%;
+    }
+    .premium .p-key{
+      width:40px;height:40px;border-radius:11px;
+      background:rgba(255,255,255,.18);
+      display:flex;align-items:center;justify-content:center;
+      font-size:1rem;flex-shrink:0;position:relative;z-index:1;
+    }
+    .premium .p-info{flex:1;position:relative;z-index:1}
+    .premium .p-info h4{font-size:.85rem;font-weight:700;margin-bottom:1px}
+    .premium .p-info p{font-size:.68rem;opacity:.85;font-weight:500}
+    .premium .p-price{
+      font-size:1.05rem;font-weight:900;white-space:nowrap;
+      flex-shrink:0;position:relative;z-index:1;
+    }
+    .premium .p-price small{font-size:.65rem;font-weight:600;opacity:.8}
+
+    /* ── Tip of the Day ── */
+    .tip-card{
+      margin:0;
+      background:linear-gradient(135deg,#fffbeb 0%,#fef9c3 100%);
+      border-radius:16px;
+      border:1px solid #fde68a;
+      overflow:hidden;
+      position:relative;
+    }
+    .tip-card::before{
+      content:'';
+      position:absolute;top:-18px;right:-18px;
+      width:72px;height:72px;border-radius:50%;
+      background:rgba(251,191,36,.15);
+    }
+    .tip-header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:10px 14px 0;
+    }
+    .tip-tag{
+      display:inline-flex;align-items:center;gap:5px;
+      background:#fde68a;color:#92400e;
+      font-size:.58rem;font-weight:800;
+      text-transform:uppercase;letter-spacing:.6px;
+      padding:3px 8px;border-radius:6px;
+    }
+    .tip-nav{
+      display:flex;align-items:center;gap:6px;
+    }
+    .tip-nav button{
+      background:rgba(251,191,36,.25);border:none;
+      width:22px;height:22px;border-radius:6px;
+      color:#92400e;font-size:.62rem;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:background .15s;flex-shrink:0;
+    }
+    .tip-nav button:active{background:rgba(251,191,36,.5)}
+    .tip-counter{
+      font-size:.62rem;font-weight:700;color:#b45309;
+      min-width:28px;text-align:center;
+    }
+    .tip-body{
+      padding:10px 14px 12px;
+      position:relative;z-index:1;
+    }
+    .tip-text{
+      font-size:.8rem;font-weight:600;color:#78350f;
+      line-height:1.55;
+    }
+    .tip-progress{
+      display:flex;gap:4px;
+      padding:0 14px 10px;
+    }
+    .tip-pip{
+      flex:1;height:3px;border-radius:99px;
+      background:#fde68a;transition:background .3s;
+    }
+    .tip-pip.on{background:#f59e0b;}
+
+    /* ── Floating Help FAB ── */
+    .help-fab{
+      position:fixed;
+      bottom:84px;right:16px;
+      width:48px;height:48px;
+      border-radius:50%;
+      background:linear-gradient(135deg,#059669,#0d9488);
+      color:#fff;font-size:1.2rem;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 4px 20px rgba(5,150,105,.35);
+      cursor:pointer;border:none;
+      z-index:150;
+      transition:transform .2s,box-shadow .2s;
+    }
+    .help-fab:active{transform:scale(.9);box-shadow:0 2px 10px rgba(5,150,105,.25)}
+    .help-fab .fab-pulse{
+      position:absolute;inset:0;border-radius:50%;
+      border:2px solid #059669;
+      animation:fabPing 2.5s cubic-bezier(0,0,.2,1) infinite;
+    }
+    @keyframes fabPing{
+      0%{transform:scale(1);opacity:.6}
+      100%{transform:scale(1.6);opacity:0}
+    }
+
+    /* ── Bottom nav (Matiks-inspired active pill) ── */
+    .bnav{
+      position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+      width:100%;max-width:480px;background:#fff;
+      border-top:1px solid #f1f5f9;
+      display:flex;align-items:center;justify-content:space-around;
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      z-index:200;
+    }
+    .bnav-item{
+      display:flex;flex-direction:column;align-items:center;gap:2px;
+      text-decoration:none;cursor:pointer;
+      padding:5px 14px;border-radius:12px;
+      transition:all .2s;border:none;background:none;
+    }
+    .bnav-item:active{background:#f1f5f9}
+    .bnav-item i{font-size:1.05rem;color:#94a3b8;transition:color .2s}
+    .bnav-item span{font-size:.58rem;font-weight:600;color:#94a3b8;transition:color .2s}
+    .bnav-item.on{background:#ecfdf5;border-radius:14px}
+    .bnav-item.on i{color:#059669}
+    .bnav-item.on span{color:#059669;font-weight:700}
+
+    /* ── Slide menu ── */
+    .m-overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,.4);
+      z-index:300;opacity:0;visibility:hidden;
+      transition:opacity .3s,visibility .3s;
+    }
+    .m-overlay.open{opacity:1;visibility:visible}
+    .m-drawer{
+      position:fixed;top:0;left:0;width:282px;height:100%;
+      background:#f8fafc;z-index:301;
+      transform:translateX(-100%);
+      transition:transform .32s cubic-bezier(.4,0,.2,1);
+      display:flex;flex-direction:column;overflow-y:auto;
+      scrollbar-width:none;
+    }
+    .m-drawer::-webkit-scrollbar{display:none}
+    .m-drawer.open{transform:translateX(0)}
+
+    /* ── Drawer profile header ── */
+    .m-head{
+      background:linear-gradient(135deg,#059669 0%,#0d9488 100%);
+      padding:48px 20px 22px;position:relative;
+    }
+    .m-close{
+      position:absolute;top:14px;right:14px;
+      width:28px;height:28px;border-radius:50%;
+      background:rgba(255,255,255,.18);border:none;
+      color:#fff;font-size:.75rem;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:background .15s;
+    }
+    .m-close:active{background:rgba(255,255,255,.32)}
+    .m-av{
+      width:54px;height:54px;border-radius:50%;
+      background:rgba(255,255,255,.22);
+      border:2.5px solid rgba(255,255,255,.6);
+      color:#fff;font-weight:800;font-size:1.1rem;
+      display:flex;align-items:center;justify-content:center;
+      margin-bottom:10px;
+    }
+    .m-uname{font-size:.95rem;font-weight:800;color:#fff;margin-bottom:2px}
+    .m-usub{font-size:.68rem;color:rgba(255,255,255,.75);font-weight:500;margin-bottom:10px}
+    .m-head-meta{display:flex;align-items:center;gap:10px}
+    .m-streak{
+      display:inline-flex;align-items:center;gap:4px;
+      background:rgba(255,255,255,.18);border-radius:99px;
+      padding:3px 10px;font-size:.62rem;font-weight:700;color:#fff;
+    }
+    .m-streak i{color:#fbbf24}
+    .m-profile-btn{
+      margin-left:auto;display:inline-flex;align-items:center;gap:4px;
+      background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
+      border-radius:99px;padding:4px 11px;
+      font-size:.62rem;font-weight:700;color:#fff;
+      text-decoration:none;cursor:pointer;transition:background .15s;
+    }
+    .m-profile-btn:active{background:rgba(255,255,255,.3)}
+
+    /* ── Drawer body ── */
+    .m-body{padding:12px 12px 4px;flex:1}
+    .m-section{
+      font-size:.58rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+      color:#94a3b8;padding:8px 10px 4px;
+    }
+    .m-link{
+      display:flex;align-items:center;gap:11px;
+      padding:10px 10px;border-radius:12px;
+      font-size:.82rem;font-weight:600;color:#475569;
+      text-decoration:none;cursor:pointer;
+      transition:background .12s,color .12s;
+      border:none;background:none;width:100%;text-align:left;
+      margin-bottom:1px;
+    }
+    .m-link:active{background:#e2e8f0}
+    .m-link.act{background:#ecfdf5;color:#059669}
+    .m-link.act .m-ico{background:linear-gradient(135deg,#059669,#0d9488)}
+    .m-ico{
+      width:32px;height:32px;border-radius:10px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      font-size:.8rem;color:#fff;
+    }
+    .m-lbl{flex:1}
+    .m-badge{
+      font-size:.52rem;font-weight:800;padding:2px 7px;
+      border-radius:99px;letter-spacing:.3px;
+    }
+    .m-badge.live{background:#fef2f2;color:#f43f5e}
+    .m-badge.pro{background:#fef3c7;color:#b45309}
+    .m-badge.new{background:#f0fdf4;color:#15803d}
+    .m-divider{height:1px;background:#e2e8f0;margin:8px 10px}
+
+    /* ── Premium upgrade strip ── */
+    .m-upgrade{
+      margin:12px 12px;border-radius:14px;
+      background:linear-gradient(135deg,#fffbeb,#fef9c3);
+      border:1px solid #fde68a;padding:12px 14px;
+      display:flex;align-items:center;gap:10px;cursor:pointer;
+      transition:opacity .15s;
+    }
+    .m-upgrade:active{opacity:.85}
+    .m-upgrade-ico{
+      width:36px;height:36px;border-radius:10px;flex-shrink:0;
+      background:linear-gradient(135deg,#f59e0b,#d97706);
+      display:flex;align-items:center;justify-content:center;
+      font-size:.9rem;color:#fff;
+    }
+    .m-upgrade-title{font-size:.78rem;font-weight:800;color:#92400e}
+    .m-upgrade-sub{font-size:.62rem;color:#b45309;font-weight:500;margin-top:1px}
+    .m-upgrade-arrow{margin-left:auto;color:#d97706;font-size:.75rem}
+
+    /* ── Drawer footer ── */
+    .m-foot{
+      padding:12px 18px 20px;
+      font-size:.62rem;color:#cbd5e1;text-align:center;
+    }
+    .m-foot b{color:#059669}
+
+    /* ── Utility ── */
+    .gap{height:14px}
+
+    /* ── Marquee shared ── */
+    .marquee-wrap{
+      overflow:hidden;position:relative;padding:4px 0 10px;
+    }
+    .marquee-track{
+      display:flex;gap:12px;width:max-content;padding-left:16px;
+      animation:marqueeFlow var(--mdur,32s) linear infinite;
+      will-change:transform;
+    }
+    .marquee-track.paused{animation-play-state:paused}
+    @keyframes marqueeFlow{
+      from{transform:translateX(0)}
+      to{transform:translateX(-50%)}
+    }
+
+    /* ── Forum Posts ── */
+    .forum-card{
+      flex-shrink:0;width:220px;background:#fff;border-radius:14px;
+      border:1px solid #e2e8f0;padding:12px 13px;
+      box-shadow:0 2px 10px rgba(0,0,0,.06);
+      cursor:pointer;transition:transform .15s;
+    }
+    .forum-card:active{transform:scale(.97)}
+    .forum-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+    .forum-cat{
+      display:inline-flex;align-items:center;gap:4px;
+      font-size:.56rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+      padding:3px 8px;border-radius:99px;
+    }
+    .forum-cat.gk{background:#dbeafe;color:#1d4ed8}
+    .forum-cat.math{background:#fef3c7;color:#b45309}
+    .forum-cat.eng{background:#dcfce7;color:#15803d}
+    .forum-cat.reason{background:#f3e8ff;color:#7e22ce}
+    .forum-cat.general{background:#fff7ed;color:#c2410c}
+    .forum-hot{font-size:.58rem;color:#f43f5e;font-weight:700;
+      display:flex;align-items:center;gap:3px}
+    .forum-title{
+      font-size:.76rem;font-weight:600;color:#1e293b;
+      line-height:1.4;margin-bottom:10px;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    }
+    .forum-meta{display:flex;align-items:center;gap:7px}
+    .forum-av{
+      width:20px;height:20px;border-radius:50%;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      font-size:.5rem;font-weight:800;color:#fff;
+      background:linear-gradient(135deg,#059669,#0d9488);
+    }
+    .forum-uname{font-size:.62rem;font-weight:600;color:#64748b;flex:1;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .forum-stats{display:flex;align-items:center;gap:7px;font-size:.58rem;color:#94a3b8;font-weight:600}
+    .forum-stats span{display:flex;align-items:center;gap:2px}
+    .forum-stats .liked{color:#f43f5e}
+
+    /* ── Success Stories ── */
+    .story-viewer{
+      margin:0 16px;position:relative;overflow:hidden;border-radius:16px;
+    }
+    .story-card{
+      background:#fff;border:1px solid #e2e8f0;border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 3px 12px rgba(0,0,0,.07);
+      display:flex;flex-direction:column;
+      /* default: waiting off-screen right */
+      position:absolute;top:0;left:0;width:100%;
+      transform:translateX(105%);
+      transition:transform .44s cubic-bezier(.4,0,.2,1);
+    }
+    /* active card anchors container height */
+    .story-card.s-active{
+      position:relative;
+      transform:translateX(0);
+    }
+    /* exiting card slides off to the left */
+    .story-card.s-out{
+      position:absolute;
+      transform:translateX(-105%);
+    }
+    .story-accent{height:4px}
+    .story-body{padding:14px 15px 13px;flex:1;display:flex;flex-direction:column;position:relative}
+    .story-body::before{
+      content:'\201C';
+      position:absolute;top:4px;right:10px;
+      font-size:4rem;font-family:Georgia,serif;font-weight:900;
+      color:#f1f5f9;line-height:1;pointer-events:none;
+    }
+    .story-badge{
+      display:inline-flex;align-items:center;gap:4px;
+      border-radius:99px;padding:3px 9px;
+      font-size:.56rem;font-weight:700;
+      align-self:flex-start;margin-bottom:9px;
+    }
+    .story-quote{
+      font-size:.75rem;font-weight:500;color:#475569;
+      line-height:1.55;flex:1;
+      margin-bottom:12px;
+    }
+    .story-divider{height:1px;background:#f1f5f9;margin-bottom:10px}
+    .story-footer{display:flex;align-items:center;gap:9px}
+    .story-av{
+      width:32px;height:32px;border-radius:50%;flex-shrink:0;
+      background:linear-gradient(135deg,#059669,#0d9488);
+      display:flex;align-items:center;justify-content:center;
+      font-size:.65rem;font-weight:800;color:#fff;
+    }
+    .story-info{flex:1;min-width:0}
+    .story-name{font-size:.73rem;font-weight:700;color:#1e293b;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .story-exam{font-size:.59rem;color:#94a3b8;font-weight:500;margin-top:1px}
+    .story-stars{font-size:.63rem;color:#f59e0b;flex-shrink:0;letter-spacing:.5px}
+    /* dots below story viewer */
+    .story-dots{
+      display:flex;justify-content:center;gap:5px;margin-top:10px;
+    }
+    .story-dot{
+      width:6px;height:6px;border-radius:50%;
+      background:#e2e8f0;transition:all .3s;cursor:pointer;
+    }
+    .story-dot.on{width:18px;border-radius:3px;background:#059669}
+  </style>
+</head>
+<body>
+
+<!-- Slide menu -->
+<div class="m-overlay" id="ov" onclick="togMenu()"></div>
+<nav class="m-drawer" id="dr">
+
+  <!-- Profile header -->
+  <div class="m-head">
+    <button class="m-close" onclick="togMenu()" aria-label="Close menu">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <div class="m-av">NM</div>
+    <div class="m-uname">Nikhil Maurya</div>
+    <div class="m-usub">SSC Aspirant · Class X pass</div>
+    <div class="m-head-meta">
+      <div class="m-streak"><i class="fa-solid fa-fire-flame-curved"></i> 0 day streak</div>
+      <a class="m-profile-btn" href="#">View Profile <i class="fa-solid fa-chevron-right"></i></a>
+    </div>
+  </div>
+
+  <!-- Nav links -->
+  <div class="m-body">
+
+    <div class="m-section">Prepare</div>
+    <a class="m-link act" href="https://www.mysscguide.com/home">
+      <div class="m-ico" style="background:linear-gradient(135deg,#059669,#0d9488)"><i class="fa-solid fa-house"></i></div>
+      <span class="m-lbl">Home</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/mocks">
+      <div class="m-ico" style="background:linear-gradient(135deg,#3b82f6,#2563eb)"><i class="fa-solid fa-file-invoice"></i></div>
+      <span class="m-lbl">Mocks</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/previous-year">
+      <div class="m-ico" style="background:linear-gradient(135deg,#ec4899,#f43f5e)"><i class="fa-regular fa-copy"></i></div>
+      <span class="m-lbl">Previous Year Papers</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/contests">
+      <div class="m-ico" style="background:linear-gradient(135deg,#f59e0b,#eab308)"><i class="fa-solid fa-trophy"></i></div>
+      <span class="m-lbl">Live Contests</span>
+      <span class="m-badge live">LIVE</span>
+    </a>
+
+    <div class="m-divider"></div>
+    <div class="m-section">Tools</div>
+    <a class="m-link" href="https://www.mysscguide.com/typing-test">
+      <div class="m-ico" style="background:linear-gradient(135deg,#06b6d4,#0891b2)"><i class="fa-solid fa-keyboard"></i></div>
+      <span class="m-lbl">Typing Test</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/mistake-notebook">
+      <div class="m-ico" style="background:linear-gradient(135deg,#ef4444,#dc2626)"><i class="fa-solid fa-book-skull"></i></div>
+      <span class="m-lbl">Mistake Notebook</span>
+      <span class="m-badge live">5</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/mnemonics">
+      <div class="m-ico" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)"><i class="fa-solid fa-brain"></i></div>
+      <span class="m-lbl">Mnemonics</span>
+      <span class="m-badge new">NEW</span>
+    </a>
+
+    <div class="m-divider"></div>
+    <div class="m-section">Community</div>
+    <a class="m-link" href="https://www.mysscguide.com/forums">
+      <div class="m-ico" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="fa-solid fa-users"></i></div>
+      <span class="m-lbl">Forums</span>
+    </a>
+
+    <div class="m-divider"></div>
+    <div class="m-section">Account</div>
+    <a class="m-link" href="#">
+      <div class="m-ico" style="background:linear-gradient(135deg,#64748b,#475569)"><i class="fa-solid fa-gear"></i></div>
+      <span class="m-lbl">Settings</span>
+    </a>
+    <a class="m-link" href="#">
+      <div class="m-ico" style="background:linear-gradient(135deg,#94a3b8,#64748b)"><i class="fa-solid fa-right-from-bracket"></i></div>
+      <span class="m-lbl">Sign Out</span>
+    </a>
+
+  </div>
+
+  <!-- Premium upgrade CTA -->
+  <a class="m-upgrade" href="https://www.mysscguide.com/selection-key">
+    <div class="m-upgrade-ico"><i class="fa-solid fa-key"></i></div>
+    <div>
+      <div class="m-upgrade-title">Unlock Selection Key</div>
+      <div class="m-upgrade-sub">Unlimited mocks, PYQs &amp; contests</div>
+    </div>
+    <i class="fa-solid fa-chevron-right m-upgrade-arrow"></i>
+  </a>
+
+  <div class="m-foot">&copy; 2026 My<b>SSC</b>guide · All rights reserved</div>
+</nav>
+
+<!-- Header -->
+<header class="header">
+  <div class="brand" onclick="togMenu()">
+    <div class="brand-logo"><i class="fa-solid fa-book-open"></i></div>
+    <div class="brand-text">My<b>SSC</b>guide</div>
+  </div>
+  <div class="hdr-right">
+    <a class="streak-chip" href="https://www.mysscguide.com/home" title="Day Streak">
+      <i class="fa-solid fa-fire-flame-curved"></i><span>0</span>
+    </a>
+    <button class="hdr-btn notif-btn" aria-label="Notifications">
+      <i class="fa-solid fa-bell"></i><span class="notif-dot"></span>
+    </button>
+    <div class="avatar" onclick="togMenu()">NM</div>
+  </div>
+</header>
+
+<!-- Greeting -->
+<div class="greet">
+  <div class="greet-text">Hi, <span>Nikhil</span></div>
+  <div class="greet-date" id="todayDate"></div>
+</div>
+
+<!-- Ad Carousel -->
+<div class="ad-carousel" id="adCarousel">
+  <div class="ad-track" id="adTrack">
+    <div class="ad-slide" style="background:linear-gradient(135deg,#1e1b4b,#312e81)">
+      <div class="ad-label">Sponsored</div>
+      <div class="ad-title">SSC CGL 2026 Crash Course</div>
+      <div class="ad-sub">Complete syllabus in 60 days with live classes</div>
+      <button class="ad-cta">Learn More <i class="fa-solid fa-arrow-right"></i></button>
+    </div>
+    <div class="ad-slide" style="background:linear-gradient(135deg,#7c2d12,#c2410c)">
+      <div class="ad-label">Sponsored</div>
+      <div class="ad-title">Free Mock Test Series</div>
+      <div class="ad-sub">500+ questions with detailed solutions &amp; analytics</div>
+      <button class="ad-cta">Start Free <i class="fa-solid fa-arrow-right"></i></button>
+    </div>
+    <div class="ad-slide" style="background:linear-gradient(135deg,#134e4a,#0d9488)">
+      <div class="ad-label">Sponsored</div>
+      <div class="ad-title">Current Affairs Daily Dose</div>
+      <div class="ad-sub">Get 10 handpicked GK updates every morning</div>
+      <button class="ad-cta">Subscribe <i class="fa-solid fa-arrow-right"></i></button>
+    </div>
+  </div>
+  <div class="ad-dots">
+    <div class="ad-dot on" onclick="goSlide(0)"></div>
+    <div class="ad-dot" onclick="goSlide(1)"></div>
+    <div class="ad-dot" onclick="goSlide(2)"></div>
+  </div>
+</div>
+
+<!-- Today's Target -->
+<div class="target">
+  <div class="target-row">
+    <i class="fa-solid fa-bullseye t-ico"></i>
+    <span class="t-title">Today's Target</span>
+    <span class="t-hint" id="tHint">No goals yet</span>
+    <button class="t-add" onclick="showTI()" aria-label="Add"><i class="fa-solid fa-plus"></i></button>
+  </div>
+  <div class="t-input-row" id="tIR">
+    <input type="text" id="tIn" placeholder="e.g. 20 Quant questions" maxlength="60"
+      onkeydown="if(event.key==='Enter')saveT()">
+    <button class="t-save" onclick="saveT()">Add</button>
+  </div>
+  <div class="t-list" id="tL"></div>
+</div>
+
+<!-- Quick Actions -->
+<div class="section-lbl">Quick Actions</div>
+<div class="qa-grid">
+  <a class="qa-item" href="https://www.mysscguide.com/mocks">
+    <div class="qa-ico" style="background:linear-gradient(135deg,#059669,#0d9488)"><i class="fa-solid fa-file-invoice"></i></div>
+    <div class="qa-name">Mocks</div>
+  </a>
+  <a class="qa-item" href="https://www.mysscguide.com/previous-year">
+    <div class="qa-ico" style="background:linear-gradient(135deg,#ec4899,#f43f5e)"><i class="fa-regular fa-copy"></i></div>
+    <div class="qa-name">PYQs</div>
+  </a>
+  <a class="qa-item" href="https://www.mysscguide.com/contests">
+    <div class="qa-ico" style="background:linear-gradient(135deg,#f59e0b,#eab308)"><i class="fa-solid fa-trophy"></i></div>
+    <span class="qa-badge live">LIVE</span>
+    <div class="qa-name">Contests</div>
+  </a>
+  <a class="qa-item" href="https://www.mysscguide.com/typing-test">
+    <div class="qa-ico" style="background:linear-gradient(135deg,#3b82f6,#2563eb)"><i class="fa-solid fa-keyboard"></i></div>
+    <div class="qa-name">Typing</div>
+  </a>
+  <a class="qa-item" href="https://www.mysscguide.com/mistake-notebook">
+    <div class="qa-ico" style="background:linear-gradient(135deg,#ef4444,#dc2626)"><i class="fa-solid fa-book-skull"></i></div>
+    <span class="qa-badge">5</span>
+    <div class="qa-name">Mistakes</div>
+  </a>
+  <a class="qa-item" href="https://www.mysscguide.com/mnemonics">
+    <div class="qa-ico" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)"><i class="fa-solid fa-brain"></i></div>
+    <span class="qa-badge">NEW</span>
+    <div class="qa-name">Mnemonics</div>
+  </a>
+  <a class="qa-item" href="https://www.mysscguide.com/forums">
+    <div class="qa-ico" style="background:linear-gradient(135deg,#06b6d4,#0891b2)"><i class="fa-solid fa-users"></i></div>
+    <div class="qa-name">Forums</div>
+  </a>
+  <a class="qa-item" href="https://www.mysscguide.com/selection-key">
+    <div class="qa-ico" style="background:linear-gradient(135deg,#f97316,#ea580c)"><i class="fa-solid fa-key"></i></div>
+    <div class="qa-name">Premium</div>
+  </a>
+</div>
+
+<!-- Challenges -->
+<div class="section-lbl">Challenges</div>
+<div class="challenges">
+  <a class="ch-card" href="https://www.mysscguide.com/home">
+    <div class="ch-ico" style="background:#ecfdf5;color:#059669"><i class="fa-solid fa-stopwatch"></i></div>
+    <div class="ch-body">
+      <h3>Daily Challenge</h3>
+      <p>20 Qs — Maths, GK, English &amp; Reasoning</p>
+    </div>
+    <div class="ch-go"><i class="fa-solid fa-chevron-right"></i></div>
+  </a>
+  <a class="ch-card" href="https://www.mysscguide.com/home">
+    <div class="ch-ico" style="background:#fff7ed;color:#ea580c"><i class="fa-solid fa-shuffle"></i></div>
+    <div class="ch-body">
+      <h3>Random Quiz</h3>
+      <p>10 mixed questions — new set every time</p>
+    </div>
+    <div class="ch-go"><i class="fa-solid fa-chevron-right"></i></div>
+  </a>
+  <a class="ch-card" href="https://www.mysscguide.com/mocks">
+    <div class="ch-ico" style="background:#ede9fe;color:#7c3aed"><i class="fa-solid fa-pen-ruler"></i></div>
+    <div class="ch-body">
+      <h3>Create Your Mock</h3>
+      <p>Pick topic, difficulty &amp; time limit</p>
+    </div>
+    <div class="ch-go"><i class="fa-solid fa-chevron-right"></i></div>
+  </a>
+</div>
+
+<!-- Premium -->
+<div class="gap"></div>
+<a class="premium" href="https://www.mysscguide.com/selection-key">
+  <div class="p-key"><i class="fa-solid fa-key"></i></div>
+  <div class="p-info">
+    <h4>Selection Key</h4>
+    <p>Unlimited mocks, PYQs, contests &amp; more</p>
+  </div>
+  <div class="p-price">₹249<small>/yr</small></div>
+</a>
+
+<!-- Forum Posts -->
+<div class="gap"></div>
+<div class="section-lbl" style="display:flex;align-items:center;gap:6px">
+  <i class="fa-solid fa-comments" style="color:#059669;font-size:.8rem"></i> From the Forums
+</div>
+<div class="marquee-wrap">
+<div class="marquee-track" id="forumTrack" style="--mdur:32s">
+
+  <div class="forum-card">
+    <div class="forum-top">
+      <div class="forum-cat math"><i class="fa-solid fa-calculator"></i> Maths</div>
+      <div class="forum-hot"><i class="fa-solid fa-arrow-trend-up"></i> 47</div>
+    </div>
+    <div class="forum-title">Shortcut for percentage-based profit &amp; loss problems in SSC CGL?</div>
+    <div class="forum-meta">
+      <div class="forum-av">RK</div>
+      <div class="forum-uname">Rahul_Kapoor</div>
+      <div class="forum-stats">
+        <span><i class="fa-regular fa-heart liked"></i> 47</span>
+        <span><i class="fa-regular fa-comment"></i> 12</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="forum-card">
+    <div class="forum-top">
+      <div class="forum-cat gk"><i class="fa-solid fa-globe"></i> GK</div>
+      <div class="forum-hot"><i class="fa-solid fa-arrow-trend-up"></i> 83</div>
+    </div>
+    <div class="forum-title">Best source for Static GK — Lucent or Arihant for 2025 exams?</div>
+    <div class="forum-meta">
+      <div class="forum-av">PS</div>
+      <div class="forum-uname">Priya_Sharma</div>
+      <div class="forum-stats">
+        <span><i class="fa-regular fa-heart liked"></i> 83</span>
+        <span><i class="fa-regular fa-comment"></i> 29</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="forum-card">
+    <div class="forum-top">
+      <div class="forum-cat eng"><i class="fa-solid fa-pen-nib"></i> English</div>
+    </div>
+    <div class="forum-title">How to improve reading comprehension speed in under 30 days?</div>
+    <div class="forum-meta">
+      <div class="forum-av">AT</div>
+      <div class="forum-uname">Anjali_Tripathi</div>
+      <div class="forum-stats">
+        <span><i class="fa-regular fa-heart"></i> 61</span>
+        <span><i class="fa-regular fa-comment"></i> 18</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="forum-card">
+    <div class="forum-top">
+      <div class="forum-cat reason"><i class="fa-solid fa-puzzle-piece"></i> Reasoning</div>
+    </div>
+    <div class="forum-title">Blood relation and seating arrangement tricks — share your approach!</div>
+    <div class="forum-meta">
+      <div class="forum-av">VM</div>
+      <div class="forum-uname">Vikram_Mishra</div>
+      <div class="forum-stats">
+        <span><i class="fa-regular fa-heart"></i> 52</span>
+        <span><i class="fa-regular fa-comment"></i> 21</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="forum-card">
+    <div class="forum-top">
+      <div class="forum-cat general"><i class="fa-solid fa-fire"></i> Motivation</div>
+      <div class="forum-hot"><i class="fa-solid fa-arrow-trend-up"></i> 134</div>
+    </div>
+    <div class="forum-title">Failed 3 attempts. Here's what I changed for attempt 4 — it worked!</div>
+    <div class="forum-meta">
+      <div class="forum-av">SG</div>
+      <div class="forum-uname">Sneha_Gupta</div>
+      <div class="forum-stats">
+        <span><i class="fa-regular fa-heart liked"></i> 134</span>
+        <span><i class="fa-regular fa-comment"></i> 45</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="forum-card">
+    <div class="forum-top">
+      <div class="forum-cat math"><i class="fa-solid fa-shapes"></i> Maths</div>
+    </div>
+    <div class="forum-title">Geometry theorems I wish I knew before my first SSC attempt</div>
+    <div class="forum-meta">
+      <div class="forum-av">MR</div>
+      <div class="forum-uname">Manish_Rawat</div>
+      <div class="forum-stats">
+        <span><i class="fa-regular fa-heart"></i> 38</span>
+        <span><i class="fa-regular fa-comment"></i> 9</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- Success Stories -->
+<div class="gap"></div>
+<div class="section-lbl" style="display:flex;align-items:center;gap:6px">
+  <i class="fa-solid fa-trophy" style="color:#f59e0b;font-size:.8rem"></i> Success Stories
+</div>
+<div class="story-viewer" id="storyViewer">
+
+  <div class="story-card">
+    <div class="story-accent" style="background:#059669"></div>
+    <div class="story-body">
+      <div class="story-badge" style="background:#ecfdf5;color:#059669">
+        <i class="fa-solid fa-medal"></i> SSC CGL 2024
+      </div>
+      <div class="story-quote">MySSCguide mocks were the closest to the actual exam. I solved 200+ mocks and the pattern became muscle memory before exam day!</div>
+      <div class="story-divider"></div>
+      <div class="story-footer">
+        <div class="story-av">AM</div>
+        <div class="story-info">
+          <div class="story-name">Arjun Mehta</div>
+          <div class="story-exam">Rank 142 · Score 178/200</div>
+        </div>
+        <div class="story-stars">★★★★★</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-accent" style="background:#7c3aed"></div>
+    <div class="story-body">
+      <div class="story-badge" style="background:#f3e8ff;color:#7c3aed">
+        <i class="fa-solid fa-medal"></i> SSC CHSL 2024
+      </div>
+      <div class="story-quote">The mistake notebook saved me. Tracking errors for 60 days completely changed my accuracy — I stopped repeating the same mistakes.</div>
+      <div class="story-divider"></div>
+      <div class="story-footer">
+        <div class="story-av" style="background:linear-gradient(135deg,#7c3aed,#4f46e5)">NK</div>
+        <div class="story-info">
+          <div class="story-name">Neha Kulkarni</div>
+          <div class="story-exam">Rank 58 · Score 183/200</div>
+        </div>
+        <div class="story-stars">★★★★★</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-accent" style="background:#ea580c"></div>
+    <div class="story-body">
+      <div class="story-badge" style="background:#fff7ed;color:#ea580c">
+        <i class="fa-solid fa-medal"></i> SSC MTS 2024
+      </div>
+      <div class="story-quote">From a small town with no coaching — MySSCguide PYQs and live contests gave me the confidence to compete with anyone in the country.</div>
+      <div class="story-divider"></div>
+      <div class="story-footer">
+        <div class="story-av" style="background:linear-gradient(135deg,#ea580c,#dc2626)">RS</div>
+        <div class="story-info">
+          <div class="story-name">Rohit Singh</div>
+          <div class="story-exam">Rank 211 · Score 165/200</div>
+        </div>
+        <div class="story-stars">★★★★★</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-accent" style="background:#0891b2"></div>
+    <div class="story-body">
+      <div class="story-badge" style="background:#ecfeff;color:#0e7490">
+        <i class="fa-solid fa-medal"></i> SSC CPO 2024
+      </div>
+      <div class="story-quote">Tip of the Day and daily challenges kept me consistent through the toughest months. Small habits compounded into big results!</div>
+      <div class="story-divider"></div>
+      <div class="story-footer">
+        <div class="story-av" style="background:linear-gradient(135deg,#0891b2,#1d4ed8)">DV</div>
+        <div class="story-info">
+          <div class="story-name">Divya Verma</div>
+          <div class="story-exam">Rank 37 · Score 191/200</div>
+        </div>
+        <div class="story-stars">★★★★★</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-accent" style="background:#be185d"></div>
+    <div class="story-body">
+      <div class="story-badge" style="background:#fdf2f8;color:#be185d">
+        <i class="fa-solid fa-medal"></i> SSC CGL 2024
+      </div>
+      <div class="story-quote">Typing test improved my speed from 22 WPM to 41 WPM in just 45 days. An absolute game-changer for the skill test round!</div>
+      <div class="story-divider"></div>
+      <div class="story-footer">
+        <div class="story-av" style="background:linear-gradient(135deg,#be185d,#9d174d)">KP</div>
+        <div class="story-info">
+          <div class="story-name">Kartik Pandey</div>
+          <div class="story-exam">Rank 89 · Score 174/200</div>
+        </div>
+        <div class="story-stars">★★★★★</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-accent" style="background:#d97706"></div>
+    <div class="story-body">
+      <div class="story-badge" style="background:#fffbeb;color:#b45309">
+        <i class="fa-solid fa-medal"></i> SSC GD 2024
+      </div>
+      <div class="story-quote">Mnemonics section is a genius idea. I retained 90% of GK even after 3 months — something I could never do with plain reading!</div>
+      <div class="story-divider"></div>
+      <div class="story-footer">
+        <div class="story-av" style="background:linear-gradient(135deg,#d97706,#b45309)">SJ</div>
+        <div class="story-info">
+          <div class="story-name">Saurabh Joshi</div>
+          <div class="story-exam">Rank 178 · Score 155/200</div>
+        </div>
+        <div class="story-stars">★★★★★</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="story-dots" id="storyDots"></div>
+
+<!-- Tip of the Day -->
+<div class="gap"></div>
+<div class="tip-card" style="margin:0 16px">
+  <div class="tip-header">
+    <div class="tip-tag"><i class="fa-solid fa-lightbulb"></i> Tip of the Day</div>
+    <div class="tip-nav">
+      <button onclick="tipPrev()" aria-label="Previous tip"><i class="fa-solid fa-chevron-left"></i></button>
+      <span class="tip-counter" id="tipCounter">1/5</span>
+      <button onclick="tipNext()" aria-label="Next tip"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+  </div>
+  <div class="tip-body">
+    <div class="tip-text" id="tipText"></div>
+  </div>
+  <div class="tip-progress" id="tipProgress"></div>
+</div>
+
+<div class="gap"></div>
+
+<!-- Floating Help -->
+<button class="help-fab" onclick="window.open('https://www.mysscguide.com/forums','_blank')" aria-label="Help">
+  <span class="fab-pulse"></span>
+  <i class="fa-solid fa-headset"></i>
+</button>
+
+<!-- Hurrah Toast -->
+<div class="hurrah-toast" id="hurrahToast">
+  <span class="hurrah-emoji">🎉</span>
+  <div class="hurrah-title">Target crushed!</div>
+  <div class="hurrah-sub">Keep up the great work!</div>
+</div>
+
+<!-- Bottom Nav -->
+<nav class="bnav">
+  <button class="bnav-item on" aria-label="Home">
+    <i class="fa-solid fa-house-chimney"></i><span>Home</span>
+  </button>
+  <a class="bnav-item" href="https://www.mysscguide.com/mocks" aria-label="Mocks">
+    <i class="fa-solid fa-clipboard-list"></i><span>Mocks</span>
+  </a>
+  <a class="bnav-item" href="https://www.mysscguide.com/previous-year" aria-label="PYQs">
+    <i class="fa-solid fa-clock-rotate-left"></i><span>PYQs</span>
+  </a>
+  <a class="bnav-item" href="https://www.mysscguide.com/contests" aria-label="Contests">
+    <i class="fa-solid fa-medal"></i><span>Contests</span>
+  </a>
+  <button class="bnav-item" onclick="togMenu()" aria-label="Menu">
+    <i class="fa-solid fa-grip"></i><span>Menu</span>
+  </button>
+</nav>
+
+<script>
+  document.getElementById('todayDate').textContent =
+    new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
+
+  /* ── Ad Carousel ── */
+  var curSlide=0,totalSlides=3,autoTimer;
+  var track=document.getElementById('adTrack');
+  var dots=document.querySelectorAll('.ad-dot');
+
+  function goSlide(n){
+    curSlide=n;
+    track.style.transform='translateX(-'+(curSlide*(100/totalSlides))+'%)';
+    dots.forEach(function(d,i){d.classList.toggle('on',i===curSlide)});
+    resetAuto();
+  }
+  function nextSlide(){goSlide((curSlide+1)%totalSlides)}
+  function resetAuto(){clearInterval(autoTimer);autoTimer=setInterval(nextSlide,4000)}
+  resetAuto();
+
+  (function(){
+    var el=document.getElementById('adCarousel'),sx=0,dx=0;
+    el.addEventListener('touchstart',function(e){sx=e.touches[0].clientX},{passive:true});
+    el.addEventListener('touchend',function(e){
+      dx=e.changedTouches[0].clientX-sx;
+      if(dx<-40)goSlide(Math.min(curSlide+1,totalSlides-1));
+      else if(dx>40)goSlide(Math.max(curSlide-1,0));
+    },{passive:true});
+  })();
+
+  function togMenu(){
+    document.getElementById('dr').classList.toggle('open');
+    document.getElementById('ov').classList.toggle('open');
+  }
+
+  /* ── Tips ── */
+  var tips=[
+    {cat:'Study Habit', text:'Practise daily to build consistency — even 30 minutes beats a 3-hour weekend binge.'},
+    {cat:'Exam Strategy', text:'In SSC exams, skip hard questions first. Mark them and come back — don\'t let one question cost you 10.'},
+    {cat:'Memory Hack', text:'Create a mnemonic for every GK list you struggle with. Silly sentences stick far longer than plain repetition.'},
+    {cat:'Speed Tip', text:'For Quantitative Aptitude, master the top 5 shortcut formulas per chapter. Speed beats perfection in MCQs.'},
+    {cat:'Mental Health', text:'Take a 5-minute walk after every 45 minutes of study. Your brain consolidates memory during the break, not during the grind.'},
+  ];
+  var tipIdx=0;
+  function renderTip(){
+    var t=tips[tipIdx];
+    document.getElementById('tipText').textContent=t.text;
+    document.getElementById('tipCounter').textContent=(tipIdx+1)+'/'+tips.length;
+    var prog=document.getElementById('tipProgress');
+    prog.innerHTML=tips.map(function(_,i){
+      return '<div class="tip-pip'+(i===tipIdx?' on':'')+'"></div>';
+    }).join('');
+  }
+  function tipNext(){tipIdx=(tipIdx+1)%tips.length;renderTip()}
+  function tipPrev(){tipIdx=(tipIdx-1+tips.length)%tips.length;renderTip()}
+  renderTip();
+  // auto-rotate tips every 8s
+  setInterval(tipNext,8000);
+  // swipe on tip card
+  (function(){
+    var el=document.querySelector('.tip-card'),sx=0;
+    el.addEventListener('touchstart',function(e){sx=e.touches[0].clientX},{passive:true});
+    el.addEventListener('touchend',function(e){
+      var dx=e.changedTouches[0].clientX-sx;
+      if(dx<-40)tipNext();else if(dx>40)tipPrev();
+    },{passive:true});
+  })();
+
+  var tg=[];
+  function showTI(){
+    document.getElementById('tIR').classList.add('visible');
+    document.getElementById('tIn').focus();
+  }
+  function saveT(){
+    var v=document.getElementById('tIn').value.trim();
+    if(!v)return;
+    tg.push({t:v,d:false});
+    document.getElementById('tIn').value='';
+    document.getElementById('tIR').classList.remove('visible');
+    renT();
+  }
+  var hurrahMsgs=[
+    {emoji:'🎉', title:'Target crushed!', sub:'Keep up the great work!'},
+    {emoji:'🔥', title:'On fire!', sub:'Nothing can stop you now.'},
+    {emoji:'⚡', title:'Nailed it!', sub:'One step closer to your dream.'},
+    {emoji:'🏆', title:'Champion move!', sub:'Every small win counts.'},
+    {emoji:'💪', title:'Beast mode!', sub:'You\'re absolutely killing it!'},
+  ];
+
+  function showHurrah(){
+    var msg=hurrahMsgs[Math.floor(Math.random()*hurrahMsgs.length)];
+    var t=document.getElementById('hurrahToast');
+    t.querySelector('.hurrah-emoji').textContent=msg.emoji;
+    t.querySelector('.hurrah-title').textContent=msg.title;
+    t.querySelector('.hurrah-sub').textContent=msg.sub;
+    t.classList.remove('hide');
+    t.classList.add('show');
+    launchConfetti();
+    setTimeout(function(){
+      t.classList.remove('show');
+      t.classList.add('hide');
+    },2200);
+  }
+
+  function launchConfetti(){
+    var colors=['#059669','#f97316','#f59e0b','#8b5cf6','#ec4899','#3b82f6','#10b981'];
+    for(var c=0;c<26;c++){
+      (function(idx){
+        setTimeout(function(){
+          var el=document.createElement('div');
+          el.className='confetti';
+          el.style.cssText=[
+            'left:'+(Math.random()*100)+'vw',
+            'top:-10px',
+            'background:'+colors[Math.floor(Math.random()*colors.length)],
+            'animation-duration:'+(1.2+Math.random()*.8)+'s',
+            'animation-delay:'+(Math.random()*.3)+'s',
+            'transform:rotate('+(Math.random()*360)+'deg)',
+          ].join(';');
+          document.body.appendChild(el);
+          setTimeout(function(){el.remove()},2200);
+        },idx*25);
+      })(c);
+    }
+  }
+
+  /* ── Forum marquee: clone for seamless loop + touch-pause ── */
+  (function(){
+    var t=document.getElementById('forumTrack');
+    t.innerHTML+=t.innerHTML;
+    var wrap=t.parentElement;
+    wrap.addEventListener('touchstart',function(){t.classList.add('paused')},{passive:true});
+    wrap.addEventListener('touchend',function(){
+      setTimeout(function(){t.classList.remove('paused')},120);
+    },{passive:true});
+  })();
+
+  /* ── Story Viewer: single-card slideshow ── */
+  (function(){
+    var cards=Array.prototype.slice.call(document.querySelectorAll('#storyViewer .story-card'));
+    var dotsWrap=document.getElementById('storyDots');
+    var cur=0,timer;
+
+    // Build dots
+    cards.forEach(function(_,i){
+      var d=document.createElement('div');
+      d.className='story-dot'+(i===0?' on':'');
+      d.addEventListener('click',function(){goStory(i)});
+      dotsWrap.appendChild(d);
+    });
+
+    // Activate first
+    cards[0].classList.add('s-active');
+
+    function goStory(next){
+      if(next===cur)return;
+      clearInterval(timer);
+      var prev=cards[cur];
+      cur=next;
+      var nc=cards[cur];
+      // slide out current
+      prev.classList.remove('s-active');
+      prev.classList.add('s-out');
+      // slide in next
+      nc.classList.add('s-active');
+      // update dots
+      dotsWrap.querySelectorAll('.story-dot').forEach(function(d,i){
+        d.classList.toggle('on',i===cur);
+      });
+      // clean up exited card after transition
+      setTimeout(function(){prev.classList.remove('s-out')},460);
+      startTimer();
+    }
+
+    function startTimer(){
+      timer=setInterval(function(){
+        goStory((cur+1)%cards.length);
+      },3800);
+    }
+    startTimer();
+  })();
+
+  function togT(i){
+    var wasUndone=!tg[i].d;
+    tg[i].d=!tg[i].d;
+    if(wasUndone)showHurrah();
+    renT();
+  }
+  function delT(i){tg.splice(i,1);renT()}
+  function renT(){
+    document.getElementById('tHint').style.display=tg.length?'none':'';
+    document.getElementById('tL').innerHTML=tg.map(function(o,i){
+      return '<div class="t-item">'
+        +'<div class="t-chk '+(o.d?'done':'')+'" onclick="togT('+i+')"></div>'
+        +'<div class="t-txt '+(o.d?'done':'')+'">'+ o.t +'</div>'
+        +'<button class="t-del" onclick="delT('+i+')"><i class="fa-solid fa-xmark"></i></button></div>';
+    }).join('');
+  }
+</script>
+</body>
+</html>

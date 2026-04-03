@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function OtpVerificationScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const isLoginFlow = route.params?.isLoginFlow || false;
   const { userEmail, setUserName, setHasLoggedIn } = useLoginModal();

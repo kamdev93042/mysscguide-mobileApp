@@ -36,7 +36,7 @@ const ALL_SSC_EXAMS = [
 ];
 
 export default function SSCExamsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set());

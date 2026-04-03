@@ -13,6 +13,18 @@ export const API_BASE_URL = getBaseUrl();
 const isLikelyAuthErrorMessage = (message: string) =>
   /unauthori[sz]ed|token\s+is\s+expired|invalid\s+claims|jwt|forbidden|invalid\s+token/i.test(message || '');
 
+const shouldAttachAuthHeader = (token: string | null) => {
+  if (!token) return false;
+
+  const trimmed = token.trim();
+  if (!trimmed || trimmed === 'true' || trimmed === 'dev-bypass-token') {
+    return false;
+  }
+
+  // Backend expects JWT-like Bearer tokens; skip placeholders and malformed values.
+  return trimmed.split('.').length === 3;
+};
+
 export const isAuthSessionError = (error: any) => {
   if (!error) return false;
   const msg = String(error?.message || '');
@@ -30,7 +42,7 @@ async function fetchApi(endpoint: string, options: RequestInit = {}) {
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    if (token) {
+    if (shouldAttachAuthHeader(token)) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
@@ -478,6 +490,71 @@ export const mnemonicApi = {
         reason,
       }),
     });
+  },
+};
+
+type DashboardTodoPayload = Array<{ text: string; done: boolean }>;
+
+const normalizeTodos = (payload: any): DashboardTodoPayload => {
+  const raw = payload?.todos ?? payload?.data?.todos ?? payload?.items ?? payload?.data?.items ?? payload?.data ?? payload;
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item: any) => {
+      if (typeof item === 'string') {
+        return { text: item.trim(), done: false };
+      }
+
+      const text = String(item?.text ?? item?.title ?? item?.label ?? '').trim();
+      if (!text) return null;
+      return { text, done: Boolean(item?.done ?? item?.completed ?? item?.isDone) };
+    })
+    .filter(Boolean) as DashboardTodoPayload;
+};
+
+    const TODO_ENDPOINTS = ['/user/dashboard/todos', '/user/todos', '/user/targets/todos', '/user/dashboard/targets/todos'];
+
+export const dashboardApi = {
+  async getTodos() {
+    let lastError: any;
+    for (const endpoint of TODO_ENDPOINTS) {
+      try {
+        const response = await fetchApi(endpoint, { method: 'GET' });
+        return normalizeTodos(response);
+      } catch (error: any) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error('Unable to load dashboard todos from API');
+  },
+
+  async saveTodos(todos: DashboardTodoPayload) {
+    const normalized = normalizeTodos(todos);
+    const payloadVariants = [
+      { todos: normalized },
+      { items: normalized },
+      { data: { todos: normalized } },
+    ];
+    const methods: Array<'PUT' | 'POST' | 'PATCH'> = ['PUT', 'POST', 'PATCH'];
+
+    let lastError: any;
+    for (const endpoint of TODO_ENDPOINTS) {
+      for (const method of methods) {
+        for (const payload of payloadVariants) {
+          try {
+            await fetchApi(endpoint, {
+              method,
+              body: JSON.stringify(payload),
+            });
+            return;
+          } catch (error: any) {
+            lastError = error;
+          }
+        }
+      }
+    }
+
+    throw lastError || new Error('Unable to save dashboard todos to API');
   },
 };
 

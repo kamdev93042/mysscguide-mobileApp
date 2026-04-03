@@ -1,5 +1,4 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { forumApi } from '../services/api';
 
 export type Comment = {
@@ -33,7 +32,50 @@ type TopContributor = {
   count: number;
 };
 
-const INITIAL_POSTS: ForumPostData[] = [];
+const INITIAL_POSTS: ForumPostData[] = [
+  {
+    id: 'demo-1',
+    author: 'Rahul Kapoor',
+    authorInitial: 'R',
+    title: 'Shortcut for percentage-based profit and loss problems in SSC CGL?',
+    subtitle: 'I keep losing time in long-form calculations. Share your fastest method.',
+    tags: ['Maths', 'ProfitLoss'],
+    likes: 47,
+    comments: [],
+    commentCount: 12,
+    views: 220,
+    timestamp: '2h ago',
+    userVote: null,
+  },
+  {
+    id: 'demo-2',
+    author: 'Priya Sharma',
+    authorInitial: 'P',
+    title: 'Best source for Static GK: Lucent or Arihant for 2026 exams?',
+    subtitle: 'Need one source to revise multiple times instead of switching books.',
+    tags: ['GK', 'Preparation'],
+    likes: 83,
+    comments: [],
+    commentCount: 29,
+    views: 340,
+    timestamp: '5h ago',
+    userVote: null,
+  },
+  {
+    id: 'demo-3',
+    author: 'Sneha Gupta',
+    authorInitial: 'S',
+    title: 'Failed 3 attempts. What changed for my 4th attempt and finally worked.',
+    subtitle: 'Weekly revision plan, strict mock review, and fewer random resources.',
+    tags: ['Motivation', 'Strategy'],
+    likes: 134,
+    comments: [],
+    commentCount: 45,
+    views: 620,
+    timestamp: '1d ago',
+    userVote: null,
+  },
+];
 
 type ForumsContextType = {
   posts: ForumPostData[];
@@ -221,7 +263,7 @@ const mapPostFromApi = (raw: any): ForumPostData => {
 };
 
 export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [posts, setPosts] = useState<ForumPostData[]>([]);
+  const [posts, setPosts] = useState<ForumPostData[]>(INITIAL_POSTS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trendingTags, setTrendingTags] = useState<string[]>([]);
@@ -261,14 +303,6 @@ export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setError(null);
 
     try {
-      // Check for auth token before making API calls
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        setError('LOGIN_REQUIRED');
-        setLoading(false);
-        return;
-      }
-
       const [postsRes, tagsRes, contributorsRes] = await Promise.allSettled([
         forumApi.listPosts({ limit: 50 }),
         forumApi.getTrendingTags(8),
@@ -279,14 +313,12 @@ export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const postList = toArray(postsRes.value).map(mapPostFromApi);
         if (postList.length > 0) {
           setPosts(postList);
+        } else {
+          setPosts((prev) => (prev.length > 0 ? prev : INITIAL_POSTS));
         }
       } else {
-        const reason = postsRes.reason;
-        if (reason?.status === 401 || reason?.isAuthError) {
-          setError('LOGIN_REQUIRED');
-        } else {
-          setError(reason?.message || 'Could not load forum posts.');
-        }
+        setError(postsRes.reason?.message || 'Could not load forum posts.');
+        setPosts((prev) => (prev.length > 0 ? prev : INITIAL_POSTS));
       }
 
       if (tagsRes.status === 'fulfilled') {
@@ -312,11 +344,7 @@ export const ForumsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setTopContributors(contributors);
       }
     } catch (e: any) {
-      if (e?.status === 401 || e?.isAuthError) {
-        setError('LOGIN_REQUIRED');
-      } else {
-        setError(e?.message || 'Could not load forum data.');
-      }
+      setError(e?.message || 'Could not load forum data.');
     } finally {
       setLoading(false);
     }

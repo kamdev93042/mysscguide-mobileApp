@@ -23,9 +23,15 @@
       "package": "com.mysscguide.app"
     },
     "web": {},
+    "extra": {
+      "googleWebClientId": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+      "googleAndroidClientId": "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+      "googleIosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com"
+    },
     "plugins": [
       "@react-native-community/datetimepicker",
-      "expo-asset"
+      "expo-asset",
+      "expo-web-browser"
     ]
   }
 }

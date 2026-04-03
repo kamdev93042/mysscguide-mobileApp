@@ -1,49 +1,62 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   Pressable,
   ScrollView,
   useWindowDimensions,
-  Image,
   TextInput,
+  Animated,
+  Easing,
+  Platform,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
-// Simple persistent storage key for today's target todos
+import Svg, { Defs, LinearGradient, Path, Rect, Stop, Circle } from 'react-native-svg';
+
 const TODO_STORAGE_KEY = 'dashboard_todays_target_todos_v1';
 const RESULT_HISTORY_STORAGE_KEY = 'pyqs_result_history_v1';
 const DAILY_EXAM_LATEST_STORAGE_KEY = 'daily_exam_latest_v1';
+
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoginModal } from '../context/LoginModalContext';
 import { useTheme } from '../context/ThemeContext';
 import { useMocks } from '../context/MocksContext';
+import { dashboardApi, forumApi, mockApi, pyqApi } from '../services/api';
 
-const SLIDES = [
-  {
-    title: 'Live Quizzes & Tests',
-    subtitle: 'Attempt daily mock tests and boost your preparation level.',
-    btn: 'Try For Free',
-    bg: '#059669',
-  },
-  {
-    title: 'MySSCguide',
-    subtitle: 'The ultimate platform where students solve questions for SSC exams confidently.',
-    btn: 'Start Solving',
-    bg: '#047857',
-  },
-];
-
-const SUBJECT_CARD_META = [
-  { key: 'quant', label: 'Quant. Aptitude Solved', icon: 'calculator', color: '#eab308' },
-  { key: 'gi', label: 'Gen. Intelligence Solved', icon: 'bulb', color: '#a855f7' },
-  { key: 'english', label: 'English Language Solved', icon: 'document-text', color: '#ec4899' },
-  { key: 'ga', label: 'Gen. Awareness Solved', icon: 'globe', color: '#c084fc' },
-] as const;
+type TodoItem = {
+  text: string;
+  done: boolean;
+};
 
 type ResultHistoryItem = {
+  wrong?: number;
   sectionBreakup?: Array<{ section?: string; correct?: number; attempted?: number }>;
+};
+
+type QuickActionItem = {
+  id: string;
+  label: string;
+  icon: string;
+  bg: readonly [string, string];
+  badge?: string;
+};
+
+type HomeForumPost = {
+  id: string;
+  category: string;
+  title: string;
+  likes: number;
+  comments: number;
+  user: string;
+  avatar: string;
+  toneBg: string;
+  toneText: string;
+  icon: keyof typeof Ionicons.glyphMap;
 };
 
 type DailyExamResultEntry = {
@@ -64,68 +77,377 @@ type DailyLatestMap = {
   quiz?: DailyExamResultEntry;
 };
 
-const normalizeSectionToken = (name?: string) =>
-  String(name || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
-
-const resolveSubjectKey = (sectionName?: string): 'quant' | 'gi' | 'english' | 'ga' | null => {
-  const token = normalizeSectionToken(sectionName);
-  if (!token) return null;
-  if (token.includes('parta') || token.includes('generalintelligence') || token.includes('reasoning')) return 'gi';
-  if (token.includes('partb') || token.includes('quant') || token.includes('aptitude') || token.includes('math')) return 'quant';
-  if (token.includes('partc') || token.includes('english')) return 'english';
-  if (token.includes('partd') || token.includes('generalawareness') || token.includes('gk')) return 'ga';
-  return null;
+const COLORS = {
+  primary: '#059669',
+  primaryDark: '#047857',
+  bg: '#f8fafc',
+  text: '#1e293b',
+  textSecondary: '#64748b',
 };
 
+const SECTION_TONES = {
+  challenge: {
+    lightBg: '#fffbf5',
+    lightBorder: '#fed7aa',
+    lightAccent: '#f97316',
+    darkBg: '#1f1208',
+    darkBorder: '#92400e',
+    darkAccent: '#fb923c',
+  },
+  quiz: {
+    lightBg: '#f5f3ff',
+    lightBorder: '#ddd6fe',
+    lightAccent: '#7c3aed',
+    darkBg: '#130d1f',
+    darkBorder: '#4c1d95',
+    darkAccent: '#a78bfa',
+  },
+  mock: {
+    lightBg: '#ecfeff',
+    lightBorder: '#a5f3fc',
+    lightAccent: '#0891b2',
+    darkBg: '#08232d',
+    darkBorder: '#0e7490',
+    darkAccent: '#22d3ee',
+  },
+};
+
+const SLIDES = [
+  {
+    id: 'crash',
+    title: 'SSC CGL 2026 Crash Course',
+    subtitle: 'Complete syllabus in 60 days with live classes',
+    btn: 'Learn More',
+  },
+  {
+    id: 'mocks',
+    title: 'Free Mock Test Series',
+    subtitle: '500+ questions with detailed solutions and analytics',
+    btn: 'Start Free',
+  },
+  {
+    id: 'gk',
+    title: 'Current Affairs Daily Dose',
+    subtitle: 'Get 10 handpicked GK updates every morning',
+    btn: 'Subscribe',
+  },
+];
+
+const QUICK_ACTIONS: QuickActionItem[] = [
+  { id: 'mocks', label: 'Mocks', icon: 'document-text', bg: ['#059669', '#0d9488'] as const },
+  { id: 'pyq', label: 'PYQs', icon: 'copy', bg: ['#ec4899', '#f43f5e'] as const },
+  { id: 'contests', label: 'Contests', icon: 'trophy', bg: ['#f59e0b', '#eab308'] as const },
+  { id: 'typing', label: 'Typing', icon: 'keypad', bg: ['#3b82f6', '#2563eb'] as const },
+  { id: 'mistakes', label: 'Mistakes', icon: 'book', bg: ['#ef4444', '#dc2626'] as const },
+  { id: 'mnemonics', label: 'Mnemonics', icon: 'bulb', bg: ['#8b5cf6', '#7c3aed'] as const, badge: 'NEW' },
+  { id: 'forums', label: 'Forums', icon: 'people', bg: ['#06b6d4', '#0891b2'] as const },
+  { id: 'premium', label: 'Premium', icon: 'key', bg: ['#f97316', '#ea580c'] as const },
+];
+
+const FALLBACK_FORUM_POSTS: HomeForumPost[] = [
+  {
+    id: 'f1',
+    category: 'Maths',
+    title: 'Shortcut for percentage-based profit and loss problems in SSC CGL?',
+    likes: 47,
+    comments: 12,
+    user: 'Rahul_Kapoor',
+    avatar: 'RK',
+    toneBg: '#fef3c7',
+    toneText: '#b45309',
+    icon: 'calculator',
+  },
+  {
+    id: 'f2',
+    category: 'GK',
+    title: 'Best source for Static GK: Lucent or Arihant for 2025 exams?',
+    likes: 83,
+    comments: 29,
+    user: 'Priya_Sharma',
+    avatar: 'PS',
+    toneBg: '#dbeafe',
+    toneText: '#1d4ed8',
+    icon: 'globe',
+  },
+  {
+    id: 'f3',
+    category: 'English',
+    title: 'How to improve reading comprehension speed in under 30 days?',
+    likes: 61,
+    comments: 18,
+    user: 'Anjali_Tripathi',
+    avatar: 'AT',
+    toneBg: '#dcfce7',
+    toneText: '#15803d',
+    icon: 'create',
+  },
+  {
+    id: 'f4',
+    category: 'Motivation',
+    title: 'Failed 3 attempts. Here is what I changed for attempt 4 and it worked.',
+    likes: 134,
+    comments: 45,
+    user: 'Sneha_Gupta',
+    avatar: 'SG',
+    toneBg: '#fff7ed',
+    toneText: '#c2410c',
+    icon: 'flame',
+  },
+];
+
+const getForumStyle = (category: string) => {
+  const normalized = category.toLowerCase();
+  if (normalized.includes('math')) return { toneBg: '#fef3c7', toneText: '#b45309', icon: 'calculator' as const };
+  if (normalized.includes('gk') || normalized.includes('current')) return { toneBg: '#dbeafe', toneText: '#1d4ed8', icon: 'globe' as const };
+  if (normalized.includes('english')) return { toneBg: '#dcfce7', toneText: '#15803d', icon: 'create' as const };
+  if (normalized.includes('motiv')) return { toneBg: '#fff7ed', toneText: '#c2410c', icon: 'flame' as const };
+  return { toneBg: '#ecfeff', toneText: '#0e7490', icon: 'chatbubbles' as const };
+};
+
+const getInitials = (name: string) => {
+  const compact = name.trim();
+  if (!compact) return 'US';
+  const parts = compact.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+};
+
+const toArray = (payload: any): any[] => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.posts)) return payload.posts;
+  if (Array.isArray(payload.data?.posts)) return payload.data.posts;
+  if (Array.isArray(payload.data?.items)) return payload.data.items;
+  if (Array.isArray(payload.challenges)) return payload.challenges;
+  if (Array.isArray(payload.data?.challenges)) return payload.data.challenges;
+  return [];
+};
+
+const SUCCESS_STORIES = [
+  {
+    id: 's1',
+    accent: '#059669',
+    badgeBg: '#ecfdf5',
+    badgeText: '#059669',
+    quote: 'MySSCguide mocks were the closest to the actual exam. Solving 200+ mocks made the pattern muscle memory before exam day.',
+    name: 'Arjun Mehta',
+    exam: 'Rank 142 · Score 178/200',
+    avatar: 'AM',
+    examTag: 'SSC CGL 2024',
+  },
+  {
+    id: 's2',
+    accent: '#7c3aed',
+    badgeBg: '#f3e8ff',
+    badgeText: '#7c3aed',
+    quote: 'The mistake notebook changed my accuracy. Tracking errors for 60 days stopped repeat mistakes completely.',
+    name: 'Neha Kulkarni',
+    exam: 'Rank 58 · Score 183/200',
+    avatar: 'NK',
+    examTag: 'SSC CHSL 2024',
+  },
+  {
+    id: 's3',
+    accent: '#ea580c',
+    badgeBg: '#fff7ed',
+    badgeText: '#ea580c',
+    quote: 'PYQs and live contests gave me confidence to compete with anyone in the country from a small town background.',
+    name: 'Rohit Singh',
+    exam: 'Rank 211 · Score 165/200',
+    avatar: 'RS',
+    examTag: 'SSC MTS 2024',
+  },
+];
+
+const TIPS = [
+  'Practice daily to build consistency. Even 30 minutes beats a 3-hour weekend binge.',
+  'Skip hard questions first in SSC exams. Mark and return later so one question does not cost 10 minutes.',
+  'Make mnemonics for GK lists that feel difficult. Silly lines stay longer than plain repetition.',
+  'For Quant, master top 5 shortcut formulas per chapter. Speed wins in MCQs.',
+  'Take a 5-minute walk every 45 minutes. Memory consolidates during breaks.',
+];
+
+function TopoHeaderTexture() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 390 250" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
+      <Path d="M20 44c34-29 79-31 111 2 33 35 29 84-5 113-35 29-82 27-113-7-30-34-25-79 7-108z" stroke="rgba(16,185,129,0.1)" strokeWidth="2" fill="none" />
+      <Path d="M47 72c20-18 49-18 70 0 20 19 21 49 0 69-21 20-50 18-69-1-20-20-20-50-1-68z" stroke="rgba(16,185,129,0.1)" strokeWidth="2" fill="none" />
+      <Path d="M248 26c37-21 88-13 114 20 26 32 19 78-17 108-38 29-90 25-118-6-29-32-21-92 21-122z" stroke="rgba(16,185,129,0.1)" strokeWidth="2" fill="none" />
+      <Path d="M265 54c23-12 55-8 73 12 18 21 13 52-12 72-26 20-58 17-76-4-18-22-12-58 15-80z" stroke="rgba(16,185,129,0.1)" strokeWidth="2" fill="none" />
+      <Path d="M0 165c42 20 86 17 121-5 29-19 53-36 86-41 30-5 62 5 90 10 31 6 63 4 93-8" stroke="rgba(16,185,129,0.1)" strokeWidth="2" fill="none" />
+    </Svg>
+  );
+}
+
+function SlideSurface({ index }: { index: number }) {
+  const gradients = [
+    ['#1e1b4b', '#312e81'],
+    ['#7c2d12', '#c2410c'],
+    ['#134e4a', '#0d9488'],
+  ] as const;
+  const pair = gradients[index] || gradients[0];
+
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 340 180" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <LinearGradient id={`slideGrad${index}`} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0%" stopColor={pair[0]} />
+          <Stop offset="100%" stopColor={pair[1]} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="340" height="180" fill={`url(#slideGrad${index})`} />
+      <Circle cx="292" cy="30" r="72" fill="rgba(255,255,255,0.12)" />
+      <Path d="M18 28c27-23 62-24 88 1 27 27 25 67-3 91-29 25-67 24-91-2-23-26-20-66 6-90z" stroke="rgba(255,255,255,0.24)" strokeWidth="2" fill="none" />
+      <Path d="M40 50c16-13 39-14 55 0 16 14 16 38-1 53-16 14-39 13-54-2-15-16-15-38 0-51z" stroke="rgba(255,255,255,0.24)" strokeWidth="2" fill="none" />
+      <Path d="M190 18c33-18 75-11 98 16 23 27 17 68-14 92-32 24-76 20-102-8-25-28-19-76 18-100z" stroke="rgba(255,255,255,0.2)" strokeWidth="2" fill="none" />
+    </Svg>
+  );
+}
+
+function IconBadge({ colors, icon }: { colors: readonly [string, string]; icon: keyof typeof Ionicons.glyphMap }) {
+  return (
+    <View style={[styles.quickActionIcon, { backgroundColor: colors[0] }]}>
+      <Svg width="52" height="52" viewBox="0 0 52 52" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id={`qa-${icon}`} x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor={colors[0]} />
+            <Stop offset="100%" stopColor={colors[1]} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="52" height="52" rx="16" fill={`url(#qa-${icon})`} />
+      </Svg>
+      <Ionicons name={icon} size={22} color="#ffffff" />
+    </View>
+  );
+}
 
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { userName } = useLoginModal();
-  const { isDark, toggleTheme } = useTheme();
-  const { recentAttempts } = useMocks();
-  const [slideIndex, setSlideIndex] = useState(0);
-  const scrollRef = useRef(null);
-  const [resultHistory, setResultHistory] = useState<ResultHistoryItem[]>([]);
-  const [dailyLatest, setDailyLatest] = useState<DailyLatestMap>({});
+  const { isDark } = useTheme();
+  useMocks();
 
-  // To-do list state
-  const [todos, setTodos] = useState<string[]>([]);
+  const [, setResultHistory] = useState<ResultHistoryItem[]>([]);
+  const [dailyLatest, setDailyLatest] = useState<DailyLatestMap>({});
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [topCarouselWidth, setTopCarouselWidth] = useState(width);
+
+  const [todos, setTodos] = useState<TodoItem[]>([]);
   const [newTodo, setNewTodo] = useState('');
+  const [showTodoInput, setShowTodoInput] = useState(false);
   const [todosLoaded, setTodosLoaded] = useState(false);
-  const [isAddingTodo, setIsAddingTodo] = useState(false);
-  // Load todos from storage on mount
+  const [forumPosts, setForumPosts] = useState<HomeForumPost[]>(FALLBACK_FORUM_POSTS);
+  const [quickActionBadges, setQuickActionBadges] = useState<Record<string, string>>({
+    contests: 'LIVE',
+    mnemonics: 'NEW',
+  });
+  const todoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [storyIndex, setStoryIndex] = useState(0);
+  const [tipIndex, setTipIndex] = useState(0);
+  const topCarouselRef = useRef<ScrollView>(null);
+  const slideIndexRef = useRef(0);
+  const autoSlideResumeAtRef = useRef(0);
+  const storyScrollRef = useRef<ScrollView>(null);
+  const forumTranslateX = useRef(new Animated.Value(0)).current;
+
+  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const headerTranslateY = useRef(new Animated.Value(16)).current;
+  const carouselOpacity = useRef(new Animated.Value(0)).current;
+  const carouselTranslateY = useRef(new Animated.Value(12)).current;
+  const targetOpacity = useRef(new Animated.Value(0)).current;
+  const targetTranslateY = useRef(new Animated.Value(12)).current;
+
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
-        const raw = await (await import('@react-native-async-storage/async-storage')).default.getItem(TODO_STORAGE_KEY);
-        if (raw && isMounted) {
-          setTodos(JSON.parse(raw));
+        const storage = (await import('@react-native-async-storage/async-storage')).default;
+        const raw = await storage.getItem(TODO_STORAGE_KEY);
+
+        let localTodos: TodoItem[] = [];
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            if (parsed.length && typeof parsed[0] === 'string') {
+              localTodos = parsed.map((item: string) => ({ text: item, done: false }));
+            } else {
+              localTodos = parsed as TodoItem[];
+            }
+          }
         }
-      } catch {}
+
+        let todosFromApi: TodoItem[] = [];
+        try {
+          todosFromApi = await dashboardApi.getTodos();
+        } catch {
+          // Fall back to local cache if dashboard todos API is unavailable.
+        }
+
+        if (!isMounted) return;
+
+        const hydrated = todosFromApi.length > 0 ? todosFromApi : localTodos;
+        setTodos(hydrated);
+
+        if (todosFromApi.length > 0) {
+          await storage.setItem(TODO_STORAGE_KEY, JSON.stringify(todosFromApi));
+        }
+      } catch {
+        // Use empty default state when storage cannot be read.
+      }
+
       if (isMounted) setTodosLoaded(true);
     })();
-    return () => { isMounted = false; };
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Persist todos when changed (after load)
   useEffect(() => {
     if (!todosLoaded) return;
-    (async () => {
-      try {
-        const storage = (await import('@react-native-async-storage/async-storage')).default;
-        if (todos.length === 0) {
-          await storage.removeItem(TODO_STORAGE_KEY);
-        } else {
-          await storage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
+    if (todoSyncTimerRef.current) {
+      clearTimeout(todoSyncTimerRef.current);
+    }
+
+    todoSyncTimerRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const storage = (await import('@react-native-async-storage/async-storage')).default;
+          if (todos.length === 0) {
+            await storage.removeItem(TODO_STORAGE_KEY);
+          } else {
+            await storage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
+          }
+        } catch {
+          // Ignore write failures to avoid blocking UI.
         }
-      } catch {}
-    })();
+
+        try {
+          await dashboardApi.saveTodos(todos);
+        } catch {
+          // Keep local persistence if API save fails.
+        }
+      })();
+    }, 350);
+
+    return () => {
+      if (todoSyncTimerRef.current) {
+        clearTimeout(todoSyncTimerRef.current);
+      }
+    };
   }, [todos, todosLoaded]);
+
+  useEffect(() => {
+    return () => {
+      if (todoSyncTimerRef.current) {
+        clearTimeout(todoSyncTimerRef.current);
+      }
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -161,46 +483,114 @@ export default function DashboardScreen() {
     }, [])
   );
 
-  const subjectSolvedMap = useMemo(() => {
-    const base = { quant: 0, gi: 0, english: 0, ga: 0 };
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(headerOpacity, {
+        toValue: 1,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(headerTranslateY, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      Animated.parallel([
+        Animated.timing(carouselOpacity, {
+          toValue: 1,
+          duration: 380,
+          delay: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(carouselTranslateY, {
+          toValue: 0,
+          duration: 380,
+          delay: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
 
-    const absorb = (items: Array<{ section?: string; correct?: number; attempted?: number }>) => {
-      items.forEach((sectionItem) => {
-        const subjectKey = resolveSubjectKey(sectionItem.section);
-        if (!subjectKey) return;
-        const solved = Number(sectionItem.correct ?? sectionItem.attempted ?? 0);
-        if (Number.isFinite(solved)) {
-          base[subjectKey] += Math.max(0, solved);
-        }
-      });
-    };
-
-    resultHistory.forEach((item) => {
-      absorb(item.sectionBreakup || []);
+      Animated.parallel([
+        Animated.timing(targetOpacity, {
+          toValue: 1,
+          duration: 360,
+          delay: 600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(targetTranslateY, {
+          toValue: 0,
+          duration: 360,
+          delay: 600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
     });
+  }, [carouselOpacity, carouselTranslateY, headerOpacity, headerTranslateY, targetOpacity, targetTranslateY]);
 
-    (recentAttempts || []).forEach((attempt: any) => {
-      absorb(attempt?.sectionBreakup || attempt?.results?.sectionBreakup || []);
-    });
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTipIndex((prev) => (prev + 1) % TIPS.length);
+    }, 8000);
 
-    return base;
-  }, [resultHistory, recentAttempts]);
-
-  const subjectCards = useMemo(
-    () =>
-      SUBJECT_CARD_META.map((item) => ({
-        ...item,
-        value: String(subjectSolvedMap[item.key]),
-      })),
-    [subjectSolvedMap]
-  );
+    return () => clearInterval(timer);
+  }, []);
 
   const displayName = userName || 'User';
-  const bg = isDark ? '#0f172a' : '#f8fafc';
-  const cardBg = isDark ? '#1e293b' : '#fff';
-  const text = isDark ? '#fff' : '#1e293b';
-  const muted = isDark ? '#94a3b8' : '#64748b';
-  const border = isDark ? '#1e293b' : '#e2e8f0';
+  const challengeResult = dailyLatest.challenge;
+  const quizResult = dailyLatest.quiz;
+
+  const pageBg = isDark ? '#0f1512' : COLORS.bg;
+  const textColor = isDark ? '#f8fafc' : COLORS.text;
+  const textMuted = isDark ? '#cbd5e1' : COLORS.textSecondary;
+  const cardBg = isDark ? '#132920' : '#ffffff';
+  const cardBorder = isDark ? '#065f46' : '#e2e8f0';
+  const resultSurface = isDark ? 'rgba(15,23,42,0.55)' : 'rgba(255,255,255,0.45)';
+  const sectionInlineColor = isDark ? '#cbd5e1' : '#64748b';
+  const forumCardBg = isDark ? '#0f172a' : '#ffffff';
+  const forumCardBorder = isDark ? '#334155' : '#e2e8f0';
+  const forumTitleColor = isDark ? '#e2e8f0' : '#1e293b';
+  const forumUserColor = isDark ? '#cbd5e1' : '#64748b';
+  const forumStatsColor = isDark ? '#94a3b8' : '#94a3b8';
+  const storyCardBg = isDark ? '#0f172a' : '#ffffff';
+  const storyCardBorder = isDark ? '#334155' : '#e2e8f0';
+  const storyQuoteColor = isDark ? '#cbd5e1' : '#475569';
+  const storyNameColor = isDark ? '#f8fafc' : '#1e293b';
+  const storyExamColor = isDark ? '#94a3b8' : '#94a3b8';
+  const tipBg = isDark ? '#292016' : '#fffbeb';
+  const tipBorder = isDark ? '#6b4f1d' : '#fde68a';
+  const tipTextColor = isDark ? '#fcd34d' : '#78350f';
+  const heroBg = isDark ? '#0f172a' : '#ffffff';
+  const heroBorder = isDark ? '#334155' : '#f1f5f9';
+  const heroTitleColor = isDark ? '#f8fafc' : '#0f172a';
+  const heroDateColor = isDark ? '#cbd5e1' : '#94a3b8';
+  const heroButtonBg = isDark ? '#1e293b' : '#ffffff';
+
+  const challengeIsCompletedToday = !!challengeResult && new Date(challengeResult.completedAt).toDateString() === new Date().toDateString();
+  const challengeMaxScore = challengeResult ? challengeResult.totalQuestions * 2 : 40;
+  const challengePct = challengeResult ? Math.round((challengeResult.score / challengeMaxScore) * 100) : 0;
+
+  const quizIsCompletedToday = !!quizResult && new Date(quizResult.completedAt).toDateString() === new Date().toDateString();
+  const quizMaxScore = quizResult ? quizResult.totalQuestions * 2 : 20;
+  const quizPct = quizResult ? Math.round((quizResult.score / quizMaxScore) * 100) : 0;
+
+  const dailyCardWidth = Math.min(width * 0.74, 320);
+  const forumCardWidth = Math.min(width * 0.7, 260);
+  const forumCardGap = 10;
+  const forumSetWidth = forumPosts.length * (forumCardWidth + forumCardGap);
+  const storyCardWidth = Math.min(width - 32, 380);
+  const storySnapWidth = storyCardWidth + 12;
+  const todayLabel = new Date().toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(Math.max(0, seconds) / 60);
@@ -214,543 +604,1428 @@ export default function DashboardScreen() {
     return dt.toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
-  const challengeResult = dailyLatest.challenge;
-  const quizResult = dailyLatest.quiz;
+  const navigateQuickAction = (id: string) => {
+    const root = navigation.getParent?.()?.getParent?.();
+
+    if (id === 'mocks') {
+      navigation.navigate('Mocks' as never);
+      return;
+    }
+
+    if (id === 'pyq') {
+      navigation.navigate('PYQs' as never);
+      return;
+    }
+
+    if (id === 'contests') {
+      navigation.navigate('Contests' as never);
+      return;
+    }
+
+    if (id === 'typing' || id === 'mnemonics') {
+      const tabScreen = id === 'typing' ? 'Typing' : 'Mnemonics';
+      root?.navigate('Main', { screen: tabScreen });
+      return;
+    }
+
+    if (id === 'forums') {
+      root?.navigate('Forums');
+      return;
+    }
+
+    if (id === 'premium') {
+      navigation.navigate('Mocks' as never);
+      return;
+    }
+
+    if (id === 'mistakes') {
+      navigation.navigate('DailyChallenge' as never, { mode: 'challenge' } as never);
+    }
+  };
+
+  const addTodo = () => {
+    const text = newTodo.trim();
+    if (!text) {
+      setShowTodoInput(false);
+      return;
+    }
+
+    setTodos((prev) => [...prev, { text, done: false }]);
+    setNewTodo('');
+    setShowTodoInput(false);
+  };
+
+  const openMenuTab = () => {
+    navigation.getParent?.()?.getParent?.()?.navigate('MenuDrawer');
+  };
+
+  const onTopCarouselScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = event.nativeEvent.contentOffset.x;
+    const measuredWidth = event.nativeEvent.layoutMeasurement.width || topCarouselWidth || width;
+    const next = Math.round(x / measuredWidth);
+    const bounded = Math.max(0, Math.min(SLIDES.length - 1, next));
+    slideIndexRef.current = bounded;
+    setSlideIndex(bounded);
+  };
+
+  const goToTopSlide = (index: number) => {
+    const bounded = Math.max(0, Math.min(SLIDES.length - 1, index));
+    const snapWidth = topCarouselWidth || width;
+    topCarouselRef.current?.scrollTo({ x: bounded * snapWidth, y: 0, animated: true });
+    slideIndexRef.current = bounded;
+    setSlideIndex(bounded);
+    autoSlideResumeAtRef.current = Date.now() + 6000;
+  };
 
   useEffect(() => {
-    const t = setInterval(() => {
-      setSlideIndex((i) => {
-        const next = (i + 1) % SLIDES.length;
-        scrollRef.current?.scrollTo({ x: next * width, animated: true });
-        return next;
-      });
-    }, 4000);
-    return () => clearInterval(t);
+    setTopCarouselWidth(width);
   }, [width]);
 
-  return (
-    <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
-      <View style={[styles.header, { borderBottomColor: border }]}>
-        <View style={styles.logoRow}>
-          <Image 
-            source={require('../assets/sscguidelogo.png')} 
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-          <Text style={[styles.logoText, { color: text }]}>
-            My<Text style={styles.logoHighlight}>SSC</Text>guide
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Pressable onPress={toggleTheme} style={styles.iconBtn} hitSlop={8}>
-            <Ionicons
-              name={isDark ? 'sunny-outline' : 'moon-outline'}
-              size={20}
-              color="#059669"
-            />
-          </Pressable>
-          <Pressable
-            style={styles.iconBtn}
-            hitSlop={8}
-            onPress={() => navigation.navigate('Notifications' as never)}
-          >
-            <Ionicons name="notifications-outline" size={20} color="#059669" />
-          </Pressable>
-        </View>
-      </View>
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (Date.now() < autoSlideResumeAtRef.current) {
+        return;
+      }
 
+      const next = (slideIndexRef.current + 1) % SLIDES.length;
+      const snapWidth = topCarouselWidth || width;
+      topCarouselRef.current?.scrollTo({ x: next * snapWidth, y: 0, animated: true });
+      slideIndexRef.current = next;
+      setSlideIndex(next);
+    }, 4200);
+
+    return () => clearInterval(timer);
+  }, [topCarouselWidth, width]);
+
+  useEffect(() => {
+    if (forumSetWidth <= 0) return;
+
+    forumTranslateX.stopAnimation();
+    forumTranslateX.setValue(0);
+
+    const pxPerSecond = 22;
+    const duration = Math.max(8000, Math.round((forumSetWidth / pxPerSecond) * 1000));
+    const marqueeAnim = Animated.loop(
+      Animated.timing(forumTranslateX, {
+        toValue: -forumSetWidth,
+        duration,
+        easing: Easing.linear,
+        useNativeDriver: Platform.OS !== 'web',
+      })
+    );
+
+    marqueeAnim.start();
+    return () => marqueeAnim.stop();
+  }, [forumSetWidth, forumTranslateX]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStoryIndex((prev) => (prev + 1) % SUCCESS_STORIES.length);
+    }, 3800);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    storyScrollRef.current?.scrollTo({
+      x: storyIndex * storySnapWidth,
+      animated: true,
+    });
+  }, [storyIndex, storySnapWidth]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const computeMistakes = (history: ResultHistoryItem[]) => {
+      let totalWrong = 0;
+      for (const item of history) {
+        if (typeof item?.wrong === 'number') {
+          totalWrong += Math.max(0, item.wrong);
+          continue;
+        }
+
+        if (Array.isArray(item?.sectionBreakup)) {
+          for (const section of item.sectionBreakup) {
+            const attempted = Number(section?.attempted || 0);
+            const correct = Number(section?.correct || 0);
+            totalWrong += Math.max(0, attempted - correct);
+          }
+        }
+      }
+      return totalWrong;
+    };
+
+    const fetchHomeData = async () => {
+      try {
+        const [postsRes, contestsRes, myMocksRes, pyqCountRes, storageModule] = await Promise.all([
+          forumApi.listPosts({ limit: 8 }),
+          mockApi.getPublicChallenges(),
+          mockApi.getMyCustomTests({ limit: 50 }),
+          pyqApi.countTestPapers(),
+          import('@react-native-async-storage/async-storage'),
+        ]);
+
+        if (!isActive) return;
+
+        const posts = toArray(postsRes)
+          .slice(0, 8)
+          .map((post: any, index: number): HomeForumPost => {
+            const category = String(post?.category || post?.tags?.[0] || 'General');
+            const user = String(post?.authorName || post?.author?.name || post?.user?.name || 'Community User');
+            const title = String(post?.title || post?.subtitle || 'Community discussion');
+            const likes = Number(post?.likes ?? post?.likeCount ?? post?.stats?.likes ?? 0) || 0;
+            const comments = Number(post?.comments ?? post?.replyCount ?? post?.commentCount ?? 0) || 0;
+            const style = getForumStyle(category);
+
+            return {
+              id: String(post?.id || post?._id || `forum-${index}`),
+              category,
+              title,
+              likes,
+              comments,
+              user,
+              avatar: getInitials(user),
+              toneBg: style.toneBg,
+              toneText: style.toneText,
+              icon: style.icon,
+            };
+          });
+
+        if (posts.length > 0) {
+          setForumPosts(posts);
+        }
+
+        const contests = toArray(contestsRes);
+        const myMocks = toArray(myMocksRes);
+        const pyqCount = Number(pyqCountRes?.count ?? pyqCountRes?.data?.count ?? pyqCountRes?.total ?? 0) || 0;
+        const rawHistory = await storageModule.default.getItem(RESULT_HISTORY_STORAGE_KEY);
+        const parsedHistory = rawHistory ? (JSON.parse(rawHistory) as ResultHistoryItem[]) : [];
+        const mistakes = computeMistakes(Array.isArray(parsedHistory) ? parsedHistory : []);
+
+        setQuickActionBadges((prev) => ({
+          ...prev,
+          mocks: myMocks.length > 0 ? `${myMocks.length}` : prev.mocks || '',
+          pyq: pyqCount > 0 ? `${pyqCount}` : prev.pyq || '',
+          contests: contests.length > 0 ? `LIVE ${contests.length}` : 'LIVE',
+          forums: posts.length > 0 ? `${posts.length}` : prev.forums || '',
+          mistakes: mistakes > 0 ? `${mistakes}` : '',
+        }));
+      } catch {
+        if (!isActive) return;
+        setForumPosts((prev) => (prev.length > 0 ? prev : FALLBACK_FORUM_POSTS));
+      }
+    };
+
+    void fetchHomeData();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  return (
+    <View style={[styles.wrapper, { backgroundColor: pageBg }]}>
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        style={[styles.scroll, { backgroundColor: pageBg }]}
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: pageBg }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.welcomeTitle, { color: text }]}>
-          Welcome back, {displayName}!
-        </Text>
-        <Text style={[styles.welcomeSub, { color: muted }]}>
-          Let's crush your goals today.
-        </Text>
-
-        {/* Ad Slider */}
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => {
-            const i = Math.round(e.nativeEvent.contentOffset.x / width);
-            setSlideIndex(i);
-          }}
-          style={[styles.slider, { width }]}
-          contentContainerStyle={{ width: width * SLIDES.length }}
+        <Animated.View
+          style={[
+            styles.hero,
+            {
+              backgroundColor: heroBg,
+              borderBottomColor: heroBorder,
+              paddingTop: insets.top + 8,
+              opacity: headerOpacity,
+              transform: [{ translateY: headerTranslateY }],
+            },
+          ]}
         >
-          {SLIDES.map((s, i) => (
-            <View key={i} style={[styles.slide, { width }]}>
-              <View style={[styles.slideInner, { backgroundColor: s.bg }]}>
-                <Text style={styles.slideTitle}>{s.title}</Text>
-                <Text style={styles.slideSub}>{s.subtitle}</Text>
-                <Pressable style={styles.slideBtn}>
-                  <Text style={styles.slideBtnText}>{s.btn}</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-        <View style={styles.dots}>
-          {SLIDES.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                i === slideIndex && styles.dotActive,
-              ]}
-            />
-          ))}
-        </View>
-
-        {/* Subject Wise Performance */}
-        <Text style={[styles.sectionTitle, { color: text }]}>
-          Subject Wise Performance
-        </Text>
-        <View style={styles.subjectGrid}>
-          {subjectCards.map((item) => (
-            <View
-              key={item.label}
-              style={[styles.subjectCard, { backgroundColor: cardBg, borderColor: border }]}
-            >
-              <View style={[styles.subjectIconWrap, { backgroundColor: item.color + '30' }]}>
-                <Ionicons name={item.icon} size={20} color={item.color} />
-              </View>
-              <Text style={[styles.subjectValue, { color: text }]}>{item.value}</Text>
-              <Text style={[styles.subjectLabel, { color: muted }]} numberOfLines={2}>
-                {item.label}
+          <View style={styles.heroTopRow}>
+            <Pressable style={styles.brandRow} onPress={openMenuTab}>
+              <Image source={require('../assets/sscguidelogonew.png')} style={styles.brandLogo} resizeMode="cover" />
+              <Text style={[styles.logoText, { color: heroTitleColor }]}>
+                My<Text style={styles.logoHighlight}>SSC</Text>guide
               </Text>
+            </Pressable>
+            <View style={styles.heroActionRow}>
+              <Pressable style={styles.streakChip} onPress={() => {}}>
+                <Ionicons name="flame" size={12} color="#f97316" />
+                <Text style={styles.streakChipText}>0</Text>
+              </Pressable>
+              <Pressable style={[styles.heroIconBtn, { backgroundColor: heroButtonBg }]} hitSlop={8} onPress={() => navigation.navigate('Notifications' as never)}>
+                <Ionicons name="notifications" size={18} color="#f59e0b" />
+                <View style={styles.notificationDot} />
+              </Pressable>
+              <Pressable style={styles.heroAvatar} onPress={openMenuTab}>
+                <Text style={styles.heroAvatarText}>{displayName.slice(0, 2).toUpperCase()}</Text>
+              </Pressable>
             </View>
-          ))}
-        </View>
+          </View>
 
-        {/* Today's Target with To-Do List */}
-        <View style={[styles.blockCard, { backgroundColor: cardBg, borderColor: border }]}> 
-          <View style={[styles.blockIconWrap, { backgroundColor: 'rgba(5, 150, 105, 0.2)' }]}> 
-            <Ionicons name="flag" size={22} color="#059669" /> 
-          </View> 
-          <Text style={[styles.blockTitle, { color: text }]}>TODAY'S TARGET</Text>
-          {/* To-Do List */}
-          <View style={{ width: '100%', marginTop: 12, marginBottom: 8 }}>
-            {todos.length === 0 && !isAddingTodo && (
-              <View style={{ paddingVertical: 10, alignItems: 'center' }}>
-                <Text style={[styles.blockSub, { color: muted, textAlign: 'center', fontStyle: 'italic' }]}>
-                  Your day is clear. Add your first target!
-                </Text>
-              </View>
-            )}
-            {todos.map((todo, idx) => (
-              <View 
-                key={idx} 
-                style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  marginBottom: 8,
-                  backgroundColor: isDark ? '#33415550' : '#f1f5f9',
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: isDark ? '#47556950' : '#e2e8f0',
-                }}
+          <View style={styles.greetBar}>
+            <Text style={[styles.greetText, { color: isDark ? '#e2e8f0' : '#334155' }]}>
+              Hi, <Text style={styles.greetName}>{displayName}</Text>
+            </Text>
+            <Text style={[styles.greetDate, { color: heroDateColor }]}>{todayLabel}</Text>
+          </View>
+        </Animated.View>
+
+        <View style={[styles.bodyContent, { backgroundColor: pageBg }]}>
+          <Animated.View
+            style={{
+              opacity: carouselOpacity,
+              transform: [{ translateY: carouselTranslateY }],
+            }}
+          >
+            <View
+              style={styles.slider}
+              onLayout={(event) => {
+                const measured = event.nativeEvent.layout.width;
+                if (measured && Math.abs(measured - topCarouselWidth) > 1) {
+                  setTopCarouselWidth(measured);
+                }
+              }}
+            >
+              <ScrollView
+                ref={topCarouselRef}
+                horizontal
+                pagingEnabled
+                decelerationRate="fast"
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={onTopCarouselScrollEnd}
               >
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#059669', marginRight: 10 }} />
-                <Text style={{ flex: 1, color: text, fontSize: 14, fontWeight: '500' }}>{todo}</Text>
-                <Pressable
-                  onPress={() => setTodos(todos.filter((_, i) => i !== idx))}
-                  style={{ marginLeft: 8, padding: 2 }}
-                  hitSlop={8}
-                  accessibilityLabel="Delete task"
-                >
-                  <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                {SLIDES.map((item, index) => (
+                  <View key={item.id} style={[styles.slide, { width: topCarouselWidth || width }]}>
+                    <View style={styles.slideInner}>
+                      <SlideSurface index={index} />
+                      <Text style={styles.slideLabel}>Sponsored</Text>
+                      <Text style={styles.slideTitle}>{item.title}</Text>
+                      <Text style={styles.slideSub}>{item.subtitle}</Text>
+                      <Pressable style={styles.slideBtn}>
+                        <Text style={styles.slideBtnText}>{item.btn}</Text>
+                        <Ionicons name="arrow-forward" size={12} color="#ffffff" />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+            <View style={styles.carouselDots}>
+              {SLIDES.map((_, index) => (
+                <Pressable key={index} onPress={() => goToTopSlide(index)} hitSlop={12} style={styles.carouselDotTap}>
+                  <View style={[styles.carouselDot, index === slideIndex && styles.carouselDotActive]} />
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
+
+          <Animated.View
+            style={{
+              opacity: targetOpacity,
+              transform: [{ translateY: targetTranslateY }],
+            }}
+          >
+            <View style={[styles.targetCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+              <View style={styles.targetHeader}>
+                <Ionicons name="locate" size={14} color="#7c3aed" />
+                <Text style={[styles.targetTitle, { color: textColor }]}>Today's Target</Text>
+                <Text style={styles.targetHint}>{todos.length === 0 ? 'No goals yet' : `${todos.filter((item) => !item.done).length} left`}</Text>
+                <Pressable style={styles.targetAdd} onPress={() => setShowTodoInput(true)}>
+                  <Ionicons name="add" size={15} color="#059669" />
                 </Pressable>
               </View>
+
+              {showTodoInput && (
+                <View style={styles.todoInputRow}>
+                  <TextInput
+                    value={newTodo}
+                    onChangeText={setNewTodo}
+                    placeholder="e.g. 20 Quant questions"
+                    placeholderTextColor={isDark ? '#94a3b8' : '#94a3b8'}
+                    style={[styles.todoInput, { color: textColor, borderColor: '#d1d5db', backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}
+                    returnKeyType="done"
+                    onSubmitEditing={addTodo}
+                  />
+                  <Pressable style={styles.todoSaveBtn} onPress={addTodo}>
+                    <Text style={styles.todoSaveText}>Add</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {todos.length > 0 ? (
+                <View style={styles.todoList}>
+                  {todos.map((todo, idx) => (
+                    <View key={`${todo.text}-${idx}`} style={styles.todoItem}>
+                      <Pressable
+                        style={[styles.todoCheck, todo.done && styles.todoCheckDone]}
+                        onPress={() => {
+                          setTodos((prev) => prev.map((item, index) => (index === idx ? { ...item, done: !item.done } : item)));
+                        }}
+                      >
+                        {todo.done ? <Ionicons name="checkmark" size={10} color="#ffffff" /> : null}
+                      </Pressable>
+                      <Text style={[styles.todoText, { color: textColor }, todo.done && styles.todoTextDone]}>{todo.text}</Text>
+                      <Pressable
+                        style={styles.todoDelete}
+                        onPress={() => {
+                          setTodos((prev) => prev.filter((_, index) => index !== idx));
+                        }}
+                      >
+                        <Ionicons name="close" size={14} color="#cbd5e1" />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.emptyTargetText, { color: textMuted }]}>Add your first target for today.</Text>
+              )}
+            </View>
+          </Animated.View>
+
+          <Text style={[styles.sectionLabel, { color: isDark ? '#cbd5e1' : '#94a3b8' }]}>Quick Actions</Text>
+          <View style={styles.quickActionsGrid}>
+            {QUICK_ACTIONS.map((item) => (
+              <Pressable key={item.id} style={styles.quickActionItem} onPress={() => navigateQuickAction(item.id)}>
+                <View>
+                  <IconBadge colors={item.bg} icon={item.icon as keyof typeof Ionicons.glyphMap} />
+                  {(item.badge || quickActionBadges[item.id]) ? (
+                    <View style={[styles.quickBadge, (item.badge || quickActionBadges[item.id])?.includes('LIVE') && styles.quickBadgeLive]}>
+                      <Text style={styles.quickBadgeText}>{item.badge || quickActionBadges[item.id]}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={[styles.quickActionName, { color: isDark ? '#cbd5e1' : '#64748b' }]}>{item.label}</Text>
+              </Pressable>
             ))}
           </View>
 
-          {/* New Target Button - only shown when not adding */}
-          {!isAddingTodo && (
-            <Pressable style={styles.blockBtn} onPress={() => setIsAddingTodo(true)}>
-              <Text style={styles.blockBtnText}>+ NEW TARGET</Text>
+          <Text style={[styles.sectionLabel, { color: isDark ? '#cbd5e1' : '#94a3b8' }]}>Challenges</Text>
+          <View style={styles.challengesList}>
+            <Pressable style={[styles.challengeCard, { backgroundColor: cardBg, borderColor: cardBorder }]} onPress={() => navigation.navigate('DailyChallenge' as never, { mode: 'challenge' } as never)}>
+              <View style={[styles.challengeIcon, { backgroundColor: '#ecfdf5' }]}>
+                <Ionicons name="timer" size={18} color="#059669" />
+              </View>
+              <View style={styles.challengeBody}>
+                <Text style={[styles.challengeTitle, { color: textColor }]}>Daily Challenge</Text>
+                <Text style={[styles.challengeSub, { color: textMuted }]}>
+                  {challengeIsCompletedToday && challengeResult
+                    ? `Completed ${challengePct}% • ${challengeResult.score.toFixed(1)}/${challengeMaxScore}`
+                    : '20 Qs - Maths, GK, English and Reasoning'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
             </Pressable>
-          )}
 
-          {/* Add New To-Do Input Row - only shown when isAddingTodo is true */}
-          {isAddingTodo && (
-            <View style={{ width: '100%', marginTop: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TextInput
-                  autoFocus
-                  value={newTodo}
-                  onChangeText={setNewTodo}
-                  placeholder="Task name (e.g. Solve 50 Quant)..."
-                  placeholderTextColor={muted}
-                  style={{
-                    flex: 1,
-                    backgroundColor: isDark ? '#334155' : '#fff',
-                    color: text,
-                    borderRadius: 10,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    fontSize: 14,
-                    borderWidth: 1,
-                    borderColor: '#059669',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 2,
-                    elevation: 2,
-                  }}
-                  returnKeyType="done"
-                  onSubmitEditing={() => {
-                    if (newTodo.trim()) {
-                      setTodos([newTodo.trim(), ...todos]);
-                      setNewTodo('');
-                      setIsAddingTodo(false);
-                    } else {
-                      setIsAddingTodo(false);
-                    }
-                  }}
-                />
+            <Pressable style={[styles.challengeCard, { backgroundColor: cardBg, borderColor: cardBorder }]} onPress={() => navigation.navigate('DailyChallenge' as never, { mode: 'quiz' } as never)}>
+              <View style={[styles.challengeIcon, { backgroundColor: '#fff7ed' }]}>
+                <Ionicons name="shuffle" size={18} color="#ea580c" />
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10, gap: 12 }}>
-                <Pressable
-                  onPress={() => {
-                    setNewTodo('');
-                    setIsAddingTodo(false);
-                  }}
-                  style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-                >
-                  <Text style={{ color: muted, fontWeight: '600', fontSize: 13 }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    if (newTodo.trim()) {
-                      setTodos([newTodo.trim(), ...todos]);
-                      setNewTodo('');
-                      setIsAddingTodo(false);
-                    } else {
-                      setIsAddingTodo(false);
-                    }
-                  }}
-                  style={{ 
-                    backgroundColor: '#059669', 
-                    paddingVertical: 6, 
-                    paddingHorizontal: 16, 
-                    borderRadius: 6,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 2,
-                    elevation: 3,
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Add Target</Text>
-                </Pressable>
+              <View style={styles.challengeBody}>
+                <Text style={[styles.challengeTitle, { color: textColor }]}>Random Quiz</Text>
+                <Text style={[styles.challengeSub, { color: textMuted }]}>
+                  {quizIsCompletedToday && quizResult
+                    ? `Completed ${quizPct}% • ${quizResult.score.toFixed(1)}/${quizMaxScore}`
+                    : '10 mixed questions - new set every time'}
+                </Text>
               </View>
-            </View>
-          )}
-        </View>
+              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+            </Pressable>
 
-        {/* Daily Challenge */}
-        {(() => {
-          const isCompletedToday = !!challengeResult && new Date(challengeResult.completedAt).toDateString() === new Date().toDateString();
-          const maxScore = challengeResult ? challengeResult.totalQuestions * 2 : 40;
-          const pct = challengeResult ? Math.round((challengeResult.score / maxScore) * 100) : 0;
-          return (
-        <View style={[styles.blockCard, { backgroundColor: cardBg, borderColor: border }]}>
-          <View style={[styles.blockIconWrap, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
-            <Ionicons name="stopwatch" size={22} color="#3b82f6" />
+            <Pressable style={[styles.challengeCard, { backgroundColor: cardBg, borderColor: cardBorder }]} onPress={() => navigation.navigate('CreateMock' as never)}>
+              <View style={[styles.challengeIcon, { backgroundColor: '#ede9fe' }]}>
+                <Ionicons name="create" size={18} color="#7c3aed" />
+              </View>
+              <View style={styles.challengeBody}>
+                <Text style={[styles.challengeTitle, { color: textColor }]}>Create Your Mock</Text>
+                <Text style={[styles.challengeSub, { color: textMuted }]}>Pick topic, difficulty and time limit</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+            </Pressable>
           </View>
-          <Text style={[styles.blockTitle, { color: text }]}>DAILY CHALLENGE</Text>
-          {isCompletedToday && challengeResult ? (
-            <View style={[styles.dailyResultCard, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-              <View style={styles.dailyResultTopRow}>
-                <View style={styles.dailyResultScoreCircle}>
-                  <Text style={[styles.dailyResultPct, { color: isDark ? '#ffffff' : '#065f46' }]}>{pct}%</Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.dailyResultTitle, { color: isDark ? '#bbf7d0' : '#065f46' }]}>Challenge Complete</Text>
-                  <Text style={[styles.dailyResultScore, { color: isDark ? '#ffffff' : '#065f46' }]}>
-                    {challengeResult.score.toFixed(1)}
-                    <Text style={[styles.dailyResultOutOf, { color: isDark ? '#a7f3d0' : '#047857' }]}> / {maxScore}</Text>
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.dailyStatsRow}>
-                <View style={styles.dailyStatItem}>
-                  <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
-                  <Text style={[styles.dailyStatText, { color: isDark ? '#d1fae5' : '#047857' }]}>{challengeResult.correct} Correct</Text>
-                </View>
-                <View style={styles.dailyStatItem}>
-                  <Ionicons name="close-circle" size={14} color="#ef4444" />
-                  <Text style={[styles.dailyStatText, { color: isDark ? '#d1fae5' : '#047857' }]}>{challengeResult.wrong} Wrong</Text>
-                </View>
-                <View style={styles.dailyStatItem}>
-                  <Ionicons name="time" size={14} color="#3b82f6" />
-                  <Text style={[styles.dailyStatText, { color: isDark ? '#d1fae5' : '#047857' }]}>{formatDuration(challengeResult.timeTaken)}</Text>
-                </View>
-              </View>
-              <Text style={[styles.dailyResultStamp, { color: isDark ? '#a7f3d0' : '#065f46' }]}>Completed {formatCompletedAt(challengeResult.completedAt)}</Text>
-            </View>
-          ) : (
-            <Text style={[styles.blockSub, { color: muted }]} numberOfLines={2}>
-              Complete 20 mixed questions in 30 mins to boost your speed.
-            </Text>
-          )}
-          <Pressable
-            style={[styles.blockBtn, isCompletedToday && styles.blockBtnDisabled]}
-            disabled={isCompletedToday}
-            onPress={() => navigation.navigate('DailyChallenge' as never, { mode: 'challenge' } as never)}
-          >
-            <Text style={[styles.blockBtnText, isCompletedToday && { color: muted }]}>
-              {isCompletedToday ? 'COMPLETED TODAY ✓' : 'START NOW →'}
-            </Text>
-          </Pressable>
-        </View>
-          );
-        })()}
 
-        {/* Daily Quiz */}
-        {(() => {
-          const isCompletedToday = !!quizResult && new Date(quizResult.completedAt).toDateString() === new Date().toDateString();
-          const maxScore = quizResult ? quizResult.totalQuestions * 2 : 20;
-          const pct = quizResult ? Math.round((quizResult.score / maxScore) * 100) : 0;
-          return (
-        <View style={[styles.blockCard, { backgroundColor: cardBg, borderColor: border }]}>
-          <View style={[styles.blockIconWrap, { backgroundColor: 'rgba(236, 72, 153, 0.2)' }]}>
-            <Ionicons name="help-circle" size={22} color="#ec4899" />
+          <Pressable
+            style={[
+              styles.selectionKeyCard,
+              isDark && {
+                backgroundColor: '#065f46',
+                borderColor: '#10b981',
+                shadowColor: '#10b981',
+              },
+            ]}
+            onPress={() => navigation.navigate('Mocks' as never)}
+          >
+            <View style={styles.selectionKeyBadge}>
+              <Text style={styles.selectionKeyBadgeText}>BEST VALUE</Text>
+            </View>
+            <View style={[styles.selectionKeyIconWrap, isDark && { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+              <Ionicons name="key" size={18} color="#ffffff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.selectionKeyTitle}>Selection Key</Text>
+              <Text style={styles.selectionKeySub}>Unlimited mocks, PYQs, contests and rank boosters</Text>
+            </View>
+            <View style={styles.selectionKeyRightCol}>
+              <Text style={styles.selectionKeyPrice}>Rs249/yr</Text>
+              <View style={[styles.selectionKeyCtaPill, isDark && { backgroundColor: '#a7f3d0' }]}>
+                <Text style={styles.selectionKeyCtaText}>Unlock</Text>
+                <Ionicons name="arrow-forward" size={11} color="#065f46" />
+              </View>
+            </View>
+          </Pressable>
+
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="chatbubbles" size={14} color="#059669" />
+            <Text style={[styles.sectionLabelInline, { color: sectionInlineColor }]}>From the Forums</Text>
           </View>
-          <Text style={[styles.blockTitle, { color: text }]}>DAILY QUIZ</Text>
-          {isCompletedToday && quizResult ? (
-            <View style={[styles.dailyResultCard, { backgroundColor: isDark ? '#4c1d95' : '#fce7f3' }]}>
-              <View style={styles.dailyResultTopRow}>
-                <View style={[styles.dailyResultScoreCircle, { borderColor: isDark ? '#a78bfa' : '#ec4899' }]}>
-                  <Text style={[styles.dailyResultPct, { color: isDark ? '#ffffff' : '#9d174d' }]}>{pct}%</Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.dailyResultTitle, { color: isDark ? '#e9d5ff' : '#9d174d' }]}>Quiz Complete</Text>
-                  <Text style={[styles.dailyResultScore, { color: isDark ? '#ffffff' : '#9d174d' }]}>
-                    {quizResult.score.toFixed(1)}
-                    <Text style={[styles.dailyResultOutOf, { color: isDark ? '#f5d0fe' : '#be185d' }]}> / {maxScore}</Text>
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.dailyStatsRow}>
-                <View style={styles.dailyStatItem}>
-                  <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
-                  <Text style={[styles.dailyStatText, { color: isDark ? '#f5d0fe' : '#be185d' }]}>{quizResult.correct} Correct</Text>
-                </View>
-                <View style={styles.dailyStatItem}>
-                  <Ionicons name="close-circle" size={14} color="#ef4444" />
-                  <Text style={[styles.dailyStatText, { color: isDark ? '#f5d0fe' : '#be185d' }]}>{quizResult.wrong} Wrong</Text>
-                </View>
-                <View style={styles.dailyStatItem}>
-                  <Ionicons name="time" size={14} color="#3b82f6" />
-                  <Text style={[styles.dailyStatText, { color: isDark ? '#f5d0fe' : '#be185d' }]}>{formatDuration(quizResult.timeTaken)}</Text>
-                </View>
-              </View>
-              <Text style={[styles.dailyResultStamp, { color: isDark ? '#f0abfc' : '#9d174d' }]}>Completed {formatCompletedAt(quizResult.completedAt)}</Text>
+
+          <View style={styles.forumCarouselWrap}>
+            <View style={styles.forumMarqueeViewport}>
+              <Animated.View
+                style={[
+                  styles.forumMarqueeTrack,
+                  {
+                    transform: [{ translateX: forumTranslateX }],
+                  },
+                ]}
+              >
+                {[...forumPosts, ...forumPosts].map((item, index) => (
+                  <Pressable
+                    key={`${item.id}-${index}`}
+                    style={[
+                      styles.forumCard,
+                      {
+                        width: forumCardWidth,
+                        backgroundColor: forumCardBg,
+                        borderColor: forumCardBorder,
+                      },
+                    ]}
+                    onPress={() => navigation.getParent?.()?.getParent?.()?.navigate('Forums')}
+                  >
+                    <View style={styles.forumTop}>
+                      <View style={[styles.forumCategory, { backgroundColor: item.toneBg }]}>
+                        <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={11} color={item.toneText} />
+                        <Text style={[styles.forumCategoryText, { color: item.toneText }]}>{item.category}</Text>
+                      </View>
+                      <Text style={styles.forumHot}>{item.likes}</Text>
+                    </View>
+                    <Text style={[styles.forumTitle, { color: forumTitleColor }]} numberOfLines={2}>{item.title}</Text>
+                    <View style={styles.forumMeta}>
+                      <View style={styles.forumAvatar}><Text style={styles.forumAvatarText}>{item.avatar}</Text></View>
+                      <Text style={[styles.forumUser, { color: forumUserColor }]} numberOfLines={1}>{item.user}</Text>
+                      <View style={styles.forumStats}>
+                        <View style={styles.forumStatRow}>
+                          <Ionicons name="heart-outline" size={11} color="#f43f5e" />
+                          <Text style={[styles.forumStatText, { color: forumStatsColor }]}>{item.likes}</Text>
+                        </View>
+                        <View style={styles.forumStatRow}>
+                          <Ionicons name="chatbubble-outline" size={11} color="#94a3b8" />
+                          <Text style={[styles.forumStatText, { color: forumStatsColor }]}>{item.comments}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </Pressable>
+                ))}
+              </Animated.View>
             </View>
-          ) : (
-            <Text style={[styles.blockSub, { color: muted }]} numberOfLines={2}>
-              10 mixed questions from Quant, Reasoning, English, and GA.
-            </Text>
-          )}
-          <Pressable
-            style={[styles.blockBtn, isCompletedToday && styles.blockBtnDisabled]}
-            disabled={isCompletedToday}
-            onPress={() => navigation.navigate('DailyChallenge' as never, { mode: 'quiz' } as never)}
-          >
-            <Text style={[styles.blockBtnText, isCompletedToday && { color: muted }]}>
-              {isCompletedToday ? 'COMPLETED TODAY ✓' : 'PLAY QUIZ →'}
-            </Text>
-          </Pressable>
+          </View>
+
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="trophy" size={14} color="#f59e0b" />
+            <Text style={[styles.sectionLabelInline, { color: sectionInlineColor }]}>Success Stories</Text>
+          </View>
+
+          <View style={styles.storyWrap}>
+            <ScrollView
+              ref={storyScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={storySnapWidth}
+              snapToAlignment="start"
+              contentContainerStyle={styles.storyScrollContent}
+              onMomentumScrollEnd={(event) => {
+                const nextIndex = Math.round(event.nativeEvent.contentOffset.x / storySnapWidth);
+                const boundedIndex = Math.max(0, Math.min(SUCCESS_STORIES.length - 1, nextIndex));
+                setStoryIndex(boundedIndex);
+              }}
+            >
+              {SUCCESS_STORIES.map((item) => (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.storyCard,
+                    {
+                      width: storyCardWidth,
+                      backgroundColor: storyCardBg,
+                      borderColor: storyCardBorder,
+                    },
+                  ]}
+                >
+                  <View style={[styles.storyAccent, { backgroundColor: item.accent }]} />
+                  <View style={styles.storyBody}>
+                    <View style={[styles.storyBadge, { backgroundColor: item.badgeBg }]}>
+                      <Ionicons name="medal" size={11} color={item.badgeText} />
+                      <Text style={[styles.storyBadgeText, { color: item.badgeText }]}>{item.examTag}</Text>
+                    </View>
+                    <Text style={[styles.storyQuote, { color: storyQuoteColor }]}>{item.quote}</Text>
+                    <View style={styles.storyDivider} />
+                    <View style={styles.storyFooter}>
+                      <View style={[styles.storyAvatar, { backgroundColor: item.accent }]}>
+                        <Text style={styles.storyAvatarText}>{item.avatar}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.storyName, { color: storyNameColor }]}>{item.name}</Text>
+                        <Text style={[styles.storyExam, { color: storyExamColor }]}>{item.exam}</Text>
+                      </View>
+                      <Text style={styles.storyStars}>★★★★★</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.storyDots}>
+              {SUCCESS_STORIES.map((story, index) => (
+                <View key={story.id} style={[styles.storyDot, index === storyIndex && styles.storyDotOn]} />
+              ))}
+            </View>
+          </View>
+
+          <View style={[styles.tipCard, { backgroundColor: tipBg, borderColor: tipBorder }]}>
+            <View style={styles.tipHeader}>
+              <View style={styles.tipTag}>
+                <Ionicons name="bulb" size={11} color="#92400e" />
+                <Text style={styles.tipTagText}>Tip of the Day</Text>
+              </View>
+              <View style={styles.tipNav}>
+                <Pressable style={styles.tipNavBtn} onPress={() => setTipIndex((prev) => (prev - 1 + TIPS.length) % TIPS.length)}>
+                  <Ionicons name="chevron-back" size={12} color="#92400e" />
+                </Pressable>
+                <Text style={styles.tipCounter}>{tipIndex + 1}/{TIPS.length}</Text>
+                <Pressable style={styles.tipNavBtn} onPress={() => setTipIndex((prev) => (prev + 1) % TIPS.length)}>
+                  <Ionicons name="chevron-forward" size={12} color="#92400e" />
+                </Pressable>
+              </View>
+            </View>
+            <Text style={[styles.tipText, { color: tipTextColor }]}>{TIPS[tipIndex]}</Text>
+            <View style={styles.tipProgress}>
+              {TIPS.map((_, index) => (
+                <View key={index} style={[styles.tipPip, index === tipIndex && styles.tipPipOn]} />
+              ))}
+            </View>
+          </View>
         </View>
-          );
-        })()}
-
-
-        <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: { flex: 1 },
-  header: {
+  wrapper: { flex: 1, backgroundColor: COLORS.bg },
+  hero: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    overflow: 'hidden',
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  brandLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: '#e2e8f0',
+  },
+  logoText: {
+    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  logoHighlight: {
+    color: '#059669',
+    fontWeight: '800',
+  },
+  heroActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  streakChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    borderRadius: 99,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  streakChipText: {
+    color: '#ea580c',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  heroIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    position: 'relative',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#f43f5e',
+  },
+  heroAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#059669',
+  },
+  heroAvatarText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  greetBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    marginTop: 10,
+    paddingBottom: 4,
   },
-  logoRow: { flexDirection: 'row', alignItems: 'center' },
-  headerLogo: { width: 44, height: 44 },
-  logoText: { fontSize: 18, fontWeight: '700', marginLeft: -4 },
-  logoHighlight: { color: '#059669' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+  greetText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  greetName: {
+    color: '#059669',
+    fontWeight: '800',
+  },
+  greetDate: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
   },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
-  welcomeTitle: { fontSize: 22, fontWeight: '700', marginBottom: 4 },
-  welcomeSub: { fontSize: 15, marginBottom: 16 },
-  slider: { marginHorizontal: -16, marginBottom: 8 },
+  scrollContent: {
+    paddingBottom: 110,
+  },
+  bodyContent: {
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    marginTop: -2,
+    backgroundColor: COLORS.bg,
+  },
+  slider: { marginHorizontal: -16 },
   slide: {
     paddingHorizontal: 16,
     justifyContent: 'center',
   },
   slideInner: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    borderRadius: 12,
+    minHeight: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    justifyContent: 'center',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 7,
   },
-  slideTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 8 },
-  slideSub: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginBottom: 16 },
+  slideLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 6,
+  },
+  slideTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 5,
+    maxWidth: '88%',
+    lineHeight: 24,
+  },
+  slideSub: {
+    color: 'rgba(255,255,255,0.86)',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 14,
+    maxWidth: '86%',
+  },
   slideBtn: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 8,
-  },
-  slideBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 20 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#475569' },
-  dotActive: { backgroundColor: '#059669', width: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  subjectGrid: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  subjectCard: {
-    width: '48%',
-    padding: 10,
-    marginBottom: 12,
     alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
+    gap: 5,
   },
-  subjectIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  slideBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  carouselDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
+    gap: 6,
+    marginTop: 10,
+    marginBottom: 14,
   },
-  subjectValue: { fontSize: 20, fontWeight: '700', marginBottom: 2 },
-  subjectLabel: { fontSize: 12, textAlign: 'center' },
-  blockCard: {
-    padding: 16,
-    borderRadius: 12,
+  carouselDotTap: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 4,
+    backgroundColor: 'rgba(5,150,105,0.35)',
+  },
+  carouselDotActive: {
+    width: 18,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#059669',
+  },
+  targetCard: {
     borderWidth: 1,
-    marginBottom: 12,
-    alignItems: 'center',
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 14,
   },
-  blockIconWrap: {
+  targetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  targetTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  targetHint: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  targetAdd: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todoInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+  todoInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    fontSize: 12,
+  },
+  todoSaveBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  todoSaveText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  todoList: {
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  todoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: '#f8fafc',
+  },
+  todoCheck: {
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todoCheckDone: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  todoText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  todoTextDone: {
+    color: '#94a3b8',
+    textDecorationLine: 'line-through',
+  },
+  todoDelete: {
+    padding: 2,
+  },
+  emptyTargetText: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  sectionLabel: {
+    fontSize: 11,
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    fontWeight: '700',
+    marginBottom: 10,
+    marginTop: 8,
+    letterSpacing: 0.5,
+  },
+  challengesList: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  challengeCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  challengeIcon: {
     width: 44,
     height: 44,
     borderRadius: 12,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
   },
-  blockTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
-  blockSub: { fontSize: 14, marginBottom: 12, textAlign: 'center' },
-  blockBtn: { alignSelf: 'center', paddingVertical: 6 },
-  blockBtnText: { color: '#059669', fontWeight: '700', fontSize: 14 },
-  blockBtnDisabled: { opacity: 0.6 },
-  dailyResultCard: {
-    width: '100%',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 10,
+  challengeBody: {
+    flex: 1,
   },
-  dailyResultTopRow: {
+  challengeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  challengeSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  quickActionsGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 14,
+    marginBottom: 16,
   },
-  dailyResultScoreCircle: {
+  quickActionItem: {
+    width: '23%',
+    alignItems: 'center',
+  },
+  quickActionIcon: {
     width: 52,
     height: 52,
-    borderRadius: 26,
-    borderWidth: 3,
-    borderColor: '#059669',
-    justifyContent: 'center',
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    position: 'relative',
   },
-  dailyResultPct: { fontSize: 14, fontWeight: '900' },
-  dailyResultTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.2, marginBottom: 2 },
-  dailyResultScore: { fontSize: 24, fontWeight: '900' },
-  dailyResultOutOf: { fontSize: 14, fontWeight: '700' },
-  dailyStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  quickBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#f43f5e',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  quickBadgeLive: {
+    backgroundColor: '#059669',
+  },
+  quickBadgeText: {
+    color: '#ffffff',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  quickActionName: {
+    marginTop: 6,
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  dailyCardsRail: {
+    paddingTop: 2,
+    paddingBottom: 8,
+    gap: 12,
+    paddingRight: 8,
+    marginBottom: 12,
+  },
+  infoCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 15,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '700',
     marginBottom: 6,
   },
-  dailyStatItem: {
+  infoSub: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  resultCard: {
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  resultPct: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  resultScore: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  resultMeta: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  infoBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 15,
+  },
+  infoBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  infoBtnDisabled: {
+    opacity: 0.65,
+  },
+  selectionKeyCard: {
+    marginBottom: 14,
+    borderRadius: 14,
+    backgroundColor: '#059669',
+    borderWidth: 1,
+    borderColor: '#34d399',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#047857',
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  selectionKeyBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#fef3c7',
+    borderBottomLeftRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  selectionKeyBadgeText: {
+    color: '#92400e',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  selectionKeyIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  selectionKeyTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  selectionKeySub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 10,
+    marginTop: 1,
+    fontWeight: '600',
+  },
+  selectionKeyRightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  selectionKeyPrice: {
+    color: '#ffffff',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  selectionKeyCtaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#d1fae5',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  selectionKeyCtaText: {
+    color: '#065f46',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  sectionLabelInline: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  forumCarouselWrap: {
+    marginBottom: 22,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  forumMarqueeViewport: {
+    overflow: 'hidden',
+  },
+  forumMarqueeTrack: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  forumCard: {
+    width: 240,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginRight: 10,
+  },
+  forumTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  forumCategory: {
+    borderRadius: 99,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  dailyStatText: { fontSize: 11, fontWeight: '700' },
-  dailyResultMeta: { fontSize: 12, fontWeight: '700', marginTop: 4 },
-  dailyResultStamp: { fontSize: 11, fontWeight: '600', marginTop: 4 },
-  shortcutsGrid: {
-    marginTop: 4,
+  forumCategoryText: {
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
-  shortcutsRow: {
+  forumHot: {
+    color: '#f43f5e',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  forumTitle: {
+    fontSize: 12,
+    color: '#1e293b',
+    fontWeight: '600',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  forumMeta: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginHorizontal: -6,
-  },
-  shortcutCard: {
-    width: '48%',
-    padding: 12,
-    marginHorizontal: 6,
-    marginVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
     alignItems: 'center',
+    gap: 8,
   },
-  shortcutSpacer: {
-    width: '48%',
-    marginHorizontal: 6,
-    marginVertical: 6,
-  },
-  shortcutIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  forumAvatar: {
+    width: 21,
+    height: 21,
+    borderRadius: 11,
+    backgroundColor: '#059669',
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  forumAvatarText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  forumUser: {
+    flex: 1,
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  forumStats: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    gap: 8,
   },
-  shortcutTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  forumStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  forumStatText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  storyWrap: {
+    marginBottom: 22,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  storyScrollContent: {
+    paddingRight: 12,
+    gap: 12,
+  },
+  storyCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  storyAccent: {
+    height: 4,
+  },
+  storyBody: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  storyBadge: {
+    alignSelf: 'flex-start',
     borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginBottom: 10,
   },
-  shortcutTagText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
-  shortcutTitle: { fontSize: 14, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
-  shortcutSub: { fontSize: 12, textAlign: 'center', lineHeight: 16 },
+  storyBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  storyQuote: {
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 19,
+    marginBottom: 10,
+  },
+  storyDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginBottom: 9,
+  },
+  storyFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  storyAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyAvatarText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  storyName: {
+    fontSize: 12,
+    color: '#1e293b',
+    fontWeight: '700',
+  },
+  storyExam: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 1,
+  },
+  storyStars: {
+    fontSize: 10,
+    color: '#f59e0b',
+    letterSpacing: 0.6,
+  },
+  storyDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 10,
+  },
+  storyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#e2e8f0',
+  },
+  storyDotOn: {
+    width: 18,
+    borderRadius: 3,
+    backgroundColor: '#059669',
+  },
+  tipCard: {
+    marginTop: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    backgroundColor: '#fffbeb',
+    paddingTop: 10,
+    paddingBottom: 11,
+    paddingHorizontal: 14,
+  },
+  tipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  tipTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#fde68a',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  tipTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#92400e',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  tipNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tipNavBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: 'rgba(251,191,36,0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tipCounter: {
+    minWidth: 30,
+    textAlign: 'center',
+    fontSize: 10,
+    color: '#b45309',
+    fontWeight: '700',
+  },
+  tipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#78350f',
+    lineHeight: 19,
+    marginBottom: 10,
+  },
+  tipProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tipPip: {
+    flex: 1,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: '#fde68a',
+  },
+  tipPipOn: {
+    backgroundColor: '#f59e0b',
+  },
 });
