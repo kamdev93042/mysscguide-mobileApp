@@ -27,21 +27,21 @@ const MENU_ITEMS = [
       { id: 'home', label: 'Home', icon: 'home', bg: ['#059669', '#0d9488'] as const },
       { id: 'mocks', label: 'Mocks', icon: 'document-text', bg: ['#3b82f6', '#2563eb'] as const },
       { id: 'pyqs', label: 'Previous Year Papers', icon: 'copy', bg: ['#ec4899', '#f43f5e'] as const },
-      { id: 'contests', label: 'Live Contests', icon: 'trophy', bg: ['#f59e0b', '#eab308'] as const, badge: 'LIVE' },
+      { id: 'contests', label: 'Live Contests', icon: 'trophy', bg: ['#f59e0b', '#eab308'] as const },
     ],
   },
   {
     section: 'Tools',
     items: [
       { id: 'typing', label: 'Typing Test', icon: 'keypad', bg: ['#06b6d4', '#0891b2'] as const },
-      { id: 'mistakes', label: 'Mistake Notebook', icon: 'book', bg: ['#ef4444', '#dc2626'] as const, badge: '5' },
+      { id: 'mistakes', label: 'Mistake Notebook', icon: 'book', bg: ['#ef4444', '#dc2626'] as const },
     ],
   },
   {
     section: 'Community',
     items: [
       { id: 'forums', label: 'Forums', icon: 'people', bg: ['#10b981', '#059669'] as const },
-      { id: 'mnemonics', label: 'Mnemonics', icon: 'bulb', bg: ['#8b5cf6', '#7c3aed'] as const, badge: 'NEW' },
+      { id: 'mnemonics', label: 'Mnemonics', icon: 'bulb', bg: ['#8b5cf6', '#7c3aed'] as const },
     ],
   },
   {
@@ -276,9 +276,9 @@ export default function MenuScreen() {
     if (id === 'mocks') return closeDrawerThenNavigate('Mocks');
     if (id === 'pyqs') return closeDrawerThenNavigate('PYQs');
     if (id === 'contests') return closeDrawerThenNavigate('Contests');
-    if (id === 'typing') return closeDrawerThenNavigate('Main', { screen: 'Typing' });
+    if (id === 'typing') return closeDrawerThenNavigate('Typing');
     if (id === 'mistakes') return closeDrawerThenNavigate('DailyChallenge', { mode: 'challenge' });
-    if (id === 'mnemonics') return closeDrawerThenNavigate('Main', { screen: 'Mnemonics' });
+    if (id === 'mnemonics') return closeDrawerThenNavigate('Mnemonics');
     if (id === 'forums') return closeDrawerThenNavigate('Forums');
     if (id === 'settings') return closeDrawerThenNavigate('Profile');
   };
@@ -337,13 +337,12 @@ export default function MenuScreen() {
                   <Ionicons name={item.icon as any} size={15} color="#ffffff" />
                 </View>
                 <Text style={styles.menuLabel}>{item.label}</Text>
-                {item.badge ? <Text style={[styles.badge, item.badge === 'LIVE' && styles.badgeLive]}>{item.badge}</Text> : null}
               </Pressable>
             ))}
           </View>
         ))}
 
-        <Pressable style={styles.upgradeCard} onPress={() => navigation.navigate('Mocks')}>
+        <Pressable style={styles.upgradeCard} onPress={() => navigation.navigate('Main', { screen: 'Premium' })}>
           <View style={styles.upgradeIcon}><Ionicons name="key" size={14} color="#ffffff" /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.upgradeTitle}>Unlock Selection Key</Text>

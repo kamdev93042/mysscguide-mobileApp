@@ -17,7 +17,6 @@ import WelcomeScreen from './screens/WelcomeScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import MenuScreen from './screens/MenuScreen';
-import PlaceholderScreen from './screens/PlaceholderScreen';
 import OtpVerificationScreen from './screens/OtpVerificationScreen';
 import NameScreen from './screens/NameScreen';
 import NotificationScreen from './screens/NotificationScreen';
@@ -33,11 +32,11 @@ import ContestScreen from './screens/ContestScreen';
 import MnemonicsScreen from './screens/MnemonicsScreen';
 import ForumsScreen from './screens/ForumsScreen';
 import ForumPostScreen from './screens/ForumPostScreen';
-import TestsScreen from './screens/TestsScreen';
 import TestAnalysisScreen from './screens/TestAnalysisScreen';
 import DailyChallengeScreen from './screens/DailyChallengeScreen';
 
 const MockPracticeScreen = require('./screens/MockPracticeScreen').default;
+const PremiumScreen = require('./screens/' + 'PremiumScreen').default;
 
 const Stack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -47,9 +46,10 @@ const Tab = createBottomTabNavigator();
 const BYPASS_LOGIN_FOR_TESTING = __DEV__ && false;
 
 const TAB_SCREENS = [
-  { name: 'Tests', label: 'Tests', icon: 'document-text', component: TestsScreen },
-  { name: 'Mnemonics', label: 'Mnemonics', icon: 'bulb', component: MnemonicsScreen },
-  { name: 'Typing', label: 'Typing', icon: 'keypad', component: TypingScreen },
+  { name: 'PYQs', label: 'PYQ', icon: 'copy', component: PyqsScreen },
+  { name: 'Mocks', label: 'Mocks', icon: 'clipboard', component: MocksScreen },
+  { name: 'Forums', label: 'Forums', icon: 'people', component: ForumsScreen },
+  { name: 'Premium', label: 'Premium', icon: 'diamond', component: PremiumScreen },
 ];
 
 function HomeStackNavigator() {
@@ -77,14 +77,10 @@ function MainTabs() {
         tabBarShowLabel: true,
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
           backgroundColor: tabBg,
           borderTopColor: borderTop,
           borderTopWidth: 1,
-          height: 62 + Math.max(insets.bottom, 4),
+          height: 64 + Math.max(insets.bottom, 4),
           paddingTop: 6,
           paddingBottom: Math.max(insets.bottom, 4),
           elevation: 0,
@@ -94,14 +90,14 @@ function MainTabs() {
         tabBarInactiveTintColor: tabInactive,
         tabBarActiveBackgroundColor: isDark ? '#064e3b' : '#ecfdf5',
         tabBarItemStyle: {
-          marginHorizontal: 4,
-          marginVertical: 2,
+          marginHorizontal: 2,
+          marginVertical: 0,
           borderRadius: 14,
         },
         tabBarLabelStyle: {
-          fontSize: 9,
+          fontSize: 11,
           fontWeight: '700',
-          marginBottom: 2,
+          marginBottom: 3,
         },
         tabBarIconStyle: { marginTop: 2 },
       }}
@@ -130,23 +126,6 @@ function MainTabs() {
           }}
         />
       ))}
-      <Tab.Screen
-        name="Menu"
-        component={PlaceholderScreen}
-        listeners={({ navigation }) => ({
-          tabPress: (event: any) => {
-            event.preventDefault();
-            navigation.getParent()?.navigate('MenuDrawer' as never);
-          },
-        })}
-        initialParams={{ name: 'Menu' }}
-        options={{
-          tabBarLabel: 'Menu',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name="grid" size={focused ? 20 : 18} color={color} />
-          ),
-        }}
-      />
     </Tab.Navigator>
   );
 }
@@ -262,6 +241,8 @@ export default function App() {
                 <Stack.Screen name="Forums" component={ForumsScreen} />
                 <Stack.Screen name="Mocks" component={MocksScreen} />
                 <Stack.Screen name="PYQs" component={PyqsScreen} />
+                <Stack.Screen name="Typing" component={TypingScreen} />
+                <Stack.Screen name="Mnemonics" component={MnemonicsScreen} />
                 <Stack.Screen name="Contests" component={ContestScreen} />
                 <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen

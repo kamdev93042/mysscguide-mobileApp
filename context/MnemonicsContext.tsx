@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { mnemonicApi } from '../services/api';
 
 export type MnemonicItem = {
@@ -7,6 +7,7 @@ export type MnemonicItem = {
   meaning: string;
   trick: string;
   author: string;
+  ownedByMe?: boolean;
   likes: number;
   dislikes: number;
   isSaved: boolean;
@@ -18,7 +19,7 @@ type MnemonicsContextType = {
   mnemonics: MnemonicItem[];
   addMnemonic: (word: string, meaning: string, trick: string, author: string) => Promise<void>;
   toggleSave: (id: string) => void;
-  deleteMnemonic: (id: string) => void;
+  deleteMnemonic: (id: string) => Promise<void>;
   reportMnemonic: (id: string, reason: string) => Promise<void>;
   incrementLike: (id: string) => void;
   incrementDislike: (id: string) => void;
@@ -43,6 +44,63 @@ export const useMnemonics = () => useContext(MnemonicsContext);
 export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mnemonics, setMnemonics] = useState<MnemonicItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const voteInFlightRef = useRef<Set<string>>(new Set());
+
+  const resolveVotePayload = (res: any) => {
+    const payloadCandidates = [
+      res?.data?.data,
+      res?.data?.mnemonic,
+      res?.data,
+      res?.mnemonic,
+      res,
+    ];
+    const payload =
+      payloadCandidates.find(
+        (item) =>
+          item &&
+          typeof item === 'object' &&
+          (item.upvotes != null ||
+            item.downvotes != null ||
+            item.likes != null ||
+            item.dislikes != null ||
+            item.likeCount != null ||
+            item.dislikeCount != null ||
+            typeof item.likedByMe === 'boolean' ||
+            typeof item.dislikedByMe === 'boolean' ||
+            item.userVote === 'like' ||
+            item.userVote === 'dislike' ||
+            item.userVote === null)
+      ) ||
+      res?.data ||
+      res;
+
+    const upvotes = Number(payload?.upvotes ?? payload?.likes ?? payload?.likeCount);
+    const downvotes = Number(payload?.downvotes ?? payload?.dislikes ?? payload?.dislikeCount);
+    const likedByMe = payload?.likedByMe;
+    const dislikedByMe = payload?.dislikedByMe;
+    const rawUserVote = payload?.userVote;
+
+    const hasCounts = Number.isFinite(upvotes) && Number.isFinite(downvotes);
+    const hasVoteFlags =
+      typeof likedByMe === 'boolean' ||
+      typeof dislikedByMe === 'boolean' ||
+      rawUserVote === 'like' ||
+      rawUserVote === 'dislike' ||
+      rawUserVote === null;
+
+    let userVote: 'like' | 'dislike' | null = null;
+    if (likedByMe === true) userVote = 'like';
+    else if (dislikedByMe === true) userVote = 'dislike';
+    else if (rawUserVote === 'like' || rawUserVote === 'dislike' || rawUserVote === null) userVote = rawUserVote;
+
+    return {
+      hasCounts,
+      upvotes,
+      downvotes,
+      hasVoteFlags,
+      userVote,
+    };
+  };
 
   const fetchMnemonics = useCallback(async () => {
     try {
@@ -57,6 +115,16 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           meaning: apiItem.meaning,
           trick: apiItem.mnemonic, // trick maps to mnemonic
           author: apiItem.user?.name || apiItem.user?.username || 'Anonymous',
+          ownedByMe: Boolean(
+            apiItem?.ownedByMe ??
+              apiItem?.isMine ??
+              apiItem?.isOwner ??
+              apiItem?.mine ??
+              apiItem?.myMnemonic ??
+              apiItem?.canDelete ??
+              apiItem?.user?.isMe ??
+              apiItem?.creator?.isMe
+          ),
           likes: apiItem.upvotes || 0,
           dislikes: apiItem.downvotes || 0,
           isSaved: false,
@@ -98,6 +166,7 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           meaning: apiItem.meaning,
           trick: apiItem.mnemonic,
           author: apiItem.user?.name || apiItem.user?.username || author,
+          ownedByMe: true,
           likes: apiItem.upvotes || 0,
           dislikes: apiItem.downvotes || 0,
           isSaved: false,
@@ -129,6 +198,7 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMnemonics((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
       console.error('Failed to delete mnemonic:', error);
+      throw error;
     }
   };
 
@@ -149,82 +219,142 @@ export const MnemonicsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const incrementLike = async (id: string) => {
+    if (voteInFlightRef.current.has(id)) return;
+
+    const currentItem = mnemonics.find((item) => item.id === id);
+    if (!currentItem) return;
+    voteInFlightRef.current.add(id);
+
+    const currentVote = currentItem.userVote;
+    const action: 'like' | 'unlike' = currentVote === 'like' ? 'unlike' : 'like';
+
     // Optimistic update
     setMnemonics((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-        
+
         let newLikes = item.likes;
         let newDislikes = item.dislikes;
-        let newVote = item.userVote;
+        let newVote: 'like' | 'dislike' | null = item.userVote;
 
         if (item.userVote === 'like') {
-          newLikes -= 1;
+          newLikes = Math.max(0, newLikes - 1);
           newVote = null;
         } else if (item.userVote === 'dislike') {
-          newDislikes -= 1;
+          newDislikes = Math.max(0, newDislikes - 1);
           newLikes += 1;
           newVote = 'like';
         } else {
           newLikes += 1;
           newVote = 'like';
         }
-        
+
         return { ...item, likes: newLikes, dislikes: newDislikes, userVote: newVote };
       })
     );
 
     try {
-      const res = await mnemonicApi.likeMnemonic(id);
-      if (res && res.status === 'success') {
+      let res: any;
+      if (action === 'unlike') {
+        try {
+          res = await mnemonicApi.unlikeMnemonic(id);
+        } catch {
+          // Some backends expose POST as toggle for like/unlike.
+          res = await mnemonicApi.likeMnemonic(id);
+        }
+      } else {
+        res = await mnemonicApi.likeMnemonic(id);
+      }
+      const votePayload = resolveVotePayload(res);
+      if (votePayload.hasCounts || votePayload.hasVoteFlags) {
         setMnemonics((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, likes: res.upvotes, dislikes: res.downvotes } : item
-          )
+          prev.map((item) => {
+            if (item.id !== id) return item;
+
+            return {
+              ...item,
+              likes: votePayload.hasCounts ? votePayload.upvotes : item.likes,
+              dislikes: votePayload.hasCounts ? votePayload.downvotes : item.dislikes,
+              userVote: votePayload.hasVoteFlags ? votePayload.userVote : item.userVote,
+            };
+          })
         );
       }
     } catch (error) {
       console.error('Failed to like mnemonic:', error);
+      await fetchMnemonics();
+    } finally {
+      voteInFlightRef.current.delete(id);
     }
   };
 
   const incrementDislike = async (id: string) => {
+    if (voteInFlightRef.current.has(id)) return;
+
+    const currentItem = mnemonics.find((item) => item.id === id);
+    if (!currentItem) return;
+    voteInFlightRef.current.add(id);
+
+    const currentVote = currentItem.userVote;
+    const action: 'dislike' | 'undislike' = currentVote === 'dislike' ? 'undislike' : 'dislike';
+
     // Optimistic update
     setMnemonics((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-        
+
         let newLikes = item.likes;
         let newDislikes = item.dislikes;
-        let newVote = item.userVote;
+        let newVote: 'like' | 'dislike' | null = item.userVote;
 
         if (item.userVote === 'dislike') {
-          newDislikes -= 1;
+          newDislikes = Math.max(0, newDislikes - 1);
           newVote = null;
         } else if (item.userVote === 'like') {
-          newLikes -= 1;
+          newLikes = Math.max(0, newLikes - 1);
           newDislikes += 1;
           newVote = 'dislike';
         } else {
           newDislikes += 1;
           newVote = 'dislike';
         }
-        
+
         return { ...item, likes: newLikes, dislikes: newDislikes, userVote: newVote };
       })
     );
 
     try {
-      const res = await mnemonicApi.dislikeMnemonic(id);
-      if (res && res.status === 'success') {
+      let res: any;
+      if (action === 'undislike') {
+        try {
+          res = await mnemonicApi.undislikeMnemonic(id);
+        } catch {
+          // Some backends expose POST as toggle for dislike/undislike.
+          res = await mnemonicApi.dislikeMnemonic(id);
+        }
+      } else {
+        res = await mnemonicApi.dislikeMnemonic(id);
+      }
+      const votePayload = resolveVotePayload(res);
+      if (votePayload.hasCounts || votePayload.hasVoteFlags) {
         setMnemonics((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, likes: res.upvotes, dislikes: res.downvotes } : item
-          )
+          prev.map((item) => {
+            if (item.id !== id) return item;
+
+            return {
+              ...item,
+              likes: votePayload.hasCounts ? votePayload.upvotes : item.likes,
+              dislikes: votePayload.hasCounts ? votePayload.downvotes : item.dislikes,
+              userVote: votePayload.hasVoteFlags ? votePayload.userVote : item.userVote,
+            };
+          })
         );
       }
     } catch (error) {
       console.error('Failed to dislike mnemonic:', error);
+      await fetchMnemonics();
+    } finally {
+      voteInFlightRef.current.delete(id);
     }
   };
 

@@ -15,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pyqApi } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
+import { useLoginModal } from '../context/LoginModalContext';
+import { buildUserStorageScope, withUserScope } from '../utils/storageScope';
 
 type SubjectKey = 'MATHS' | 'ENGLISH' | 'REASONING' | 'GENERAL AWARENESS';
 type Language = 'EN' | 'HI';
@@ -84,11 +86,15 @@ type DailyExamResultEntry = {
   completedAt: string;
 };
 
-const persistDailyExamResult = async (entry: DailyExamResultEntry) => {
+const persistDailyExamResult = async (
+  entry: DailyExamResultEntry,
+  latestStorageKey: string,
+  historyStorageKey: string
+) => {
   try {
     const [latestRaw, historyRaw] = await Promise.all([
-      AsyncStorage.getItem(DAILY_EXAM_LATEST_STORAGE_KEY),
-      AsyncStorage.getItem(DAILY_EXAM_HISTORY_STORAGE_KEY),
+      AsyncStorage.getItem(latestStorageKey),
+      AsyncStorage.getItem(historyStorageKey),
     ]);
 
     const latest = latestRaw ? JSON.parse(latestRaw) : {};
@@ -103,8 +109,8 @@ const persistDailyExamResult = async (entry: DailyExamResultEntry) => {
     const nextHistory = [entry, ...historyList].slice(0, 100);
 
     await Promise.all([
-      AsyncStorage.setItem(DAILY_EXAM_LATEST_STORAGE_KEY, JSON.stringify(nextLatest)),
-      AsyncStorage.setItem(DAILY_EXAM_HISTORY_STORAGE_KEY, JSON.stringify(nextHistory)),
+      AsyncStorage.setItem(latestStorageKey, JSON.stringify(nextLatest)),
+      AsyncStorage.setItem(historyStorageKey, JSON.stringify(nextHistory)),
     ]);
   } catch (error) {
     console.error('Failed to persist daily exam result', error);
@@ -292,6 +298,7 @@ export default function DailyChallengeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { isDark } = useTheme();
+  const { userName, userEmail } = useLoginModal();
 
   const mode: Mode = route.params?.mode === 'quiz' ? 'quiz' : 'challenge';
   const config = MODE_CONFIGS[mode];
@@ -317,6 +324,9 @@ export default function DailyChallengeScreen() {
   const text = isDark ? '#e5e7eb' : '#0f172a';
   const muted = isDark ? '#8ea0ba' : '#64748b';
   const primary = '#059669';
+  const storageScope = buildUserStorageScope(userEmail, userName);
+  const dailyExamLatestStorageKey = withUserScope(DAILY_EXAM_LATEST_STORAGE_KEY, storageScope);
+  const dailyExamHistoryStorageKey = withUserScope(DAILY_EXAM_HISTORY_STORAGE_KEY, storageScope);
 
   useEffect(() => {
     let isMounted = true;
@@ -631,7 +641,7 @@ export default function DailyChallengeScreen() {
       completedAt: new Date().toISOString(),
     };
 
-    await persistDailyExamResult(payload);
+    await persistDailyExamResult(payload, dailyExamLatestStorageKey, dailyExamHistoryStorageKey);
     navigation.goBack();
   };
 

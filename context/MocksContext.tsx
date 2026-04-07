@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { mockApi } from '../services/api';
+import { useLoginModal } from './LoginModalContext';
 
 export interface MockChallenge {
   id?: string;
@@ -50,11 +51,13 @@ export const useMocks = () => {
 };
 
 export function MocksProvider({ children }: { children: React.ReactNode }) {
+  const { hasLoggedIn, userEmail, userName } = useLoginModal();
   const [myChallenges, setMyChallenges] = useState<MockChallenge[]>([]);
   const [publicChallenges, setPublicChallenges] = useState<MockChallenge[]>([]);
   const [recentAttempts, setRecentAttempts] = useState<Attempt[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const accountIdentity = String(userEmail || userName || '').trim().toLowerCase();
 
   const extractArray = (res: any, type: string = ''): any[] => {
     console.log(`[API RESPONSE] ${type}:`, JSON.stringify(res, null, 2).substring(0, 300));
@@ -177,11 +180,21 @@ export function MocksProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Initial fetch
-    fetchMyChallenges();
-    fetchPublicChallenges();
-    fetchRecentAttempts();
-  }, []);
+    if (!hasLoggedIn) {
+      setMyChallenges([]);
+      setPublicChallenges([]);
+      setRecentAttempts([]);
+      setError(null);
+      return;
+    }
+
+    setError(null);
+    void Promise.allSettled([
+      fetchMyChallenges(),
+      fetchPublicChallenges(),
+      fetchRecentAttempts(),
+    ]);
+  }, [hasLoggedIn, accountIdentity]);
 
   return (
     <MocksContext.Provider value={{

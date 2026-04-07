@@ -4,6 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLoginModal } from '../context/LoginModalContext';
+import { useHasUnreadNotifications } from '../hooks/useHasUnreadNotifications';
 
 const TEST_CATEGORIES = [
   {
@@ -35,43 +37,51 @@ const TEST_CATEGORIES = [
 export default function TestsScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark } = useTheme();
+  const { userName } = useLoginModal();
+  const hasUnreadNotifications = useHasUnreadNotifications();
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const cardBg = isDark ? '#1e293b' : '#ffffff';
   const text = isDark ? '#ffffff' : '#1e293b';
   const mutedText = isDark ? '#94a3b8' : '#64748b';
   const border = isDark ? '#334155' : '#e2e8f0';
+  const displayName = (userName || 'User').trim() || 'User';
+  const avatarText = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'U';
 
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
       {/* Header */}
-      <View style={[styles.appHeader, { borderBottomColor: border }]}>
-        <View style={styles.logoRow}>
-          <Image
-            source={require('../assets/sscguidelogo.png')}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-          <Text style={[styles.logoText, { color: text }]}>
-            My<Text style={styles.logoHighlight}>SSC</Text>guide
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Pressable onPress={toggleTheme} style={styles.iconBtn} hitSlop={8}>
-            <Ionicons
-              name={isDark ? 'sunny-outline' : 'moon-outline'}
-              size={20}
-              color="#059669"
+      <View style={[styles.appHeader, { borderBottomColor: border, backgroundColor: isDark ? '#0f172a' : '#ffffff' }]}>
+        <View style={styles.headerTopRow}>
+          <View style={styles.logoRow}>
+            <Image
+              source={require('../assets/sscguidelogo.png')}
+              style={styles.headerLogo}
+              resizeMode="contain"
             />
-          </Pressable>
-          <Pressable
-            style={styles.iconBtn}
-            hitSlop={8}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Ionicons name="notifications-outline" size={20} color="#059669" />
-          </Pressable>
+            <Text style={[styles.logoText, { color: text }]}>
+              My<Text style={styles.logoHighlight}>SSC</Text>guide
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            <Pressable
+              style={[styles.iconBtn, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}
+              hitSlop={8}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Ionicons name="notifications" size={18} color="#f59e0b" />
+              {hasUnreadNotifications ? <View style={styles.notificationDot} /> : null}
+            </Pressable>
+            <Pressable style={styles.avatar} onPress={() => navigation.navigate('MenuDrawer')}>
+              <Text style={styles.avatarText}>{avatarText}</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -109,19 +119,50 @@ export default function TestsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   appHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    marginBottom: 0,
   },
   logoRow: { flexDirection: 'row', alignItems: 'center' },
   headerLogo: { width: 44, height: 44 },
   logoText: { fontSize: 18, fontWeight: '700', marginLeft: -4 },
   logoHighlight: { color: '#059669' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ef4444',
+  },
+  avatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
   scrollContent: { padding: 16, paddingBottom: 40 },
   headerSection: { marginBottom: 24, paddingHorizontal: 4 },
   mainTitle: { fontSize: 24, fontWeight: '800', marginBottom: 6 },

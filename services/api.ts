@@ -367,6 +367,7 @@ export const pyqApi = {
   async listTestPapers(query: {
     limit?: number;
     cursor?: string;
+    type?: string;
     examName?: string;
     examYear?: string;
     tier?: string;
@@ -376,6 +377,7 @@ export const pyqApi = {
     const params = new URLSearchParams();
     if (query.limit) params.append('limit', query.limit.toString());
     if (query.cursor) params.append('cursor', query.cursor);
+    if (query.type) params.append('type', query.type);
     if (query.examName) params.append('examName', query.examName);
     if (query.examYear) params.append('examYear', query.examYear);
     if (query.tier) params.append('tier', query.tier);
@@ -472,8 +474,16 @@ export const mnemonicApi = {
     return fetchApi(`/user/mnemonics/${id}/like`, { method: 'POST' });
   },
 
+  async unlikeMnemonic(id: string) {
+    return fetchApi(`/user/mnemonics/${id}/like`, { method: 'DELETE' });
+  },
+
   async dislikeMnemonic(id: string) {
     return fetchApi(`/user/mnemonics/${id}/dislike`, { method: 'POST' });
+  },
+
+  async undislikeMnemonic(id: string) {
+    return fetchApi(`/user/mnemonics/${id}/dislike`, { method: 'DELETE' });
   },
 
   async deleteMnemonic(id: string) {

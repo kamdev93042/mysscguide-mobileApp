@@ -19,18 +19,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useMnemonics, MnemonicItem } from '../context/MnemonicsContext';
 import { useLoginModal } from '../context/LoginModalContext';
+import { useHasUnreadNotifications } from '../hooks/useHasUnreadNotifications';
 
 const FILTER_OPTIONS = ['By word', 'By username'];
 const REPORT_REASONS = ['Inappropriate content', 'Incorrect information', 'Spam', 'Other'];
 
 export default function MnemonicsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark } = useTheme();
+  const hasUnreadNotifications = useHasUnreadNotifications();
   const { userName } = useLoginModal();
 
-  const { mnemonics, addMnemonic, deleteMnemonic, reportMnemonic, incrementLike, incrementDislike, isLoading } = useMnemonics();
+  const { mnemonics, addMnemonic, toggleSave, deleteMnemonic, reportMnemonic, incrementLike, incrementDislike, isLoading } = useMnemonics();
 
   const [filterQuery, setFilterQuery] = useState('By word');
   const [filterOpen, setFilterOpen] = useState(false);
@@ -67,7 +69,48 @@ export default function MnemonicsScreen() {
   const text = isDark ? '#fff' : '#1e293b';
   const muted = isDark ? '#94a3b8' : '#64748b';
   const border = isDark ? '#1e293b' : '#e2e8f0';
+  const footerSafeBottom = Math.max(insets.bottom, 6);
+  const footerBarHeight = 68 + footerSafeBottom;
+  const displayName = (userName || 'User').trim() || 'User';
+  const avatarText = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'U';
   const groupTileWidth = width > 1100 ? '32%' : width > 700 ? '48%' : '100%';
+
+  const normalizeName = (value: string) => value.trim().toLowerCase();
+  const canDeleteMnemonic = (item: MnemonicItem) => {
+    if (item.ownedByMe) return true;
+    const me = normalizeName(userName || '');
+    const owner = normalizeName(item.author || '');
+    if (!me || !owner) return false;
+    return me === owner || owner.startsWith(`${me} `) || me.startsWith(`${owner} `);
+  };
+
+  const handleOpenHomeTab = () => {
+    navigation.navigate('Main', {
+      screen: 'Home',
+      params: { screen: 'DashboardMain' },
+    });
+  };
+
+  const handleOpenPyqsTab = () => {
+    navigation.navigate('Main', { screen: 'PYQs' });
+  };
+
+  const handleOpenMocksTab = () => {
+    navigation.navigate('Main', { screen: 'Mocks' });
+  };
+
+  const handleOpenForumsTab = () => {
+    navigation.navigate('Main', { screen: 'Forums' });
+  };
+
+  const handleOpenPremiumTab = () => {
+    navigation.navigate('Main', { screen: 'Premium' });
+  };
 
   const filteredMnemonics = useMemo(() => {
     return mnemonics.filter((m) => {
@@ -106,19 +149,6 @@ export default function MnemonicsScreen() {
       })
     );
   }, [filteredMnemonics, userName]);
-
-  const myGroupedMnemonics = useMemo(() => {
-    if (!userName) return [];
-
-    return groupedMnemonics
-      .map((group) => group.filter((item) => item.author === userName))
-      .filter((group) => group.length > 0)
-      .sort((a, b) =>
-        (a[0]?.word || '').localeCompare(b[0]?.word || '', undefined, {
-          sensitivity: 'base',
-        })
-      );
-  }, [groupedMnemonics, userName]);
 
   const visibleGroups = useMemo(() => {
     return groupedMnemonics.slice(0, visibleCount);
@@ -173,10 +203,14 @@ export default function MnemonicsScreen() {
     }
   };
 
-  const deleteTrick = (id: string) => {
+  const deleteTrick = async (id: string) => {
     // Alert dialogs are unreliable on web, so delete directly there.
     if (Platform.OS === 'web') {
-      deleteMnemonic(id);
+      try {
+        await deleteMnemonic(id);
+      } catch {
+        Alert.alert('Delete failed', 'Could not delete this mnemonic. Please try again.');
+      }
       return;
     }
 
@@ -185,7 +219,19 @@ export default function MnemonicsScreen() {
       "Are you sure you want to delete this trick?",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteMnemonic(id) }
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await deleteMnemonic(id);
+              } catch {
+                Alert.alert('Delete failed', 'Could not delete this mnemonic. Please try again.');
+              }
+            })();
+          },
+        }
       ]
     );
   };
@@ -203,11 +249,14 @@ export default function MnemonicsScreen() {
         <View style={styles.cardHeader}>
           <Text style={[styles.cardWord, { color: text }, isVariant && { fontSize: 16 }]}>{item.word}</Text>
           <View style={{ flexDirection: 'row', gap: 16 }}>
+            <Pressable onPress={() => toggleSave(item.id)} hitSlop={8}>
+              <Ionicons name={item.isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={item.isSaved ? '#059669' : muted} />
+            </Pressable>
             <Pressable onPress={() => openReportModal(item)} hitSlop={8}>
               <Ionicons name="flag-outline" size={20} color={muted} />
             </Pressable>
-            {userName && item.author === userName && (
-              <Pressable onPress={() => deleteTrick(item.id)} hitSlop={8}>
+            {canDeleteMnemonic(item) && (
+              <Pressable onPress={() => void deleteTrick(item.id)} hitSlop={8}>
                 <Ionicons name="trash-outline" size={20} color="#ef4444" />
               </Pressable>
             )}
@@ -255,38 +304,37 @@ export default function MnemonicsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
-      <View style={[styles.appHeader, { borderBottomColor: border }]}>
-        <View style={styles.logoRow}>
-          <Image
-            source={require('../assets/sscguidelogo.png')}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-          <Text style={[styles.logoText, { color: text }]}>
-            My<Text style={styles.logoHighlight}>SSC</Text>guide
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Pressable onPress={toggleTheme} style={styles.iconBtn} hitSlop={8}>
-            <Ionicons
-              name={isDark ? 'sunny-outline' : 'moon-outline'}
-              size={20}
-              color="#059669"
+      <View style={[styles.appHeader, { borderBottomColor: border, backgroundColor: isDark ? '#0f172a' : '#ffffff' }]}>
+        <View style={styles.headerTopRow}>
+          <View style={styles.logoRow}>
+            <Image
+              source={require('../assets/sscguidelogo.png')}
+              style={styles.headerLogo}
+              resizeMode="contain"
             />
-          </Pressable>
-          <Pressable
-            style={styles.iconBtn}
-            hitSlop={8}
-            onPress={() => navigation.navigate('Notifications' as never)}
-          >
-            <Ionicons name="notifications-outline" size={20} color="#059669" />
-          </Pressable>
+            <Text style={[styles.logoText, { color: text }]}>
+              My<Text style={styles.logoHighlight}>SSC</Text>guide
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            <Pressable
+              style={[styles.iconBtn, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}
+              hitSlop={8}
+              onPress={() => navigation.navigate('Notifications' as never)}
+            >
+              <Ionicons name="notifications" size={18} color="#f59e0b" />
+              {hasUnreadNotifications ? <View style={styles.notificationDot} /> : null}
+            </Pressable>
+            <Pressable style={styles.avatar} onPress={() => navigation.navigate('MenuDrawer' as never)}>
+              <Text style={styles.avatarText}>{avatarText}</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: footerBarHeight + 24 }]}
       >
         <View style={styles.heroBanner}>
           <View style={styles.heroContent}>
@@ -357,69 +405,6 @@ export default function MnemonicsScreen() {
             <Ionicons name="add" size={18} color="#fff" />
             <Text style={styles.submitTrickText}>Submit Trick</Text>
           </Pressable>
-        </View>
-
-        {userName ? (
-          <View style={styles.sectionHeaderWrap}>
-            <Text style={[styles.sectionTitle, { color: text }]}>My Mnemonics</Text>
-            <Text style={[styles.sectionSubtitle, { color: muted }]}>Your submitted tricks shown first, grouped A-Z.</Text>
-          </View>
-        ) : null}
-
-        {userName ? (
-          <View style={[styles.grid, { flexDirection: width > 600 ? 'row' : 'column' }]}>
-            {myGroupedMnemonics.map((group) => {
-              const topTrick = group[0];
-              const key = topTrick.word.toLowerCase();
-              const variantsVisible = expandedGroups[key] || 1;
-              const hasMoreVariants = group.length > variantsVisible;
-              const shownVariants = group.slice(1, variantsVisible);
-
-              return (
-                <View key={`mine-${topTrick.id}`} style={{ width: groupTileWidth, marginBottom: 24 }}>
-                  {renderMnemonicCard(topTrick, false)}
-                  {shownVariants.length > 0 ? (
-                    <View style={styles.variantStack}>
-                      {shownVariants.map(variant => (
-                        <View key={variant.id} style={styles.variantItemWrap}>
-                          {renderMnemonicCard(variant, true)}
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-
-                  {hasMoreVariants ? (
-                    <Pressable 
-                      onPress={() => handleExpandGroup(topTrick.word)}
-                      style={styles.moreVariantsBtn}
-                    >
-                      <Ionicons name="chevron-down-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
-                      <Text style={styles.moreVariantsText}>See {group.length - variantsVisible} more trick{group.length - variantsVisible > 1 ? 's' : ''}</Text>
-                    </Pressable>
-                  ) : (group.length > 1 && variantsVisible >= group.length) ? (
-                    <Pressable 
-                      onPress={() => setExpandedGroups(p => ({ ...p, [key]: 1 }))}
-                      style={styles.moreVariantsBtn}
-                    >
-                      <Ionicons name="chevron-up-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
-                      <Text style={styles.moreVariantsText}>Show less</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              );
-            })}
-
-            {myGroupedMnemonics.length === 0 && (
-              <Text style={{ color: muted, width: '100%', textAlign: 'center', marginTop: 4, marginBottom: 20 }}>
-                No mnemonic posted by you yet.
-              </Text>
-            )}
-          </View>
-        ) : null}
-
-        <View style={styles.sectionHeaderWrap}>
-          <Text style={[styles.sectionTitle, { color: text }]}>All Mnemonics (A-Z)</Text>
-          <Text style={[styles.sectionSubtitle, { color: muted }]}>Word groups are alphabetically sorted.</Text>
         </View>
 
         <View style={[styles.grid, { flexDirection: width > 600 ? 'row' : 'column' }]}>
@@ -636,6 +621,40 @@ export default function MnemonicsScreen() {
         </View>
       </Modal>
 
+      <View
+        style={[
+          styles.profileFooterNav,
+          {
+            height: footerBarHeight,
+            paddingTop: 6,
+            paddingBottom: footerSafeBottom,
+            backgroundColor: cardBg,
+            borderTopColor: border,
+          },
+        ]}
+      >
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenHomeTab}>
+          <Ionicons name="home" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>Home</Text>
+        </Pressable>
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenPyqsTab}>
+          <Ionicons name="copy" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>PYQ</Text>
+        </Pressable>
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenMocksTab}>
+          <Ionicons name="clipboard" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>Mocks</Text>
+        </Pressable>
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenForumsTab}>
+          <Ionicons name="people" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>Forums</Text>
+        </Pressable>
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenPremiumTab}>
+          <Ionicons name="diamond" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>Premium</Text>
+        </Pressable>
+      </View>
+
     </View>
   );
 }
@@ -643,19 +662,50 @@ export default function MnemonicsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   appHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    marginBottom: 0,
   },
   logoRow: { flexDirection: 'row', alignItems: 'center' },
   headerLogo: { width: 44, height: 44 },
   logoText: { fontSize: 18, fontWeight: '700', marginLeft: -4 },
   logoHighlight: { color: '#059669' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ef4444',
+  },
+  avatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
 
   contentContainer: { padding: 16 },
 
@@ -914,5 +964,27 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 14,
     fontWeight: '600',
+  },
+  profileFooterNav: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -1,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  profileFooterItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  profileFooterLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '700',
   },
 });

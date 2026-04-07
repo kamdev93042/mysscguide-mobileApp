@@ -30,17 +30,7 @@ import * as AuthSession from 'expo-auth-session';
 WebBrowser.maybeCompleteAuthSession();
 
 function TopoTexture() {
-  return (
-    <Svg width="100%" height="100%" viewBox="0 0 390 370" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
-      <Path d="M18 34c35-30 82-30 114 4s31 83-4 113-83 30-113-5-32-81 3-112z" stroke="rgba(231,255,242,0.38)" strokeWidth="2" fill="none" />
-      <Path d="M44 62c22-18 52-19 72 1 22 21 21 53-1 73-21 19-52 18-72-2-20-20-21-52 1-72z" stroke="rgba(231,255,242,0.38)" strokeWidth="2" fill="none" />
-      <Path d="M248 22c40-22 92-12 119 22 26 33 18 84-23 115-39 29-92 22-122-11-30-33-19-95 26-126z" stroke="rgba(231,255,242,0.34)" strokeWidth="2" fill="none" />
-      <Path d="M268 52c27-14 61-8 79 15 18 22 11 56-17 76-28 20-63 15-82-8-20-24-11-64 20-83z" stroke="rgba(231,255,242,0.34)" strokeWidth="2" fill="none" />
-      <Path d="M146 164c47-22 101-10 129 25 28 35 19 83-22 108-43 26-101 18-132-17-31-36-20-92 25-116z" stroke="rgba(231,255,242,0.3)" strokeWidth="2" fill="none" />
-      <Path d="M182 192c27-11 55-5 71 13 15 18 10 45-14 59-25 15-56 9-72-10-16-20-10-50 15-62z" stroke="rgba(231,255,242,0.32)" strokeWidth="2" fill="none" />
-      <Path d="M0 190c43 19 86 16 122-7 28-18 51-37 84-42 33-5 64 6 95 11 30 5 61 3 89-7" stroke="rgba(231,255,242,0.22)" strokeWidth="2" fill="none" />
-    </Svg>
-  );
+  return null;
 }
 
 function WaveSeparator() {
@@ -246,11 +236,13 @@ export default function LoginScreen() {
 
         await AsyncStorage.setItem('userToken', loginResponse?.token || 'true');
         await AsyncStorage.setItem('isLoggedIn', 'true');
+        await AsyncStorage.setItem('userEmail', trimmedEmail);
 
         const fetchedName = loginResponse?.user?.username || loginResponse?.user?.fullName || loginResponse?.username;
         if (fetchedName) {
           setUserName(fetchedName);
         }
+        setUserEmail(trimmedEmail);
 
         setHasLoggedIn(true);
         setLoading(false);

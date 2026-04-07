@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MySSCguide - Mocks</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{font-size:17px;-webkit-tap-highlight-color:transparent}
+    body{
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      background:#f8fafc;color:#1e293b;
+      min-height:100dvh;overflow-x:hidden;
+      padding-bottom:76px;
+      max-width:480px;margin:0 auto;position:relative;
+    }
+    a{text-decoration:none;color:inherit}
+    button{font-family:inherit}
+
+    /* Header */
+    .header{
+      position:sticky;top:0;z-index:100;
+      background:#fff;
+      padding:10px 16px;
+      display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid #f1f5f9;
+    }
+    .brand{display:flex;align-items:center;gap:8px;cursor:pointer}
+    .brand-logo{
+      width:32px;height:32px;border-radius:9px;
+      background:linear-gradient(135deg,#059669,#0d9488);
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-size:14px;
+    }
+    .brand-text{font-size:1.05rem;font-weight:800;color:#0f172a;letter-spacing:-.4px}
+    .brand-text b{color:#059669;font-weight:800}
+    .hdr-right{display:flex;align-items:center;gap:6px}
+    .streak-chip{
+      display:flex;align-items:center;gap:3px;
+      background:#fff7ed;border:1px solid #fed7aa;
+      border-radius:99px;padding:4px 9px 4px 6px;
+      cursor:pointer;transition:background .15s;
+    }
+    .streak-chip:active{background:#ffedd5}
+    .streak-chip i{
+      color:#f97316;font-size:.85rem;
+      filter:drop-shadow(0 0 3px rgba(249,115,22,.5));
+    }
+    .streak-chip span{font-size:.72rem;font-weight:800;color:#ea580c}
+    .hdr-btn{
+      background:none;border:none;color:#94a3b8;
+      font-size:1.1rem;cursor:pointer;
+      width:34px;height:34px;border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      position:relative;transition:background .15s;
+    }
+    .hdr-btn:active{background:#f1f5f9}
+    .hdr-btn.notif-btn i{color:#f59e0b}
+    .notif-dot{
+      position:absolute;top:5px;right:5px;
+      width:7px;height:7px;background:#f43f5e;
+      border-radius:50%;border:1.5px solid #fff;
+    }
+    .avatar{
+      width:30px;height:30px;border-radius:50%;
+      background:linear-gradient(135deg,#059669,#0d9488);
+      color:#fff;font-weight:700;font-size:.7rem;
+      display:flex;align-items:center;justify-content:center;cursor:pointer;
+    }
+
+    /* Page Head */
+    .page{padding-bottom:18px}
+    .page-head{padding:14px 16px 0}
+    .page-head-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    .page-kicker{
+      font-size:.6rem;font-weight:700;letter-spacing:.6px;
+      text-transform:uppercase;color:#94a3b8;
+    }
+    .page-title{font-size:1.2rem;font-weight:900;color:#0f172a;margin-top:3px}
+    .page-sub{font-size:.74rem;color:#64748b;margin-top:4px;line-height:1.4}
+    .page-date{font-size:.62rem;color:#94a3b8;font-weight:600;padding-top:2px}
+    .page-actions{display:flex;gap:8px;margin-top:10px}
+    .btn-primary{
+      border:none;border-radius:12px;
+      padding:8px 12px;font-size:.66rem;font-weight:800;
+      text-transform:uppercase;letter-spacing:.6px;
+      background:linear-gradient(135deg,#059669,#0d9488);
+      color:#fff;cursor:pointer;
+      box-shadow:0 6px 16px rgba(5,150,105,.25);
+    }
+    .btn-ghost{
+      border:1px solid #bbf7d0;background:#ecfdf5;color:#059669;
+      border-radius:12px;padding:8px 12px;font-size:.66rem;
+      font-weight:800;text-transform:uppercase;letter-spacing:.6px;
+      cursor:pointer;
+    }
+
+    /* Hero Card */
+    .hero{
+      margin:12px 16px 0;
+      background:linear-gradient(135deg,#059669 0%,#0d9488 100%);
+      border-radius:18px;padding:16px;color:#fff;
+      position:relative;overflow:hidden;
+    }
+    .hero::before{
+      content:'';position:absolute;top:-30px;right:-30px;
+      width:120px;height:120px;border-radius:50%;
+      background:rgba(255,255,255,.12);
+    }
+    .hero::after{
+      content:'';position:absolute;bottom:-35px;left:-25px;
+      width:90px;height:90px;border-radius:50%;
+      background:rgba(255,255,255,.08);
+    }
+    .hero-tag{
+      display:inline-flex;align-items:center;gap:6px;
+      background:rgba(255,255,255,.18);
+      border:1px solid rgba(255,255,255,.25);
+      border-radius:999px;padding:4px 8px;
+      font-size:.55rem;font-weight:800;
+      text-transform:uppercase;letter-spacing:.6px;
+    }
+    .hero-title{font-size:1rem;font-weight:900;margin-top:8px}
+    .hero-sub{font-size:.7rem;opacity:.85;margin-top:6px;line-height:1.5}
+    .hero-stats{
+      display:grid;grid-template-columns:repeat(3,1fr);
+      gap:8px;margin-top:10px;
+    }
+    .hero-stat{
+      background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:12px;padding:8px 6px;text-align:center;
+    }
+    .hero-stat .val{font-size:.82rem;font-weight:800}
+    .hero-stat .lbl{
+      font-size:.5rem;text-transform:uppercase;
+      letter-spacing:.7px;opacity:.7;margin-top:2px;
+    }
+    .hero-actions{display:flex;gap:8px;margin-top:12px}
+    .hero-btn{
+      border:none;border-radius:12px;
+      padding:8px 10px;font-size:.64rem;font-weight:800;
+      text-transform:uppercase;letter-spacing:.6px;
+      cursor:pointer;
+    }
+    .hero-btn.light{background:#fff;color:#0d9488}
+    .hero-btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff}
+
+    /* Section Labels */
+    .section-lbl{
+      padding:0 16px;font-size:.7rem;font-weight:700;
+      color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;
+      margin-top:18px;margin-bottom:10px;
+    }
+
+    /* Quick Actions */
+    .action-grid{
+      display:grid;grid-template-columns:repeat(2,1fr);
+      gap:10px;padding:0 16px;
+    }
+    .action-card{
+      background:#fff;border:1px solid #e2e8f0;border-radius:14px;
+      padding:12px;display:flex;flex-direction:column;gap:6px;
+      min-height:120px;cursor:pointer;position:relative;
+      box-shadow:0 3px 10px rgba(15,23,42,.04);
+    }
+    .action-card:active{transform:scale(.98)}
+    .action-ico{
+      width:36px;height:36px;border-radius:11px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-size:1rem;
+    }
+    .action-title{font-size:.8rem;font-weight:800;color:#0f172a}
+    .action-sub{font-size:.62rem;color:#94a3b8;line-height:1.4}
+    .action-cta{
+      margin-top:auto;display:inline-flex;align-items:center;gap:6px;
+      font-size:.6rem;font-weight:800;color:#059669;
+      text-transform:uppercase;letter-spacing:.6px;
+    }
+    .action-card.locked{opacity:.7}
+    .action-card.locked .action-cta{color:#94a3b8}
+    .lock-chip{
+      position:absolute;top:10px;right:10px;
+      font-size:.48rem;text-transform:uppercase;
+      letter-spacing:.6px;background:#f1f5f9;color:#94a3b8;
+      padding:3px 6px;border-radius:999px;
+    }
+
+    /* Tabs + Search */
+    .tab-row{
+      margin:0 16px;background:#f1f5f9;border-radius:12px;
+      padding:4px;display:flex;gap:6px;
+    }
+    .tab-btn{
+      flex:1;border:none;background:transparent;
+      font-size:.7rem;font-weight:800;color:#64748b;
+      padding:7px 8px;border-radius:10px;cursor:pointer;
+      text-transform:uppercase;letter-spacing:.5px;
+    }
+    .tab-btn.on{
+      background:#fff;color:#059669;
+      box-shadow:0 2px 6px rgba(15,23,42,.08);
+    }
+    .search-row{
+      margin:6px 16px 0;background:#fff;border:1px solid #e2e8f0;
+      border-radius:12px;display:flex;align-items:center;gap:8px;
+      padding:8px 10px;
+    }
+    .search-row i{color:#94a3b8;font-size:.8rem}
+    .search-row input{
+      border:none;outline:none;font-size:.74rem;flex:1;
+      color:#1e293b;background:transparent;
+    }
+
+    /* Challenge Cards */
+    .challenge-list{display:flex;flex-direction:column;gap:10px;padding:10px 16px 0}
+    .challenge-card{
+      background:#fff;border:1px solid #e2e8f0;border-radius:16px;
+      padding:12px;box-shadow:0 3px 12px rgba(15,23,42,.05);
+    }
+    .challenge-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .challenge-title{font-size:.86rem;font-weight:800;color:#0f172a}
+    .badge{
+      font-size:.48rem;font-weight:800;text-transform:uppercase;
+      letter-spacing:.6px;padding:3px 7px;border-radius:999px;
+      border:1px solid transparent;
+    }
+    .badge.private{background:#f3e8ff;color:#7c3aed;border-color:#e9d5ff}
+    .badge.public{background:#ecfdf5;color:#059669;border-color:#bbf7d0}
+    .challenge-meta{
+      margin-top:5px;font-size:.62rem;color:#94a3b8;
+      display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+    }
+    .meta-dot{width:4px;height:4px;border-radius:50%;background:#cbd5e1}
+    .topic-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .topic-chip{
+      background:#f1f5f9;color:#475569;
+      font-size:.52rem;font-weight:700;
+      padding:3px 6px;border-radius:6px;
+      text-transform:uppercase;letter-spacing:.4px;
+    }
+    .stats-row{
+      display:grid;grid-template-columns:repeat(3,1fr);
+      gap:8px;margin-top:10px;
+    }
+    .stat-pill{
+      background:#f8fafc;border:1px solid #e2e8f0;
+      border-radius:10px;padding:6px;text-align:center;
+    }
+    .stat-pill .val{font-size:.7rem;font-weight:800;color:#0f172a}
+    .stat-pill .lbl{
+      font-size:.5rem;color:#94a3b8;text-transform:uppercase;
+      letter-spacing:.6px;margin-top:2px;
+    }
+    .action-row{display:flex;align-items:center;gap:6px;margin-top:10px}
+    .icon-btn{
+      width:30px;height:30px;border-radius:10px;
+      background:#f1f5f9;border:1px solid #e2e8f0;
+      color:#64748b;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;font-size:.8rem;
+    }
+    .action-btn{
+      margin-left:auto;border:none;border-radius:10px;
+      background:#059669;color:#fff;
+      padding:7px 12px;font-size:.6rem;font-weight:900;
+      text-transform:uppercase;letter-spacing:.7px;cursor:pointer;
+    }
+    .action-btn.alt{
+      background:#ecfdf5;color:#059669;border:1px solid #bbf7d0;
+    }
+
+    /* Recent History */
+    .filter-row{display:flex;gap:6px;padding:0 16px}
+    .filter-chip{
+      border:none;background:#f1f5f9;color:#64748b;
+      padding:6px 10px;border-radius:999px;
+      font-size:.6rem;font-weight:800;text-transform:uppercase;
+      letter-spacing:.5px;cursor:pointer;
+    }
+    .filter-chip.on{background:#ecfdf5;color:#059669;border:1px solid #bbf7d0}
+    .history-list{display:flex;flex-direction:column;gap:10px;padding:10px 16px 0}
+    .history-card{
+      background:#fff;border:1px solid #e2e8f0;border-radius:16px;
+      padding:12px;box-shadow:0 3px 12px rgba(15,23,42,.05);
+    }
+    .history-head{display:flex;align-items:center;gap:10px}
+    .history-ico{
+      width:34px;height:34px;border-radius:10px;
+      background:#ecfdf5;color:#059669;
+      display:flex;align-items:center;justify-content:center;
+      font-size:1rem;flex-shrink:0;
+    }
+    .history-info{flex:1;min-width:0}
+    .history-title{font-size:.82rem;font-weight:800;color:#0f172a}
+    .history-meta{font-size:.6rem;color:#94a3b8;margin-top:2px}
+    .history-line{
+      margin-top:6px;font-size:.6rem;color:#94a3b8;
+      display:flex;align-items:center;gap:6px;
+    }
+    .history-line i{color:#94a3b8}
+    .history-stats{
+      display:grid;grid-template-columns:repeat(3,1fr);
+      gap:8px;margin-top:8px;
+    }
+    .history-actions{display:flex;align-items:center;gap:8px;margin-top:10px}
+    .history-actions .action-btn{margin-left:0}
+
+    /* Toast */
+    .toast{
+      position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(8px);
+      background:#0f172a;color:#fff;padding:10px 14px;border-radius:12px;
+      font-size:.7rem;opacity:0;pointer-events:none;
+      transition:opacity .2s,transform .2s;z-index:500;
+      box-shadow:0 8px 22px rgba(15,23,42,.25);
+    }
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    /* Floating Help FAB */
+    .help-fab{
+      position:fixed;
+      bottom:84px;right:16px;
+      width:48px;height:48px;
+      border-radius:50%;
+      background:linear-gradient(135deg,#059669,#0d9488);
+      color:#fff;font-size:1.2rem;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 4px 20px rgba(5,150,105,.35);
+      cursor:pointer;border:none;z-index:150;
+      transition:transform .2s,box-shadow .2s;
+    }
+    .help-fab:active{transform:scale(.9);box-shadow:0 2px 10px rgba(5,150,105,.25)}
+    .help-fab .fab-pulse{
+      position:absolute;inset:0;border-radius:50%;
+      border:2px solid #059669;
+      animation:fabPing 2.5s cubic-bezier(0,0,.2,1) infinite;
+    }
+    @keyframes fabPing{
+      0%{transform:scale(1);opacity:.6}
+      100%{transform:scale(1.6);opacity:0}
+    }
+
+    /* Bottom Nav */
+    .bnav{
+      position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+      width:100%;max-width:480px;background:#fff;
+      border-top:1px solid #f1f5f9;
+      display:flex;align-items:center;justify-content:space-around;
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      z-index:200;
+    }
+    .bnav-item{
+      display:flex;flex-direction:column;align-items:center;gap:2px;
+      text-decoration:none;cursor:pointer;
+      padding:5px 14px;border-radius:12px;
+      transition:all .2s;border:none;background:none;
+    }
+    .bnav-item:active{background:#f1f5f9}
+    .bnav-item i{font-size:1.05rem;color:#94a3b8;transition:color .2s}
+    .bnav-item span{font-size:.58rem;font-weight:600;color:#94a3b8;transition:color .2s}
+    .bnav-item.on{background:#ecfdf5;border-radius:14px}
+    .bnav-item.on i{color:#059669}
+    .bnav-item.on span{color:#059669;font-weight:700}
+
+    /* Slide Menu */
+    .m-overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,.4);
+      z-index:300;opacity:0;visibility:hidden;
+      transition:opacity .3s,visibility .3s;
+    }
+    .m-overlay.open{opacity:1;visibility:visible}
+    .m-drawer{
+      position:fixed;top:0;left:0;width:282px;height:100%;
+      background:#f8fafc;z-index:301;
+      transform:translateX(-100%);
+      transition:transform .32s cubic-bezier(.4,0,.2,1);
+      display:flex;flex-direction:column;overflow-y:auto;
+      scrollbar-width:none;
+    }
+    .m-drawer::-webkit-scrollbar{display:none}
+    .m-drawer.open{transform:translateX(0)}
+    .m-head{
+      background:linear-gradient(135deg,#059669 0%,#0d9488 100%);
+      padding:48px 20px 22px;position:relative;
+    }
+    .m-close{
+      position:absolute;top:14px;right:14px;
+      width:28px;height:28px;border-radius:50%;
+      background:rgba(255,255,255,.18);border:none;
+      color:#fff;font-size:.75rem;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:background .15s;
+    }
+    .m-close:active{background:rgba(255,255,255,.32)}
+    .m-av{
+      width:54px;height:54px;border-radius:50%;
+      background:rgba(255,255,255,.22);
+      border:2.5px solid rgba(255,255,255,.6);
+      color:#fff;font-weight:800;font-size:1.1rem;
+      display:flex;align-items:center;justify-content:center;
+      margin-bottom:10px;
+    }
+    .m-uname{font-size:.95rem;font-weight:800;color:#fff;margin-bottom:2px}
+    .m-usub{font-size:.68rem;color:rgba(255,255,255,.75);font-weight:500;margin-bottom:10px}
+    .m-head-meta{display:flex;align-items:center;gap:10px}
+    .m-streak{
+      display:inline-flex;align-items:center;gap:4px;
+      background:rgba(255,255,255,.18);border-radius:99px;
+      padding:3px 10px;font-size:.62rem;font-weight:700;color:#fff;
+    }
+    .m-streak i{color:#fbbf24}
+    .m-profile-btn{
+      margin-left:auto;display:inline-flex;align-items:center;gap:4px;
+      background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
+      border-radius:99px;padding:4px 11px;
+      font-size:.62rem;font-weight:700;color:#fff;
+      text-decoration:none;cursor:pointer;transition:background .15s;
+    }
+    .m-profile-btn:active{background:rgba(255,255,255,.3)}
+    .m-body{padding:12px 12px 4px;flex:1}
+    .m-section{
+      font-size:.58rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+      color:#94a3b8;padding:8px 10px 4px;
+    }
+    .m-link{
+      display:flex;align-items:center;gap:11px;
+      padding:10px 10px;border-radius:12px;
+      font-size:.82rem;font-weight:600;color:#475569;
+      text-decoration:none;cursor:pointer;
+      transition:background .12s,color .12s;
+      border:none;background:none;width:100%;text-align:left;
+      margin-bottom:1px;
+    }
+    .m-link:active{background:#e2e8f0}
+    .m-link.act{background:#ecfdf5;color:#059669}
+    .m-link.act .m-ico{background:linear-gradient(135deg,#059669,#0d9488)}
+    .m-ico{
+      width:32px;height:32px;border-radius:10px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      font-size:.8rem;color:#fff;
+    }
+    .m-lbl{flex:1}
+    .m-badge{
+      font-size:.52rem;font-weight:800;padding:2px 7px;
+      border-radius:99px;letter-spacing:.3px;
+    }
+    .m-badge.live{background:#fef2f2;color:#f43f5e}
+    .m-badge.pro{background:#fef3c7;color:#b45309}
+    .m-badge.new{background:#f0fdf4;color:#15803d}
+    .m-divider{height:1px;background:#e2e8f0;margin:8px 10px}
+    .m-upgrade{
+      margin:12px 12px;border-radius:14px;
+      background:linear-gradient(135deg,#fffbeb,#fef9c3);
+      border:1px solid #fde68a;padding:12px 14px;
+      display:flex;align-items:center;gap:10px;cursor:pointer;
+      transition:opacity .15s;
+    }
+    .m-upgrade:active{opacity:.85}
+    .m-upgrade-ico{
+      width:36px;height:36px;border-radius:10px;flex-shrink:0;
+      background:linear-gradient(135deg,#f59e0b,#d97706);
+      display:flex;align-items:center;justify-content:center;
+      font-size:.9rem;color:#fff;
+    }
+    .m-upgrade-title{font-size:.78rem;font-weight:800;color:#92400e}
+    .m-upgrade-sub{font-size:.62rem;color:#b45309;font-weight:500;margin-top:1px}
+    .m-upgrade-arrow{margin-left:auto;color:#d97706;font-size:.75rem}
+    .m-foot{
+      padding:12px 18px 20px;
+      font-size:.62rem;color:#cbd5e1;text-align:center;
+    }
+    .m-foot b{color:#059669}
+
+    /* Utility */
+    .gap{height:14px}
+    .empty{
+      background:#fff;border:1px dashed #cbd5e1;border-radius:12px;
+      padding:12px;text-align:center;color:#94a3b8;
+      font-size:.7rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Slide menu -->
+<div class="m-overlay" id="ov" onclick="togMenu()"></div>
+<nav class="m-drawer" id="dr">
+  <div class="m-head">
+    <button class="m-close" onclick="togMenu()" aria-label="Close menu">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <div class="m-av">NM</div>
+    <div class="m-uname">Nikhil Maurya</div>
+    <div class="m-usub">SSC Aspirant - Class X pass</div>
+    <div class="m-head-meta">
+      <div class="m-streak"><i class="fa-solid fa-fire-flame-curved"></i> 0 day streak</div>
+      <a class="m-profile-btn" href="#">View Profile <i class="fa-solid fa-chevron-right"></i></a>
+    </div>
+  </div>
+
+  <div class="m-body">
+    <div class="m-section">Prepare</div>
+    <a class="m-link" href="https://www.mysscguide.com/home">
+      <div class="m-ico" style="background:linear-gradient(135deg,#059669,#0d9488)"><i class="fa-solid fa-house"></i></div>
+      <span class="m-lbl">Home</span>
+    </a>
+    <a class="m-link act" href="https://www.mysscguide.com/mocks">
+      <div class="m-ico" style="background:linear-gradient(135deg,#3b82f6,#2563eb)"><i class="fa-solid fa-file-invoice"></i></div>
+      <span class="m-lbl">Mocks</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/previous-year">
+      <div class="m-ico" style="background:linear-gradient(135deg,#ec4899,#f43f5e)"><i class="fa-regular fa-copy"></i></div>
+      <span class="m-lbl">Previous Year Papers</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/contests">
+      <div class="m-ico" style="background:linear-gradient(135deg,#f59e0b,#eab308)"><i class="fa-solid fa-trophy"></i></div>
+      <span class="m-lbl">Live Contests</span>
+      <span class="m-badge live">LIVE</span>
+    </a>
+
+    <div class="m-divider"></div>
+    <div class="m-section">Tools</div>
+    <a class="m-link" href="https://www.mysscguide.com/typing-test">
+      <div class="m-ico" style="background:linear-gradient(135deg,#06b6d4,#0891b2)"><i class="fa-solid fa-keyboard"></i></div>
+      <span class="m-lbl">Typing Test</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/mistake-notebook">
+      <div class="m-ico" style="background:linear-gradient(135deg,#ef4444,#dc2626)"><i class="fa-solid fa-book-skull"></i></div>
+      <span class="m-lbl">Mistake Notebook</span>
+      <span class="m-badge live">5</span>
+    </a>
+    <a class="m-link" href="https://www.mysscguide.com/mnemonics">
+      <div class="m-ico" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)"><i class="fa-solid fa-brain"></i></div>
+      <span class="m-lbl">Mnemonics</span>
+      <span class="m-badge new">NEW</span>
+    </a>
+
+    <div class="m-divider"></div>
+    <div class="m-section">Community</div>
+    <a class="m-link" href="https://www.mysscguide.com/forums">
+      <div class="m-ico" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="fa-solid fa-users"></i></div>
+      <span class="m-lbl">Forums</span>
+    </a>
+
+    <div class="m-divider"></div>
+    <div class="m-section">Account</div>
+    <a class="m-link" href="#">
+      <div class="m-ico" style="background:linear-gradient(135deg,#64748b,#475569)"><i class="fa-solid fa-gear"></i></div>
+      <span class="m-lbl">Settings</span>
+    </a>
+    <a class="m-link" href="#">
+      <div class="m-ico" style="background:linear-gradient(135deg,#94a3b8,#64748b)"><i class="fa-solid fa-right-from-bracket"></i></div>
+      <span class="m-lbl">Sign Out</span>
+    </a>
+  </div>
+
+  <a class="m-upgrade" href="https://www.mysscguide.com/selection-key">
+    <div class="m-upgrade-ico"><i class="fa-solid fa-key"></i></div>
+    <div>
+      <div class="m-upgrade-title">Unlock Selection Key</div>
+      <div class="m-upgrade-sub">Unlimited mocks, PYQs &amp; contests</div>
+    </div>
+    <i class="fa-solid fa-chevron-right m-upgrade-arrow"></i>
+  </a>
+
+  <div class="m-foot">&copy; 2026 My<b>SSC</b>guide - All rights reserved</div>
+</nav>
+
+<!-- Header -->
+<header class="header">
+  <div class="brand" onclick="togMenu()">
+    <div class="brand-logo"><i class="fa-solid fa-book-open"></i></div>
+    <div class="brand-text">My<b>SSC</b>guide</div>
+  </div>
+  <div class="hdr-right">
+    <a class="streak-chip" href="https://www.mysscguide.com/home" title="Day Streak">
+      <i class="fa-solid fa-fire-flame-curved"></i><span>0</span>
+    </a>
+    <button class="hdr-btn notif-btn" aria-label="Notifications">
+      <i class="fa-solid fa-bell"></i><span class="notif-dot"></span>
+    </button>
+    <div class="avatar" onclick="togMenu()">NM</div>
+  </div>
+</header>
+
+<main class="page">
+  <section class="page-head">
+    <div class="page-head-top">
+      <div></div>
+      <div class="page-date" id="todayDate"></div>
+    </div>
+  </section>
+
+  <section class="hero">
+    <div class="hero-tag"><i class="fa-solid fa-bolt"></i> Previous Mock Result</div>
+    <div class="hero-title">SSC CGL Full Mock 12</div>
+    <div class="hero-sub">Review your last attempt and fix the weak spots before the next mock.</div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="val">3.5/50</div>
+        <div class="lbl">Score</div>
+      </div>
+      <div class="hero-stat">
+        <div class="val">67%</div>
+        <div class="lbl">Accuracy</div>
+      </div>
+      <div class="hero-stat">
+        <div class="val">0m 32s</div>
+        <div class="lbl">Time</div>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <button class="hero-btn light" data-action="analysis" data-name="SSC CGL Full Mock 12">View Full Analysis</button>
+      <button class="hero-btn ghost" data-action="review" data-name="SSC CGL Full Mock 12">Review Mistakes</button>
+    </div>
+  </section>
+
+  <div class="section-lbl">Quick Actions</div>
+  <div class="action-grid">
+    <a class="action-card" href="https://www.mysscguide.com/mocks">
+      <div class="action-ico" style="background:linear-gradient(135deg,#059669,#0d9488)"><i class="fa-solid fa-sliders"></i></div>
+      <div class="action-title">Create Challenge</div>
+      <div class="action-sub">Pick topics, difficulty and time limit.</div>
+      <div class="action-cta">Build Now <i class="fa-solid fa-arrow-right"></i></div>
+    </a>
+    <a class="action-card" href="https://www.mysscguide.com/previous-year">
+      <div class="action-ico" style="background:linear-gradient(135deg,#ec4899,#f43f5e)"><i class="fa-regular fa-copy"></i></div>
+      <div class="action-title">PYQ Archives</div>
+      <div class="action-sub">Previous year papers across shifts.</div>
+      <div class="action-cta">Browse Papers <i class="fa-solid fa-arrow-right"></i></div>
+    </a>
+    <a class="action-card" href="https://www.mysscguide.com/mocks">
+      <div class="action-ico" style="background:linear-gradient(135deg,#7c3aed,#5b21b6)"><i class="fa-solid fa-star"></i></div>
+      <div class="action-title">Rank Maker Archives</div>
+      <div class="action-sub">Elite mock series for top ranks.</div>
+      <div class="action-cta">Browse Series <i class="fa-solid fa-arrow-right"></i></div>
+    </a>
+    <a class="action-card" href="https://www.mysscguide.com/mocks">
+      <div class="action-ico" style="background:linear-gradient(135deg,#2563eb,#0ea5e9)"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="action-title">Sectional Tests</div>
+      <div class="action-sub">Topic-wise practice for every exam.</div>
+      <div class="action-cta">Choose Exam <i class="fa-solid fa-arrow-right"></i></div>
+    </a>
+    <a class="action-card" href="https://www.mysscguide.com/previous-year">
+      <div class="action-ico" style="background:linear-gradient(135deg,#f59e0b,#eab308)"><i class="fa-solid fa-book-open"></i></div>
+      <div class="action-title">Chapter-wise PYQs</div>
+      <div class="action-sub">Chapter-level questions with solutions.</div>
+      <div class="action-cta">Explore <i class="fa-solid fa-arrow-right"></i></div>
+    </a>
+    <div class="action-card locked" data-action="locked" role="button" aria-label="Doctor's Prescription">
+      <div class="lock-chip">Locked</div>
+      <div class="action-ico" style="background:linear-gradient(135deg,#94a3b8,#64748b)"><i class="fa-solid fa-flask"></i></div>
+      <div class="action-title">Doctor's Prescription</div>
+      <div class="action-sub">Personalized plan based on weak areas.</div>
+      <div class="action-cta">Unlock Pro <i class="fa-solid fa-lock"></i></div>
+    </div>
+  </div>
+
+  <div class="section-lbl">Challenges</div>
+  <div class="tab-row">
+    <button class="tab-btn on" data-tab="my">My Challenges</button>
+    <button class="tab-btn" data-tab="public">Public Challenges</button>
+  </div>
+  <div class="search-row">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" id="challengeSearch" placeholder="Search by name or topic">
+  </div>
+  <div class="challenge-list" id="challengeList"></div>
+
+  <div class="section-lbl">Recent History</div>
+  <div class="filter-row">
+    <button class="filter-chip on" data-filter="all">All</button>
+    <button class="filter-chip" data-filter="public">Public</button>
+    <button class="filter-chip" data-filter="private">Private</button>
+  </div>
+  <div class="history-list" id="historyList"></div>
+  <div class="gap"></div>
+</main>
+
+<!-- Floating Help -->
+<button class="help-fab" onclick="window.open('https://www.mysscguide.com/forums','_blank')" aria-label="Help">
+  <span class="fab-pulse"></span>
+  <i class="fa-solid fa-headset"></i>
+</button>
+
+<!-- Toast -->
+<div class="toast" id="toast">Action completed</div>
+
+<!-- Bottom Nav -->
+<nav class="bnav">
+  <a class="bnav-item" href="https://www.mysscguide.com/home" aria-label="Home">
+    <i class="fa-solid fa-house-chimney"></i><span>Home</span>
+  </a>
+  <button class="bnav-item on" aria-label="Mocks">
+    <i class="fa-solid fa-clipboard-list"></i><span>Mocks</span>
+  </button>
+  <a class="bnav-item" href="https://www.mysscguide.com/previous-year" aria-label="PYQs">
+    <i class="fa-solid fa-clock-rotate-left"></i><span>PYQs</span>
+  </a>
+  <a class="bnav-item" href="https://www.mysscguide.com/contests" aria-label="Contests">
+    <i class="fa-solid fa-medal"></i><span>Contests</span>
+  </a>
+  <button class="bnav-item" onclick="togMenu()" aria-label="Menu">
+    <i class="fa-solid fa-grip"></i><span>Menu</span>
+  </button>
+</nav>
+
+<script>
+  document.getElementById('todayDate').textContent =
+    new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
+
+  function togMenu(){
+    document.getElementById('dr').classList.toggle('open');
+    document.getElementById('ov').classList.toggle('open');
+  }
+
+  var challenges=[
+    {
+      name:'practice-2',
+      scope:'my',
+      visibility:'Private',
+      questions:25,
+      duration:'20 mins',
+      created:'30 Mar 2026, 12:10 pm',
+      topics:['Active & Passive Voice'],
+      score:'3.5/50',
+      accuracy:'67%',
+      time:'0m 32s'
+    },
+    {
+      name:'practice',
+      scope:'my',
+      visibility:'Private',
+      questions:25,
+      duration:'20 mins',
+      created:'30 Mar 2026, 12:08 pm',
+      topics:['Algebra'],
+      score:'5.5/50',
+      accuracy:'75%',
+      time:'0m 35s'
+    },
+    {
+      name:'CGL Topper Set',
+      scope:'public',
+      visibility:'Public',
+      questions:100,
+      duration:'75 mins',
+      created:'28 Mar 2026, 6:20 pm',
+      topics:['Quant','Reasoning'],
+      score:null,
+      accuracy:null,
+      time:null
+    },
+    {
+      name:'CHSL Speed Sprint',
+      scope:'public',
+      visibility:'Public',
+      questions:50,
+      duration:'35 mins',
+      created:'25 Mar 2026, 9:40 pm',
+      topics:['English','GK'],
+      score:null,
+      accuracy:null,
+      time:null
+    }
+  ];
+
+  var history=[
+    {
+      name:'practice-2',
+      mode:'Custom',
+      date:'2026-03-30',
+      visibility:'Private',
+      participants:'1/1',
+      score:'3.5/50',
+      accuracy:'67%',
+      time:'0m 32s'
+    },
+    {
+      name:'practice',
+      mode:'Custom',
+      date:'2026-03-30',
+      visibility:'Private',
+      participants:'1/1',
+      score:'5.5/50',
+      accuracy:'75%',
+      time:'0m 35s'
+    },
+    {
+      name:'CGL Topper Set',
+      mode:'Community',
+      date:'2026-03-28',
+      visibility:'Public',
+      participants:'342',
+      score:'42/100',
+      accuracy:'71%',
+      time:'52m 12s'
+    }
+  ];
+
+  var activeTab='my';
+  var historyFilter='all';
+  var searchInput=document.getElementById('challengeSearch');
+
+  function renderChallenges(){
+    var q=searchInput.value.trim().toLowerCase();
+    var filtered=challenges.filter(function(c){
+      if(c.scope!==activeTab)return false;
+      if(!q)return true;
+      var hay=(c.name+' '+c.topics.join(' ')).toLowerCase();
+      return hay.indexOf(q)!==-1;
+    });
+    var wrap=document.getElementById('challengeList');
+    if(!filtered.length){
+      wrap.innerHTML='<div class="empty">No challenges found for this filter.</div>';
+      return;
+    }
+    wrap.innerHTML=filtered.map(function(c){
+      var badgeClass=c.visibility==='Private'?'badge private':'badge public';
+      var topics=c.topics.map(function(t){return '<span class="topic-chip">'+t+'</span>'}).join('');
+      var score=c.score||'--';
+      var accuracy=c.accuracy||'--';
+      var time=c.time||'--';
+      var cta=c.score?'View Analysis':'Start Now';
+      var ctaAction=c.score?'analysis':'start';
+      return ''
+        +'<div class="challenge-card">'
+        +  '<div class="challenge-top">'
+        +    '<div class="challenge-title">'+c.name+'</div>'
+        +    '<span class="'+badgeClass+'">'+c.visibility+'</span>'
+        +  '</div>'
+        +  '<div class="challenge-meta">'
+        +    '<span>'+c.questions+' Qs</span>'
+        +    '<span class="meta-dot"></span>'
+        +    '<span>'+c.duration+'</span>'
+        +    '<span class="meta-dot"></span>'
+        +    '<span>Created '+c.created+'</span>'
+        +  '</div>'
+        +  '<div class="topic-row">'+topics+'</div>'
+        +  '<div class="stats-row">'
+        +    '<div class="stat-pill"><div class="val">'+score+'</div><div class="lbl">Score</div></div>'
+        +    '<div class="stat-pill"><div class="val">'+accuracy+'</div><div class="lbl">Accuracy</div></div>'
+        +    '<div class="stat-pill"><div class="val">'+time+'</div><div class="lbl">Time</div></div>'
+        +  '</div>'
+        +  '<div class="action-row">'
+        +    '<button class="icon-btn" data-action="share" data-name="'+c.name+'" aria-label="Share"><i class="fa-solid fa-share-nodes"></i></button>'
+        +    '<button class="icon-btn" data-action="leaderboard" data-name="'+c.name+'" aria-label="Leaderboard"><i class="fa-solid fa-trophy"></i></button>'
+        +    '<button class="action-btn" data-action="'+ctaAction+'" data-name="'+c.name+'">'+cta+'</button>'
+        +  '</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  function renderHistory(){
+    var wrap=document.getElementById('historyList');
+    var filtered=history.filter(function(h){
+      if(historyFilter==='all')return true;
+      return h.visibility.toLowerCase()===historyFilter;
+    });
+    if(!filtered.length){
+      wrap.innerHTML='<div class="empty">No history available for this filter.</div>';
+      return;
+    }
+    wrap.innerHTML=filtered.map(function(h){
+      var badgeClass=h.visibility==='Private'?'badge private':'badge public';
+      return ''
+        +'<div class="history-card">'
+        +  '<div class="history-head">'
+        +    '<div class="history-ico"><i class="fa-solid fa-bolt"></i></div>'
+        +    '<div class="history-info">'
+        +      '<div class="history-title">'+h.name+'</div>'
+        +      '<div class="history-meta">'+h.mode+' - '+h.date+'</div>'
+        +    '</div>'
+        +    '<span class="'+badgeClass+'">'+h.visibility+'</span>'
+        +  '</div>'
+        +  '<div class="history-line"><i class="fa-solid fa-users"></i> '+h.participants+' participants</div>'
+        +  '<div class="history-stats">'
+        +    '<div class="stat-pill"><div class="val">'+h.score+'</div><div class="lbl">Score</div></div>'
+        +    '<div class="stat-pill"><div class="val">'+h.accuracy+'</div><div class="lbl">Accuracy</div></div>'
+        +    '<div class="stat-pill"><div class="val">'+h.time+'</div><div class="lbl">Time</div></div>'
+        +  '</div>'
+        +  '<div class="history-actions">'
+        +    '<button class="action-btn" data-action="analysis" data-name="'+h.name+'">Analysis</button>'
+        +    '<button class="action-btn alt" data-action="retake" data-name="'+h.name+'">Retake</button>'
+        +  '</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  function setTab(tab){
+    activeTab=tab;
+    document.querySelectorAll('.tab-btn').forEach(function(btn){
+      btn.classList.toggle('on',btn.getAttribute('data-tab')===activeTab);
+    });
+    renderChallenges();
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){setTab(btn.getAttribute('data-tab'))});
+  });
+  searchInput.addEventListener('input',renderChallenges);
+
+  document.querySelectorAll('.filter-chip').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      historyFilter=btn.getAttribute('data-filter');
+      document.querySelectorAll('.filter-chip').forEach(function(b){
+        b.classList.toggle('on',b.getAttribute('data-filter')===historyFilter);
+      });
+      renderHistory();
+    });
+  });
+
+  var toastTimer;
+  function showToast(text){
+    var t=document.getElementById('toast');
+    t.textContent=text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){t.classList.remove('show')},1800);
+  }
+
+  var actionMessages={
+    start:'Starting a new mock...',
+    schedule:'Schedule your next mock.',
+    analysis:'Opening analysis...',
+    review:'Opening mistake review...',
+    share:'Share link copied.',
+    leaderboard:'Opening leaderboard...',
+    retake:'Retake started.',
+    locked:'Unlock Selection Key to access this.'
+  };
+
+  document.body.addEventListener('click',function(e){
+    var btn=e.target.closest('[data-action]');
+    if(!btn)return;
+    var action=btn.getAttribute('data-action');
+    var name=btn.getAttribute('data-name');
+    var msg=actionMessages[action]||'Done';
+    if(name && (action==='analysis' || action==='retake')){
+      msg=msg.replace('...', ' for '+name+'...');
+    }
+    showToast(msg);
+  });
+
+  renderChallenges();
+  renderHistory();
+</script>
+</body>
+</html>

@@ -1,15 +1,159 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, KeyboardAvoidingView, Platform, Alert, Linking, Image } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLoginModal } from '../context/LoginModalContext';
 import { useForums, ForumPostData, Comment } from '../context/ForumsContext';
+import { API_BASE_URL } from '../services/api';
 
 type ReplyTarget = {
   commentId: string;
   author: string;
+};
+
+type ForumAttachment = {
+  name: string;
+  url: string;
+  kind: 'pdf' | 'image' | 'file';
+};
+
+const safeDecode = (value: string) => {
+  let current = value || '';
+  for (let i = 0; i < 2; i += 1) {
+    try {
+      const decoded = decodeURIComponent(current);
+      if (decoded === current) break;
+      current = decoded;
+    } catch {
+      break;
+    }
+  }
+  return current;
+};
+
+const normalizeForumFileUrl = (rawUrl: string): string => {
+  const candidate = safeDecode((rawUrl || '').trim());
+  if (!candidate) return '';
+
+  try {
+    const maybeUrl = /^https?:\/\//i.test(candidate) ? new URL(candidate) : null;
+    if (maybeUrl) {
+      const isS3FilePath = maybeUrl.pathname.endsWith('/api/v1/s3/file') || maybeUrl.pathname.endsWith('/s3/file');
+      if (isS3FilePath) {
+        const resolved = new URL(`${API_BASE_URL}/s3/file`);
+        const key = maybeUrl.searchParams.get('key');
+        if (key) resolved.searchParams.set('key', safeDecode(key));
+        maybeUrl.searchParams.forEach((value, keyName) => {
+          if (keyName !== 'key') {
+            resolved.searchParams.set(keyName, value);
+          }
+        });
+        return resolved.toString();
+      }
+      return maybeUrl.toString();
+    }
+  } catch {
+    // fall through to relative URL handling
+  }
+
+  if (candidate.startsWith('/api/v1/s3/file')) {
+    return `${API_BASE_URL}${candidate.replace(/^\/api\/v1/, '')}`;
+  }
+
+  if (candidate.startsWith('/s3/file')) {
+    return `${API_BASE_URL}${candidate}`;
+  }
+
+  return candidate;
+};
+
+const inferAttachmentKind = (name: string, url: string, hintedType?: string): 'pdf' | 'image' | 'file' => {
+  const merged = `${name} ${url}`.toLowerCase();
+  if ((hintedType || '').toLowerCase() === 'pdf' || /\.pdf(?:$|\?|#)/i.test(merged)) {
+    return 'pdf';
+  }
+  if ((hintedType || '').toLowerCase() === 'img' || (hintedType || '').toLowerCase() === 'image' || /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|\?|#)/i.test(merged)) {
+    return 'image';
+  }
+  return 'file';
+};
+
+const parseForumMediaContent = (input: string): { cleanText: string; attachments: ForumAttachment[] } => {
+  const source = input || '';
+  const attachments: ForumAttachment[] = [];
+
+  const addAttachment = (payloadText: string, hintedType?: string) => {
+    const payload = (payloadText || '').trim();
+    if (!payload) return;
+
+    const decodedPayload = safeDecode(payload);
+    let name = 'Attachment';
+    let rawUrl = '';
+
+    if (decodedPayload.includes('][')) {
+      const [left, ...rest] = decodedPayload.split('][');
+      name = safeDecode((left || '').replace(/^\[/, '').replace(/\]$/, '').trim()) || name;
+      rawUrl = rest.join('][').replace(/^\[/, '').replace(/\]$/, '').trim();
+    } else if (decodedPayload.includes('|')) {
+      const [left, ...rest] = decodedPayload.split('|');
+      name = safeDecode((left || '').trim()) || name;
+      rawUrl = rest.join('|').trim();
+    } else {
+      const markdownUrl = decodedPayload.match(/\((https?:[^)]+)\)/i)?.[1];
+      const plainUrl = decodedPayload.match(/https?:\/\/\S+/i)?.[0];
+      const relativeUrl = decodedPayload.match(/\/(api\/v1\/)?s3\/file\?[^\s\]]+/i)?.[0];
+      rawUrl = markdownUrl || plainUrl || relativeUrl || decodedPayload;
+      const maybeName = decodedPayload
+        .replace(/\(https?:[^)]+\)/i, '')
+        .replace(/https?:\/\/\S+/i, '')
+        .replace(/\/(api\/v1\/)?s3\/file\?[^\s\]]+/i, '')
+        .trim();
+      if (maybeName) name = safeDecode(maybeName);
+    }
+
+    const normalizedUrl = normalizeForumFileUrl(rawUrl.replace(/^\[/, '').replace(/\]$/, '').trim());
+    if (!/^https?:\/\//i.test(normalizedUrl)) return;
+
+    const finalName = (() => {
+      const cleaned = name.replace(/^\[|\]$/g, '').trim();
+      if (cleaned && cleaned.toLowerCase() !== 'pdf') return cleaned;
+      try {
+        const url = new URL(normalizedUrl);
+        const key = url.searchParams.get('key');
+        if (key) {
+          const tail = safeDecode(key).split('/').filter(Boolean).pop();
+          if (tail) return tail;
+        }
+      } catch {
+        // ignore
+      }
+      return hintedType === 'pdf' ? 'Attachment.pdf' : 'Attachment';
+    })();
+
+    if (!attachments.some((item) => item.url === normalizedUrl)) {
+      attachments.push({
+        name: finalName,
+        url: normalizedUrl,
+        kind: inferAttachmentKind(finalName, normalizedUrl, hintedType),
+      });
+    }
+  };
+
+  let cleanText = source.replace(/\[(pdf|img|image|file)\]([\s\S]*?)\[\/\1\]/gi, (_full, tagType, payload) => {
+    addAttachment(payload, String(tagType || ''));
+    return ' ';
+  });
+
+  const danglingMatch = /\[(pdf|img|image|file)\]([\s\S]*)$/i.exec(cleanText);
+  if (danglingMatch) {
+    addAttachment(danglingMatch[2], String(danglingMatch[1] || ''));
+    cleanText = cleanText.slice(0, danglingMatch.index);
+  }
+
+  cleanText = cleanText.replace(/\s{2,}/g, ' ').trim();
+  return { cleanText, attachments };
 };
 
 export default function ForumPostScreen() {
@@ -44,9 +188,28 @@ export default function ForumPostScreen() {
   };
 
   const totalCommentCount = useMemo(() => getTotalComments(post.comments), [post.comments]);
+  const parsedSubtitle = useMemo(() => parseForumMediaContent(post.subtitle || ''), [post.subtitle]);
 
   const normalizeName = (value: string) => value.trim().toLowerCase();
-  const isMyContent = (owner: string) => normalizeName(userName || 'Anonymous') === normalizeName(owner || 'Anonymous');
+  const isMyContent = (owner: string) => {
+    const me = normalizeName(userName || '');
+    const author = normalizeName(owner || '');
+    if (!me || !author) return false;
+    if (me === author) return true;
+    if (author.startsWith(`${me} `) || me.startsWith(`${author} `)) return true;
+
+    const compactMe = me.replace(/[^a-z0-9]/g, '');
+    const compactAuthor = author.replace(/[^a-z0-9]/g, '');
+    if (compactMe && compactAuthor) {
+      if (compactMe === compactAuthor) return true;
+      if (compactAuthor.startsWith(compactMe) || compactMe.startsWith(compactAuthor)) return true;
+    }
+
+    const meFirst = me.split(/\s+|_/).filter(Boolean)[0] || '';
+    const authorFirst = author.split(/\s+|_/).filter(Boolean)[0] || '';
+    return Boolean(meFirst && authorFirst && meFirst === authorFirst);
+  };
+  const canManageComment = (comment: Comment) => Boolean(comment.ownedByMe) || isMyContent(comment.author);
 
   const handleSendComment = () => {
     if (!commentText.trim()) return;
@@ -90,10 +253,15 @@ export default function ForumPostScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          deleteComment(post.id, comment.id, userName || 'Anonymous');
-          if (editingCommentId === comment.id) {
-            cancelEditComment();
-          }
+          void (async () => {
+            const deleted = await deleteComment(post.id, comment.id, userName || 'Anonymous');
+            if (deleted && editingCommentId === comment.id) {
+              cancelEditComment();
+            }
+            if (!deleted) {
+              Alert.alert('Delete failed', 'You can only delete your own comment or the request failed.');
+            }
+          })();
         },
       },
     ]);
@@ -111,6 +279,39 @@ export default function ForumPostScreen() {
         },
       },
     ]);
+  };
+
+  const openExternalUrl = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert('Unable to open file', 'This file link is not supported on this device.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Unable to open file', 'Could not open this file. Please try again.');
+    }
+  };
+
+  const handleViewAttachment = (url: string) => {
+    void openExternalUrl(url);
+  };
+
+  const handleDownloadAttachment = (attachment: ForumAttachment) => {
+    try {
+      const url = new URL(attachment.url);
+      url.searchParams.set('download', '1');
+      if (attachment.name) {
+        const fileName = attachment.name.toLowerCase().endsWith('.pdf') || attachment.kind !== 'pdf'
+          ? attachment.name
+          : `${attachment.name}.pdf`;
+        url.searchParams.set('name', fileName);
+      }
+      void openExternalUrl(url.toString());
+    } catch {
+      void openExternalUrl(attachment.url);
+    }
   };
 
   const renderComment = (comment: Comment, depth = 0): React.ReactNode => {
@@ -161,7 +362,7 @@ export default function ForumPostScreen() {
                 <Pressable onPress={() => handleReplyPress(comment)} style={styles.replyBtn} hitSlop={8}>
                   <Text style={styles.replyBtnText}>Reply</Text>
                 </Pressable>
-                {isMyContent(comment.author) && (
+                {canManageComment(comment) && (
                   <>
                     <Pressable onPress={() => beginEditComment(comment)} style={styles.replyBtn} hitSlop={8}>
                       <Text style={styles.replyBtnText}>Edit</Text>
@@ -218,7 +419,34 @@ export default function ForumPostScreen() {
             </View>
             
             <Text style={[styles.postTitle, { color: text }]}>{post.title}</Text>
-            <Text style={[styles.postSub, { color: muted }]}>{post.subtitle}</Text>
+            {parsedSubtitle.cleanText ? <Text style={[styles.postSub, { color: muted }]}>{parsedSubtitle.cleanText}</Text> : null}
+
+            {parsedSubtitle.attachments.length > 0 ? (
+              <View style={[styles.attachmentCard, { borderColor: border, backgroundColor: isDark ? '#0b1220' : '#f8fafc' }]}>
+                {parsedSubtitle.attachments.map((attachment, index) => (
+                  <View key={`${attachment.url}-${index}`} style={styles.attachmentRow}>
+                    <Text numberOfLines={1} style={[styles.attachmentName, { color: text }]}>{attachment.name}</Text>
+
+                    {attachment.kind === 'image' ? (
+                      <Image
+                        source={{ uri: attachment.url }}
+                        style={styles.attachmentPreview}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+
+                    <View style={styles.attachmentActions}>
+                      <Pressable style={[styles.attachmentBtn, { borderColor: '#10b981' }]} onPress={() => handleViewAttachment(attachment.url)}>
+                        <Text style={styles.attachmentBtnText}>View</Text>
+                      </Pressable>
+                      <Pressable style={[styles.attachmentBtn, { borderColor: '#2563eb' }]} onPress={() => handleDownloadAttachment(attachment)}>
+                        <Text style={[styles.attachmentBtnText, { color: '#2563eb' }]}>Download</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             
             {post.tags.length > 0 && (
                 <View style={styles.tagsRow}>
@@ -308,6 +536,30 @@ const styles = StyleSheet.create({
   postTime: { fontSize: 12 },
   postTitle: { fontSize: 24, fontWeight: '800', marginBottom: 10, lineHeight: 32, letterSpacing: 0.1 },
   postSub: { fontSize: 16, lineHeight: 26, marginBottom: 16 },
+  attachmentCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 16,
+    gap: 10,
+  },
+  attachmentRow: { gap: 8 },
+  attachmentName: { fontSize: 13, fontWeight: '700' },
+  attachmentPreview: {
+    width: '100%',
+    height: 180,
+    borderRadius: 10,
+    backgroundColor: '#e2e8f0',
+  },
+  attachmentActions: { flexDirection: 'row', gap: 8 },
+  attachmentBtn: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#ffffff',
+  },
+  attachmentBtnText: { color: '#059669', fontSize: 12, fontWeight: '700' },
   tagsRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
   tagPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
   tagText: { fontSize: 12, fontWeight: '700' },

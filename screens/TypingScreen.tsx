@@ -11,10 +11,12 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useLoginModal } from '../context/LoginModalContext';
+import { useHasUnreadNotifications } from '../hooks/useHasUnreadNotifications';
 import { GOAL_CARDS, EXAM_TOPICS, PRACTICE_TOPICS } from '../constants/TypingConstants';
 
 
@@ -35,8 +37,10 @@ const FALLBACK_PASSAGES: Record<string, string[]> = {
 
 export default function TypingScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { isDark } = useTheme();
   const { userName } = useLoginModal();
+  const hasUnreadNotifications = useHasUnreadNotifications();
 
   // Mode Management
   const [activeMode, setActiveMode] = useState<'LOBBY' | 'PRACTICE' | 'EXAM_TOPICS' | 'EXAM_INSTRUCTIONS' | 'EXAM_PRACTICE'>('LOBBY');
@@ -186,15 +190,46 @@ export default function TypingScreen() {
 
   const inputRef = useRef<TextInput>(null);
 
-  const bg = '#020617';
-  const cardBg = '#0f172a';
-  const text = '#fff';
-  const muted = '#94a3b8';
-  const border = '#1e293b';
+  const bg = isDark ? '#0f172a' : '#f8fafc';
+  const cardBg = isDark ? '#1e293b' : '#ffffff';
+  const text = isDark ? '#ffffff' : '#1e293b';
+  const muted = isDark ? '#94a3b8' : '#64748b';
+  const border = isDark ? '#1e293b' : '#e2e8f0';
+  const footerSafeBottom = Math.max(insets.bottom, 6);
+  const footerBarHeight = 68 + footerSafeBottom;
   const emerald = '#10b981'; // Brighter emerald for the hero
   const screenWidth = Dimensions.get('window').width;
 
-  const displayName = userName || 'Ashutosh';
+  const displayName = (userName || 'User').trim() || 'User';
+  const avatarText = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'U';
+
+  const handleOpenHomeTab = () => {
+    navigation.navigate('Main', {
+      screen: 'Home',
+      params: { screen: 'DashboardMain' },
+    });
+  };
+
+  const handleOpenPyqsTab = () => {
+    navigation.navigate('Main', { screen: 'PYQs' });
+  };
+
+  const handleOpenMocksTab = () => {
+    navigation.navigate('Main', { screen: 'Mocks' });
+  };
+
+  const handleOpenForumsTab = () => {
+    navigation.navigate('Main', { screen: 'Forums' });
+  };
+
+  const handleOpenPremiumTab = () => {
+    navigation.navigate('Main', { screen: 'Premium' });
+  };
 
   // Timer Logic
   useEffect(() => {
@@ -1445,23 +1480,31 @@ export default function TypingScreen() {
 
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top, backgroundColor: bg }]}>
-
-
-      <View style={[styles.header, { borderBottomColor: border }]}>
-        <View style={styles.logoRow}>
-          <Image
-            source={require('../assets/sscguidelogo.png')}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-          <Text style={[styles.logoText, { color: text }]}>
-            My<Text style={{ color: '#059669' }}>SSC</Text>guide
-          </Text>
-        </View>
-        <View style={styles.headerIcons}>
-          <Ionicons name="moon-outline" size={20} color={muted} style={{ marginRight: 15 }} />
-          <Ionicons name="mail-outline" size={20} color={muted} style={{ marginRight: 15 }} />
-          <Ionicons name="notifications-outline" size={20} color={muted} />
+      <View style={[styles.homeHeader, { borderBottomColor: border, backgroundColor: isDark ? '#0f172a' : '#ffffff' }]}>
+        <View style={styles.homeHeaderTopRow}>
+          <View style={styles.homeBrandRow}>
+            <Image
+              source={require('../assets/sscguidelogo.png')}
+              style={styles.homeLogo}
+              resizeMode="contain"
+            />
+            <Text style={[styles.homeLogoText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              My<Text style={{ color: '#059669' }}>SSC</Text>guide
+            </Text>
+          </View>
+          <View style={styles.homeActionRow}>
+            <Pressable
+              style={[styles.homeIconBtn, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}
+              hitSlop={8}
+              onPress={() => navigation.navigate('Notifications' as never)}
+            >
+              <Ionicons name="notifications" size={18} color="#f59e0b" />
+              {hasUnreadNotifications ? <View style={styles.homeNotificationDot} /> : null}
+            </Pressable>
+            <Pressable style={styles.homeAvatar} onPress={() => navigation.navigate('MenuDrawer' as never)}>
+              <Text style={styles.homeAvatarText}>{avatarText}</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -1470,16 +1513,6 @@ export default function TypingScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={[styles.welcomeText, { color: text }]}>
-            Welcome back, {displayName}! 🚀
-          </Text>
-          <Text style={[styles.welcomeSub, { color: muted }]}>
-            Let's crush your goals today.
-          </Text>
-        </View>
-
         {/* Hero Section (From Screenshot 8) */}
         <View style={[styles.heroCard, { backgroundColor: '#059669' }]}>
           <View style={styles.heroContent}>
@@ -1930,14 +1963,100 @@ export default function TypingScreen() {
           )}
         </View>
 
-        <View style={{ height: 60 }} />
+        <View style={{ height: footerBarHeight + 12 }} />
       </ScrollView>
+
+      <View
+        style={[
+          styles.profileFooterNav,
+          {
+            height: footerBarHeight,
+            paddingTop: 6,
+            paddingBottom: footerSafeBottom,
+            backgroundColor: cardBg,
+            borderTopColor: border,
+          },
+        ]}
+      >
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenHomeTab}>
+          <Ionicons name="home" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>Home</Text>
+        </Pressable>
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenPyqsTab}>
+          <Ionicons name="copy" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>PYQ</Text>
+        </Pressable>
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenMocksTab}>
+          <Ionicons name="clipboard" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>Mocks</Text>
+        </Pressable>
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenForumsTab}>
+          <Ionicons name="people" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>Forums</Text>
+        </Pressable>
+        <Pressable style={styles.profileFooterItem} onPress={handleOpenPremiumTab}>
+          <Ionicons name="diamond" size={18} color="#94a3b8" />
+          <Text style={styles.profileFooterLabel}>Premium</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: { flex: 1 },
+  homeHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+  },
+  homeHeaderTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 0,
+  },
+  homeBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  homeLogo: { width: 44, height: 44 },
+  homeLogoText: { fontSize: 18, fontWeight: '700', marginLeft: -4 },
+  homeActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  homeIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  homeNotificationDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ef4444',
+  },
+  homeAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeAvatarText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2304,4 +2423,26 @@ const styles = StyleSheet.create({
   headerIcon: { marginRight: 10 },
   axisLabel: { fontSize: 10, fontWeight: '500', color: '#94a3b8' },
   examPassageText: { fontSize: 16, lineHeight: 28, letterSpacing: 0.5 },
+  profileFooterNav: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -1,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  profileFooterItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  profileFooterLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '700',
+  },
 });

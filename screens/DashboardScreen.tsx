@@ -14,7 +14,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import Svg, { Defs, LinearGradient, Path, Rect, Stop, Circle } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 const TODO_STORAGE_KEY = 'dashboard_todays_target_todos_v1';
 const RESULT_HISTORY_STORAGE_KEY = 'pyqs_result_history_v1';
@@ -26,7 +26,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoginModal } from '../context/LoginModalContext';
 import { useTheme } from '../context/ThemeContext';
 import { useMocks } from '../context/MocksContext';
-import { dashboardApi, forumApi, mockApi, pyqApi } from '../services/api';
+import { dashboardApi, forumApi } from '../services/api';
+import { buildUserStorageScope, withUserScope } from '../utils/storageScope';
+import { useHasUnreadNotifications } from '../hooks/useHasUnreadNotifications';
 
 type TodoItem = {
   text: string;
@@ -75,6 +77,22 @@ type DailyExamResultEntry = {
 type DailyLatestMap = {
   challenge?: DailyExamResultEntry;
   quiz?: DailyExamResultEntry;
+};
+
+const formatDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const parseMaybeDate = (raw: unknown): Date | null => {
+  if (!raw) return null;
+  const parsed = new Date(String(raw));
+  if (!isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  return null;
 };
 
 const COLORS = {
@@ -133,13 +151,15 @@ const SLIDES = [
   },
 ];
 
+const SLIDE_FALLBACK_BACKGROUNDS = ['#312e81', '#c2410c', '#0d9488'] as const;
+
 const QUICK_ACTIONS: QuickActionItem[] = [
   { id: 'mocks', label: 'Mocks', icon: 'document-text', bg: ['#059669', '#0d9488'] as const },
   { id: 'pyq', label: 'PYQs', icon: 'copy', bg: ['#ec4899', '#f43f5e'] as const },
   { id: 'contests', label: 'Contests', icon: 'trophy', bg: ['#f59e0b', '#eab308'] as const },
   { id: 'typing', label: 'Typing', icon: 'keypad', bg: ['#3b82f6', '#2563eb'] as const },
   { id: 'mistakes', label: 'Mistakes', icon: 'book', bg: ['#ef4444', '#dc2626'] as const },
-  { id: 'mnemonics', label: 'Mnemonics', icon: 'bulb', bg: ['#8b5cf6', '#7c3aed'] as const, badge: 'NEW' },
+  { id: 'mnemonics', label: 'Mnemonics', icon: 'bulb', bg: ['#8b5cf6', '#7c3aed'] as const },
   { id: 'forums', label: 'Forums', icon: 'people', bg: ['#06b6d4', '#0891b2'] as const },
   { id: 'premium', label: 'Premium', icon: 'key', bg: ['#f97316', '#ea580c'] as const },
 ];
@@ -280,6 +300,27 @@ function TopoHeaderTexture() {
   );
 }
 
+function FireStreakIcon({ active }: { active: boolean }) {
+  const fill = active ? '#fb923c' : '#d1d5db';
+  const stroke = active ? '#f97316' : '#9ca3af';
+
+  return (
+    <Svg width="13" height="13" viewBox="0 0 24 24">
+      <Path
+        d="M12 2.5c.8 3-1.2 4.8-2.7 6.2-1.5 1.4-2.8 2.6-2.8 5 0 3 2.3 5.3 5.5 5.3 3.4 0 5.8-2.5 5.8-5.7 0-2.2-1-3.9-2.4-5.5-.9-1-1.7-2.1-2-3.9-.2-.9-.4-1.3-1.4-1.4z"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M12.1 10.1c.3 1.3-.6 2.1-1.2 2.8-.7.7-1.2 1.2-1.2 2.2 0 1.4 1.1 2.4 2.5 2.4 1.5 0 2.6-1.1 2.6-2.6 0-1.1-.5-1.8-1.1-2.6-.5-.6-1-1.2-1.2-2.2-.1-.5-.2-.7-.4-.7z"
+        fill={active ? '#fdba74' : '#e5e7eb'}
+      />
+    </Svg>
+  );
+}
+
 function SlideSurface({ index }: { index: number }) {
   const gradients = [
     ['#1e1b4b', '#312e81'],
@@ -297,10 +338,8 @@ function SlideSurface({ index }: { index: number }) {
         </LinearGradient>
       </Defs>
       <Rect x="0" y="0" width="340" height="180" fill={`url(#slideGrad${index})`} />
-      <Circle cx="292" cy="30" r="72" fill="rgba(255,255,255,0.12)" />
-      <Path d="M18 28c27-23 62-24 88 1 27 27 25 67-3 91-29 25-67 24-91-2-23-26-20-66 6-90z" stroke="rgba(255,255,255,0.24)" strokeWidth="2" fill="none" />
-      <Path d="M40 50c16-13 39-14 55 0 16 14 16 38-1 53-16 14-39 13-54-2-15-16-15-38 0-51z" stroke="rgba(255,255,255,0.24)" strokeWidth="2" fill="none" />
-      <Path d="M190 18c33-18 75-11 98 16 23 27 17 68-14 92-32 24-76 20-102-8-25-28-19-76 18-100z" stroke="rgba(255,255,255,0.2)" strokeWidth="2" fill="none" />
+      <Circle cx="306" cy="20" r="66" fill="rgba(255,255,255,0.14)" />
+      <Circle cx="24" cy="22" r="34" fill="rgba(255,255,255,0.09)" />
     </Svg>
   );
 }
@@ -326,11 +365,15 @@ export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { userName } = useLoginModal();
+  const { userName, userEmail } = useLoginModal();
   const { isDark } = useTheme();
+  const hasUnreadNotifications = useHasUnreadNotifications();
   useMocks();
+  const storageScope = buildUserStorageScope(userEmail, userName);
+  const resultHistoryStorageKey = withUserScope(RESULT_HISTORY_STORAGE_KEY, storageScope);
+  const dailyExamLatestStorageKey = withUserScope(DAILY_EXAM_LATEST_STORAGE_KEY, storageScope);
 
-  const [, setResultHistory] = useState<ResultHistoryItem[]>([]);
+  const [resultHistory, setResultHistory] = useState<ResultHistoryItem[]>([]);
   const [dailyLatest, setDailyLatest] = useState<DailyLatestMap>({});
   const [slideIndex, setSlideIndex] = useState(0);
   const [topCarouselWidth, setTopCarouselWidth] = useState(width);
@@ -340,10 +383,6 @@ export default function DashboardScreen() {
   const [showTodoInput, setShowTodoInput] = useState(false);
   const [todosLoaded, setTodosLoaded] = useState(false);
   const [forumPosts, setForumPosts] = useState<HomeForumPost[]>(FALLBACK_FORUM_POSTS);
-  const [quickActionBadges, setQuickActionBadges] = useState<Record<string, string>>({
-    contests: 'LIVE',
-    mnemonics: 'NEW',
-  });
   const todoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [storyIndex, setStoryIndex] = useState(0);
@@ -447,7 +486,7 @@ export default function DashboardScreen() {
         clearTimeout(todoSyncTimerRef.current);
       }
     };
-  }, []);
+  }, [resultHistoryStorageKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -456,8 +495,8 @@ export default function DashboardScreen() {
         try {
           const storage = (await import('@react-native-async-storage/async-storage')).default;
           const [raw, dailyRaw] = await Promise.all([
-            storage.getItem(RESULT_HISTORY_STORAGE_KEY),
-            storage.getItem(DAILY_EXAM_LATEST_STORAGE_KEY),
+            storage.getItem(resultHistoryStorageKey),
+            storage.getItem(dailyExamLatestStorageKey),
           ]);
 
           const parsed = raw ? JSON.parse(raw) : [];
@@ -480,7 +519,7 @@ export default function DashboardScreen() {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, [dailyExamLatestStorageKey, resultHistoryStorageKey])
   );
 
   useEffect(() => {
@@ -534,6 +573,36 @@ export default function DashboardScreen() {
     });
   }, [carouselOpacity, carouselTranslateY, headerOpacity, headerTranslateY, targetOpacity, targetTranslateY]);
 
+  useFocusEffect(
+    useCallback(() => {
+      // Ensure the hero/carousel section is fully visible after returning from nested routes.
+      headerOpacity.setValue(1);
+      headerTranslateY.setValue(0);
+      carouselOpacity.setValue(1);
+      carouselTranslateY.setValue(0);
+      targetOpacity.setValue(1);
+      targetTranslateY.setValue(0);
+
+      const frame = requestAnimationFrame(() => {
+        const snapWidth = topCarouselWidth || width;
+        topCarouselRef.current?.scrollTo({ x: slideIndexRef.current * snapWidth, y: 0, animated: false });
+      });
+
+      return () => {
+        cancelAnimationFrame(frame);
+      };
+    }, [
+      carouselOpacity,
+      carouselTranslateY,
+      headerOpacity,
+      headerTranslateY,
+      targetOpacity,
+      targetTranslateY,
+      topCarouselWidth,
+      width,
+    ])
+  );
+
   useEffect(() => {
     const timer = setInterval(() => {
       setTipIndex((prev) => (prev + 1) % TIPS.length);
@@ -545,6 +614,40 @@ export default function DashboardScreen() {
   const displayName = userName || 'User';
   const challengeResult = dailyLatest.challenge;
   const quizResult = dailyLatest.quiz;
+
+  const currentStreak = (() => {
+    const activeDateKeys = new Set<string>();
+
+    for (const item of resultHistory) {
+      const dt = parseMaybeDate((item as any)?.submittedAt);
+      if (dt) {
+        activeDateKeys.add(formatDateKey(dt));
+      }
+    }
+
+    const challengeDate = parseMaybeDate(challengeResult?.completedAt);
+    if (challengeDate) {
+      activeDateKeys.add(formatDateKey(challengeDate));
+    }
+
+    const quizDate = parseMaybeDate(quizResult?.completedAt);
+    if (quizDate) {
+      activeDateKeys.add(formatDateKey(quizDate));
+    }
+
+    let streak = 0;
+    const day = new Date();
+    day.setHours(0, 0, 0, 0);
+
+    while (activeDateKeys.has(formatDateKey(day))) {
+      streak += 1;
+      day.setDate(day.getDate() - 1);
+    }
+
+    return streak;
+  })();
+
+  const hasStreak = currentStreak > 0;
 
   const pageBg = isDark ? '#0f1512' : COLORS.bg;
   const textColor = isDark ? '#f8fafc' : COLORS.text;
@@ -623,8 +726,13 @@ export default function DashboardScreen() {
     }
 
     if (id === 'typing' || id === 'mnemonics') {
-      const tabScreen = id === 'typing' ? 'Typing' : 'Mnemonics';
-      root?.navigate('Main', { screen: tabScreen });
+      const targetScreen = id === 'typing' ? 'Typing' : 'Mnemonics';
+
+      try {
+        navigation.navigate(targetScreen as never);
+      } catch (_error) {
+        root?.navigate(targetScreen as never);
+      }
       return;
     }
 
@@ -634,7 +742,7 @@ export default function DashboardScreen() {
     }
 
     if (id === 'premium') {
-      navigation.navigate('Mocks' as never);
+      navigation.navigate('Main' as never, { screen: 'Premium' } as never);
       return;
     }
 
@@ -736,34 +844,9 @@ export default function DashboardScreen() {
   useEffect(() => {
     let isActive = true;
 
-    const computeMistakes = (history: ResultHistoryItem[]) => {
-      let totalWrong = 0;
-      for (const item of history) {
-        if (typeof item?.wrong === 'number') {
-          totalWrong += Math.max(0, item.wrong);
-          continue;
-        }
-
-        if (Array.isArray(item?.sectionBreakup)) {
-          for (const section of item.sectionBreakup) {
-            const attempted = Number(section?.attempted || 0);
-            const correct = Number(section?.correct || 0);
-            totalWrong += Math.max(0, attempted - correct);
-          }
-        }
-      }
-      return totalWrong;
-    };
-
     const fetchHomeData = async () => {
       try {
-        const [postsRes, contestsRes, myMocksRes, pyqCountRes, storageModule] = await Promise.all([
-          forumApi.listPosts({ limit: 8 }),
-          mockApi.getPublicChallenges(),
-          mockApi.getMyCustomTests({ limit: 50 }),
-          pyqApi.countTestPapers(),
-          import('@react-native-async-storage/async-storage'),
-        ]);
+        const postsRes = await forumApi.listPosts({ limit: 8 });
 
         if (!isActive) return;
 
@@ -794,22 +877,6 @@ export default function DashboardScreen() {
         if (posts.length > 0) {
           setForumPosts(posts);
         }
-
-        const contests = toArray(contestsRes);
-        const myMocks = toArray(myMocksRes);
-        const pyqCount = Number(pyqCountRes?.count ?? pyqCountRes?.data?.count ?? pyqCountRes?.total ?? 0) || 0;
-        const rawHistory = await storageModule.default.getItem(RESULT_HISTORY_STORAGE_KEY);
-        const parsedHistory = rawHistory ? (JSON.parse(rawHistory) as ResultHistoryItem[]) : [];
-        const mistakes = computeMistakes(Array.isArray(parsedHistory) ? parsedHistory : []);
-
-        setQuickActionBadges((prev) => ({
-          ...prev,
-          mocks: myMocks.length > 0 ? `${myMocks.length}` : prev.mocks || '',
-          pyq: pyqCount > 0 ? `${pyqCount}` : prev.pyq || '',
-          contests: contests.length > 0 ? `LIVE ${contests.length}` : 'LIVE',
-          forums: posts.length > 0 ? `${posts.length}` : prev.forums || '',
-          mistakes: mistakes > 0 ? `${mistakes}` : '',
-        }));
       } catch {
         if (!isActive) return;
         setForumPosts((prev) => (prev.length > 0 ? prev : FALLBACK_FORUM_POSTS));
@@ -843,19 +910,27 @@ export default function DashboardScreen() {
         >
           <View style={styles.heroTopRow}>
             <Pressable style={styles.brandRow} onPress={openMenuTab}>
-              <Image source={require('../assets/sscguidelogonew.png')} style={styles.brandLogo} resizeMode="cover" />
+              <Image source={require('../assets/sscguidelogo.png')} style={styles.brandLogo} resizeMode="contain" />
               <Text style={[styles.logoText, { color: heroTitleColor }]}>
                 My<Text style={styles.logoHighlight}>SSC</Text>guide
               </Text>
             </Pressable>
             <View style={styles.heroActionRow}>
-              <Pressable style={styles.streakChip} onPress={() => {}}>
-                <Ionicons name="flame" size={12} color="#f97316" />
-                <Text style={styles.streakChipText}>0</Text>
+              <Pressable
+                style={[
+                  styles.streakChip,
+                  hasStreak ? styles.streakChipActive : styles.streakChipIdle,
+                ]}
+                onPress={() => {}}
+              >
+                <FireStreakIcon active={hasStreak} />
+                <Text style={[styles.streakChipText, hasStreak ? styles.streakChipTextActive : styles.streakChipTextIdle]}>
+                  {currentStreak}
+                </Text>
               </Pressable>
               <Pressable style={[styles.heroIconBtn, { backgroundColor: heroButtonBg }]} hitSlop={8} onPress={() => navigation.navigate('Notifications' as never)}>
                 <Ionicons name="notifications" size={18} color="#f59e0b" />
-                <View style={styles.notificationDot} />
+                {hasUnreadNotifications ? <View style={styles.notificationDot} /> : null}
               </Pressable>
               <Pressable style={styles.heroAvatar} onPress={openMenuTab}>
                 <Text style={styles.heroAvatarText}>{displayName.slice(0, 2).toUpperCase()}</Text>
@@ -897,7 +972,12 @@ export default function DashboardScreen() {
               >
                 {SLIDES.map((item, index) => (
                   <View key={item.id} style={[styles.slide, { width: topCarouselWidth || width }]}>
-                    <View style={styles.slideInner}>
+                    <View
+                      style={[
+                        styles.slideInner,
+                        { backgroundColor: SLIDE_FALLBACK_BACKGROUNDS[index] || SLIDE_FALLBACK_BACKGROUNDS[0] },
+                      ]}
+                    >
                       <SlideSurface index={index} />
                       <Text style={styles.slideLabel}>Sponsored</Text>
                       <Text style={styles.slideTitle}>{item.title}</Text>
@@ -989,11 +1069,6 @@ export default function DashboardScreen() {
               <Pressable key={item.id} style={styles.quickActionItem} onPress={() => navigateQuickAction(item.id)}>
                 <View>
                   <IconBadge colors={item.bg} icon={item.icon as keyof typeof Ionicons.glyphMap} />
-                  {(item.badge || quickActionBadges[item.id]) ? (
-                    <View style={[styles.quickBadge, (item.badge || quickActionBadges[item.id])?.includes('LIVE') && styles.quickBadgeLive]}>
-                      <Text style={styles.quickBadgeText}>{item.badge || quickActionBadges[item.id]}</Text>
-                    </View>
-                  ) : null}
                 </View>
                 <Text style={[styles.quickActionName, { color: isDark ? '#cbd5e1' : '#64748b' }]}>{item.label}</Text>
               </Pressable>
@@ -1239,18 +1314,16 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   brandLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    backgroundColor: '#e2e8f0',
+    width: 44,
+    height: 44,
   },
   logoText: {
     color: '#0f172a',
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
+    marginLeft: -4,
   },
   logoHighlight: {
     color: '#059669',
@@ -1265,17 +1338,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#fff7ed',
-    borderWidth: 1,
-    borderColor: '#fed7aa',
     borderRadius: 99,
     paddingVertical: 4,
     paddingHorizontal: 8,
+    borderWidth: 1,
+  },
+  streakChipActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fed7aa',
+  },
+  streakChipIdle: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
   },
   streakChipText: {
-    color: '#ea580c',
     fontSize: 11,
     fontWeight: '800',
+  },
+  streakChipTextActive: {
+    color: '#ea580c',
+  },
+  streakChipTextIdle: {
+    color: '#94a3b8',
   },
   heroIconBtn: {
     width: 32,
